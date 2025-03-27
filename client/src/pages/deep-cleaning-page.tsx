@@ -30,7 +30,7 @@ import {
   FormLabel 
 } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -203,6 +203,14 @@ export default function DeepCleaningPage() {
           Plan and schedule deep cleaning tasks for your store.
           Click on a date to add a new cleaning task.
         </p>
+        <div className="mt-4">
+          <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => {
+            const today = new Date();
+            handleSelectSlot({ start: today });
+          }}>
+            <Plus className="mr-2 h-4 w-4" /> Add New Task
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -303,7 +311,7 @@ export default function DeepCleaningPage() {
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isLoading}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading} className="bg-chai-gold hover:bg-yellow-600">
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
