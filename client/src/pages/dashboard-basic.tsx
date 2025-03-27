@@ -1,189 +1,405 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from '@tanstack/react-query';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
+import { 
+  Coffee, 
+  Store, 
+  Users, 
+  CheckSquare, 
+  AlertTriangle,
+  Sparkles,
+  Bell,
+  Menu,
+  X
+} from 'lucide-react';
+
+// Store data from the user's input
+const chaiiwalaStores = [
+  { id: 1, name: 'Cheetham Hill', address: '74 Bury Old Rd, Manchester M8 5BW', area: 1, manager: 'MGR_CH' },
+  { id: 2, name: 'Oxford Road', address: '149 Oxford Rd, Manchester M1 7EE', area: 1, manager: 'MGR_OX' },
+  { id: 3, name: 'Old Trafford', address: 'Ayres Rd, Old Trafford, Stretford, 89 M16 7GS', area: 1, manager: 'MGR_OT' },
+  { id: 4, name: 'Trafford Centre', address: 'Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford', area: 2, manager: 'MGR_TC' },
+  { id: 5, name: 'Stockport', address: '884-886 Stockport Rd, Levenshulme, Manchester', area: 1, manager: 'MGR_SR' },
+  { id: 6, name: 'Rochdale', address: '35 Milkstone Rd, Rochdale OL11 1EB', area: 2, manager: 'MGR_RD' },
+  { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
+];
+
+// Sample sales data for visualization
+const salesData = [
+  { name: 'Cheetham Hill', sales: 8450 },
+  { name: 'Oxford Road', sales: 7320 },
+  { name: 'Old Trafford', sales: 5980 },
+  { name: 'Trafford Centre', sales: 9200 },
+  { name: 'Stockport', sales: 6100 },
+  { name: 'Rochdale', sales: 5400 },
+  { name: 'Oldham', sales: 4800 },
+];
+
+// Sample tasks data
+const tasks = [
+  { id: 1, title: 'Restock chai supplies', location: 'Cheetham Hill', dueDate: '2025-03-28', completed: false },
+  { id: 2, title: 'Staff training session', location: 'Oxford Road', dueDate: '2025-03-29', completed: false },
+  { id: 3, title: 'Health inspection preparation', location: 'Trafford Centre', dueDate: '2025-03-30', completed: true },
+  { id: 4, title: 'Update menu prices', location: 'All Stores', dueDate: '2025-03-27', completed: false },
+];
+
+// Sample notifications data
+const notifications = [
+  { id: 1, title: 'Low stock alert', description: 'Chai masala running low at Rochdale', time: '2 hours ago', isHighlighted: true },
+  { id: 2, title: 'New staff onboarded', description: 'James Wilson joined Oxford Road team', time: '3 hours ago', isHighlighted: false },
+  { id: 3, title: 'Weekly sales report', description: 'All stores exceeded targets this week', time: '1 day ago', isHighlighted: false },
+];
 
 export default function DashboardBasic() {
-  const [username] = useState('Test User');
+  const [username] = useState('Store Manager');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
   
+  // Simulate query for stores to be ready for real API integration later
+  const { data: stores = chaiiwalaStores, isLoading } = useQuery({
+    queryKey: ['/api/stores'],
+    queryFn: async () => {
+      // This would normally fetch from API
+      return chaiiwalaStores;
+    },
+    enabled: false // Disable actual fetching since we're using sample data
+  });
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">Chaiiwala Dashboard</h1>
-          <div className="flex items-center">
-            <span className="mr-4">Welcome, {username}</span>
-            <button className="bg-chai-gold text-white px-4 py-2 rounded hover:bg-yellow-600">
-              Logout
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar - desktop only */}
+      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+        <div className="flex flex-col flex-grow pt-5 bg-chai-black overflow-y-auto">
+          <div className="flex items-center flex-shrink-0 px-4">
+            <div className="h-12 w-12 bg-chai-gold rounded-full flex items-center justify-center mr-3">
+              <span className="text-white font-bold text-xl">C</span>
+            </div>
+            <h1 className="text-white font-bold text-xl">Chaiiwala</h1>
+          </div>
+          <div className="mt-5 flex-1 flex flex-col">
+            <nav className="flex-1 px-2 pb-4 space-y-1">
+              <a href="#" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+                Dashboard
+              </a>
+              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Inventory
+              </a>
+              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <Users className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Staff
+              </a>
+              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <CheckSquare className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Tasks
+              </a>
+              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <Bell className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Announcements
+              </a>
+            </nav>
           </div>
         </div>
-      </header>
-      
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Stats Cards */}
+      </div>
+
+      {/* Mobile menu button */}
+      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-chai-black">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="h-8 w-8 bg-chai-gold rounded-full flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <h1 className="text-white font-bold text-lg">Chaiiwala</h1>
+          </div>
+          <button 
+            onClick={toggleMobileMenu}
+            className="text-white focus:outline-none"
+          >
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-10 bg-chai-black pt-14">
+          <nav className="px-4 pt-4 pb-5 space-y-1">
+            <a href="#" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+              Dashboard
+            </a>
+            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Inventory
+            </a>
+            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <Users className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Staff
+            </a>
+            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <CheckSquare className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Tasks
+            </a>
+            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <Bell className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Announcements
+            </a>
+          </nav>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div className="md:pl-64 flex flex-col flex-1">
+        <main className="flex-1">
+          <div className="py-6 px-4 sm:px-6 lg:px-8 mt-12 md:mt-0">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  An overview of your Chaiiwala stores performance
+                </p>
+              </div>
+              <div className="mt-4 md:mt-0 flex items-center">
+                <span className="mr-4 text-sm text-gray-700">Welcome, {username}</span>
+                <button onClick={() => toast({ title: "Not implemented", description: "Login functionality is currently in development" })} className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors">
+                  Logout
+                </button>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
+                <div className="p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                      <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
+                      <Store className="h-6 w-6 text-yellow-600" />
                     </div>
                     <div className="ml-5 w-0 flex-1">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Sales</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">£24,750</div>
-                        <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-                          <svg className="self-center flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="sr-only">Increased by</span>
-                          14%
-                        </div>
-                      </dd>
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
+                        <dd>
+                          <div className="text-lg font-semibold text-gray-900">{stores.length}</div>
+                        </dd>
+                      </dl>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
+                <div className="p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                      <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
+                      <Sparkles className="h-6 w-6 text-green-600" />
                     </div>
                     <div className="ml-5 w-0 flex-1">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Customers</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">1,234</div>
-                        <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-                          <svg className="self-center flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="sr-only">Increased by</span>
-                          8%
-                        </div>
-                      </dd>
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Sales (Weekly)</dt>
+                        <dd>
+                          <div className="text-lg font-semibold text-gray-900">£ {salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</div>
+                        </dd>
+                      </dl>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
+                <div className="p-5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
-                      <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
+                    <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                      <Users className="h-6 w-6 text-blue-600" />
                     </div>
                     <div className="ml-5 w-0 flex-1">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">12</div>
-                        <div className="ml-2 flex items-baseline text-sm font-semibold text-red-600">
-                          <svg className="self-center flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="sr-only">Increased by</span>
-                          5
-                        </div>
-                      </dd>
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Staff</dt>
+                        <dd>
+                          <div className="text-lg font-semibold text-gray-900">28</div>
+                        </dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
+                      <AlertTriangle className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
+                        <dd>
+                          <div className="text-lg font-semibold text-gray-900">{tasks.filter(task => !task.completed).length}</div>
+                        </dd>
+                      </dl>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             
-            {/* Tables Section */}
-            <div className="mt-8">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">Recent Activity</h2>
-              <div className="mt-2 flex flex-col">
-                <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                  <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                    <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Store
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Sales
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Manager
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          <tr>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">Birmingham</div>
-                              <div className="text-sm text-gray-500">UK</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                Active
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              £8,450
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              Sarah Thompson
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">Manchester</div>
-                              <div className="text-sm text-gray-500">UK</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                Active
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              £7,320
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              James Wilson
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">London</div>
-                              <div className="text-sm text-gray-500">UK</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                Maintenance
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              £5,980
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              Maria Garcia
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+            {/* Charts & Tables */}
+            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+              {/* Sales Chart */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Sales by Store (Weekly)</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={salesData}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="name" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={70}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis />
+                      <Tooltip formatter={(value) => `£${value}`} />
+                      <Bar dataKey="sales" fill="#D4AF37" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              
+              {/* Tasks */}
+              <div className="bg-white shadow rounded-lg overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900">Upcoming Tasks</h3>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {tasks.map(task => (
+                    <div key={task.id} className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className={`flex-shrink-0 h-4 w-4 rounded-full ${task.completed ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                            <p className="text-sm text-gray-500">{task.location} • Due {new Date(task.dueDate).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {task.completed ? 'Completed' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
+                <div className="px-6 py-3 bg-gray-50 text-right">
+                  <button onClick={() => toast({ title: "Coming soon", description: "Task management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
+                    View All Tasks
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Store List */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">All Stores</h3>
+                </div>
+                <ul className="divide-y divide-gray-200">
+                  {stores.map((store) => (
+                    <li key={store.id}>
+                      <div className="px-6 py-4 flex items-center">
+                        <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between">
+                          <div>
+                            <div className="flex text-sm">
+                              <p className="font-medium text-chai-gold truncate">{store.name}</p>
+                              <p className="ml-1 flex-shrink-0 font-normal text-gray-500">
+                                • Area {store.area}
+                              </p>
+                            </div>
+                            <div className="mt-2 flex">
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Store className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                                <p>{store.address}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex-shrink-0 sm:mt-0">
+                            <div className="flex overflow-hidden">
+                              <p className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                                {store.manager}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            
+            {/* Notifications */}
+            <div className="mt-8 mb-12">
+              <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Notifications</h3>
+                </div>
+                <ul className="divide-y divide-gray-200">
+                  {notifications.map((notification) => (
+                    <li key={notification.id} className={notification.isHighlighted ? 'bg-yellow-50' : ''}>
+                      <div className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              {notification.isHighlighted && (
+                                <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+                              )}
+                              <p className={`text-sm font-medium ${notification.isHighlighted ? 'text-yellow-800' : 'text-gray-900'}`}>
+                                {notification.title}
+                              </p>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500">{notification.description}</p>
+                          </div>
+                          <div className="ml-6 flex-shrink-0">
+                            <p className="text-sm text-gray-500">{notification.time}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="px-6 py-3 bg-gray-50 text-right">
+                  <button onClick={() => toast({ title: "Coming soon", description: "Notifications management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
+                    View All Notifications
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
