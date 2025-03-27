@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import TaskItem from "../dashboard/task-item";
-import { Plus } from "lucide-react";
+import { Plus, Calendar } from "lucide-react";
 
 interface Task {
   id: string;
@@ -67,9 +67,16 @@ export default function TaskList({ tasks, onTaskComplete, onAddTask }: TaskListP
             <CardTitle>Tasks</CardTitle>
             <CardDescription>Manage and track tasks across all locations</CardDescription>
           </div>
-          <Button onClick={onAddTask} className="bg-chai-gold hover:bg-yellow-600">
-            <Plus className="mr-2 h-4 w-4" /> Add Task
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="border-chai-gold text-chai-gold hover:bg-yellow-50" asChild>
+              <a href="/deep-cleaning">
+                <Calendar className="mr-2 h-4 w-4" /> Deep Cleaning
+              </a>
+            </Button>
+            <Button onClick={onAddTask} className="bg-chai-gold hover:bg-yellow-600">
+              <Plus className="mr-2 h-4 w-4" /> Add Task
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
