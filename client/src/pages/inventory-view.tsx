@@ -218,7 +218,7 @@ export default function InventoryView() {
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar - desktop only */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-        <div className="flex flex-col flex-grow pt-5 bg-chai-black overflow-y-auto">
+        <div className="flex flex-col flex-grow pt-5 bg-[#1c1f2a] overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4">
             <div className="h-12 w-12 bg-chai-gold rounded-full flex items-center justify-center mr-3">
               <span className="text-white font-bold text-xl">C</span>
@@ -231,8 +231,8 @@ export default function InventoryView() {
                 <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
                 Dashboard
               </a>
-              <a href="/inventory" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+              <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
                 Inventory
               </a>
               <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
@@ -245,7 +245,7 @@ export default function InventoryView() {
       </div>
 
       {/* Mobile menu button */}
-      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-chai-black">
+      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-[#1c1f2a]">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
             <div className="h-8 w-8 bg-chai-gold rounded-full flex items-center justify-center mr-2">
@@ -268,14 +268,14 @@ export default function InventoryView() {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-10 bg-chai-black pt-14">
+        <div className="md:hidden fixed inset-0 z-10 bg-[#1c1f2a] pt-14">
           <nav className="px-4 pt-4 pb-5 space-y-1">
             <a href="/" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
               <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
               Dashboard
             </a>
-            <a href="/inventory" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+            <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
               Inventory
             </a>
             <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">

@@ -13,6 +13,7 @@ import {
   SettingsIcon, 
   XIcon 
 } from "lucide-react";
+import chaiiwalaLogo from "@assets/chaiiwala.png";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -104,7 +105,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <div 
       className={cn(
-        "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-chai-black text-white transform transition-transform duration-300 ease-in-out",
+        "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white transform transition-transform duration-300 ease-in-out",
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
@@ -113,7 +114,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex items-center space-x-2">
           <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
             <img 
-              src="/attached_assets/chaiiwala.png" 
+              src={chaiiwalaLogo} 
               alt="Chaiiwala Logo" 
               className="h-7 w-auto"
             />
@@ -165,7 +166,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               className={cn(
                 "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
                 item.active 
-                  ? "bg-gray-800 text-chai-gold" 
+                  ? "bg-chai-gold text-white" 
                   : "text-gray-300 hover:bg-gray-700"
               )}
             >
