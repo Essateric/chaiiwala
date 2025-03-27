@@ -1,5 +1,5 @@
 import { Route, Switch } from "wouter";
-import AuthPage from "@/pages/auth-page";
+import AuthPageNew from "@/pages/auth-page-new";
 import DashboardBasic from "@/pages/dashboard-basic";
 import InventoryView from "@/pages/inventory-view";
 import NotFound from "@/pages/not-found";
@@ -61,7 +61,7 @@ function App() {
   return (
     <Switch>
       <Route path="/auth">
-        {() => <AuthPage />}
+        <AuthPageNew />
       </Route>
       <Route path="/inventory">
         <ProtectedComponent roles={["admin", "regional"]}>
