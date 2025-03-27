@@ -378,6 +378,16 @@ export class MemStorage implements IStorage {
     const hashPassword = 'c8680ca3ea7be0ac4fef3954ccf3bb114ba12f8fab964e0a6f55ff9386c022a4f4a78e71343bd0e2213c11c86266a8c1a13d507752bdd80b492ae04a5ee9f2b6.b6e5be78c42ffc3595c7352fbd88fe9f'; 
     
     const userData: InsertUser[] = [
+      // Admin with unlimited access
+      { username: "shabnam", password: hashPassword, name: "Shabnam Essa", role: "admin", email: "shabnam@chaiiwala.com" },
+      
+      // Regional manager with access to all stores
+      { username: "usman", password: hashPassword, name: "Usman Aftab", role: "regional", email: "usman@chaiiwala.com" },
+      
+      // Store manager with access limited to Stockport Road store
+      { username: "jubayed", password: hashPassword, name: "Jubayed Chowdhury", role: "store", storeId: 5, email: "jubayed@chaiiwala.com" },
+      
+      // Original seed data
       { username: "admin", password: hashPassword, name: "Admin User", role: "admin" },
       { username: "regional1", password: hashPassword, name: "Fatima Khan", role: "regional" },
       { username: "manager1", password: hashPassword, name: "Ahmed Khan", role: "store", storeId: 1 },
