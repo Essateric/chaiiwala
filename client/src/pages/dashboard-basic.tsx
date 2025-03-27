@@ -19,6 +19,7 @@ import {
   Sparkles,
   Bell,
   Menu,
+  ShoppingBasket,
   X
 } from 'lucide-react';
 
@@ -91,12 +92,12 @@ export default function DashboardBasic() {
           </div>
           <div className="mt-5 flex-1 flex flex-col">
             <nav className="flex-1 px-2 pb-4 space-y-1">
-              <a href="#" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+              <a href="/" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                 <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
                 Dashboard
               </a>
-              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+              <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
                 Inventory
               </a>
               <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
@@ -142,12 +143,12 @@ export default function DashboardBasic() {
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-10 bg-chai-black pt-14">
           <nav className="px-4 pt-4 pb-5 space-y-1">
-            <a href="#" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+            <a href="/" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
               <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
               Dashboard
             </a>
-            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+            <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
               Inventory
             </a>
             <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
