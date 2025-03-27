@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import chaiiwalaLogo from "@assets/chaiiwala.png";
 
 interface TopBarProps {
   title: string;
@@ -36,7 +37,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
           </button>
           <div className="flex items-center">
             <img 
-              src="/attached_assets/chaiiwala.png" 
+              src={chaiiwalaLogo} 
               alt="Chaiiwala Logo" 
               className="h-8 w-auto mr-3"
             />
@@ -110,7 +111,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
               <Button variant="ghost" className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center border-2 border-chai-gold overflow-hidden">
                   <img 
-                    src="/attached_assets/chaiiwala.png" 
+                    src={chaiiwalaLogo} 
                     alt="Chaiiwala Logo" 
                     className="h-6 w-auto"
                   />
