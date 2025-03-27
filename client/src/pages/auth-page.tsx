@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { 
   Card, 
@@ -23,6 +22,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -40,16 +42,52 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
-  const { user, loginMutation, registerMutation, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
+  const { toast } = useToast();
+  
+  // Direct login/register mutations without useAuth hook
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginFormValues) => {
+      const res = await apiRequest("POST", "/api/login", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Login successful",
+        description: "Welcome to the Chaiiwala Dashboard",
+      });
       navigate("/");
-    }
-  }, [user, navigate]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterFormValues) => {
+      const res = await apiRequest("POST", "/api/register", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account created",
+        description: "Your account has been created successfully",
+      });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Login form
   const loginForm = useForm<LoginFormValues>({
@@ -78,14 +116,6 @@ export default function AuthPage() {
   const onRegisterSubmit = (data: RegisterFormValues) => {
     registerMutation.mutate(data);
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
