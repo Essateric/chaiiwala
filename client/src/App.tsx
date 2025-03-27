@@ -2,6 +2,7 @@ import { Route, Switch } from "wouter";
 import AuthPageNew from "@/pages/auth-page-new";
 import DashboardBasic from "@/pages/dashboard-basic";
 import InventoryView from "@/pages/inventory-view";
+import DeepCleaningPage from "@/pages/deep-cleaning-page";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
@@ -95,6 +96,11 @@ function App() {
       <Route path="/inventory">
         <ProtectedComponent roles={["admin", "regional"]}>
           <InventoryView />
+        </ProtectedComponent>
+      </Route>
+      <Route path="/deep-cleaning">
+        <ProtectedComponent roles={["admin", "regional", "store"]}>
+          <DeepCleaningPage />
         </ProtectedComponent>
       </Route>
       <Route path="/">
