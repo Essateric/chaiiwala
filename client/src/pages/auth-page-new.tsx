@@ -61,12 +61,18 @@ export default function AuthPageNew() {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+      // Force refetch the user data after successful login
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.name}!`,
       });
-      navigate("/");
+      
+      // Add a slight delay to ensure session is established
+      setTimeout(() => {
+        navigate("/");
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -84,12 +90,18 @@ export default function AuthPageNew() {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+      // Force refetch the user data after successful registration
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.name}!`,
       });
-      navigate("/");
+      
+      // Add a slight delay to ensure session is established
+      setTimeout(() => {
+        navigate("/");
+      }, 500);
     },
     onError: (error: Error) => {
       toast({

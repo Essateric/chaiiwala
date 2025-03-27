@@ -21,12 +21,17 @@ function ProtectedComponent({
   // Direct query instead of using useAuth hook
   const { 
     data: user, 
-    isLoading 
+    isLoading,
+    isError,
+    error 
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: 1, // Don't retry too many times
+    staleTime: 5 * 60 * 1000, // 5 minutes - reduce unnecessary refetches
   });
   
+  // Show loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -35,11 +40,34 @@ function ProtectedComponent({
     );
   }
   
+  // Handle query errors
+  if (isError && error) {
+    console.error("Auth query error:", error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
+        <p className="text-gray-600 mb-6">There was a problem checking your authentication. Please try logging in again.</p>
+        <a
+          href="/auth"
+          className="px-4 py-2 bg-chai-gold text-white rounded-md hover:bg-yellow-600 transition-colors"
+        >
+          Login
+        </a>
+      </div>
+    );
+  }
+  
+  // Redirect to login if not authenticated
   if (!user) {
+    console.log("User not authenticated, redirecting to /auth");
     return <Redirect to="/auth" />;
   }
   
+  console.log("User authenticated:", user.username, "with role", user.role);
+  
+  // Check role-based access
   if (roles && !roles.includes(user.role as Role)) {
+    console.log("Access denied: User has role", user.role, "but needs one of", roles);
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
@@ -54,6 +82,7 @@ function ProtectedComponent({
     );
   }
   
+  // All checks passed - render the component
   return <>{children}</>;
 }
 
