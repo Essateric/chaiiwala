@@ -41,7 +41,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: ArchiveIcon, 
       href: '/inventory', 
       active: currentPage === 'inventory',
-      roles: ['admin', 'regional', 'store'] 
+      roles: ['admin', 'regional'] 
     },
     { 
       name: 'Staff Schedule', 
@@ -63,6 +63,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: '/tasks', 
       active: currentPage === 'tasks',
       roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    { 
+      name: 'Deep Cleaning', 
+      icon: ClipboardListIcon, 
+      href: '/deep-cleaning', 
+      active: currentPage === 'deep-cleaning',
+      roles: ['admin', 'regional', 'store'] 
     },
     { 
       name: 'Announcements', 
@@ -104,8 +111,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Logo & Brand */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
         <div className="flex items-center space-x-2">
-          <div className="h-10 w-10 bg-chai-gold rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">C</span>
+          <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
+            <img 
+              src="/attached_assets/chaiiwala.png" 
+              alt="Chaiiwala Logo" 
+              className="h-7 w-auto"
+            />
           </div>
           <span className="font-montserrat font-bold text-chai-gold text-xl">Chaiiwala</span>
         </div>
