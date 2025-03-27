@@ -87,7 +87,7 @@ export default function DashboardBasic() {
           <div className="flex items-center flex-shrink-0 px-4 py-2">
             <div className="h-12 w-auto bg-chai-gold rounded-md flex items-center justify-center mr-3 px-2">
               <img 
-                src="/attached_assets/chaiiwala.png" 
+                src="/assets/chaiiwala.png" 
                 alt="Chaiiwala Logo" 
                 className="h-8 w-auto"
               />
@@ -126,7 +126,7 @@ export default function DashboardBasic() {
           <div className="flex items-center">
             <div className="h-10 w-auto bg-chai-gold rounded-md flex items-center justify-center px-2">
               <img 
-                src="/attached_assets/chaiiwala.png" 
+                src="/assets/chaiiwala.png" 
                 alt="Chaiiwala Logo" 
                 className="h-6 w-auto"
               />
