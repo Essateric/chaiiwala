@@ -28,7 +28,40 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-export function setupAuth(app: Express) {
+export async function setupAuth(app: Express) {
+  // Create admin user with simple password if it doesn't exist
+  const existingAdmin = await storage.getUserByUsername("admin");
+  if (!existingAdmin) {
+    console.log("Creating admin user with simple password");
+    const simplePassword = await hashPassword("password123");
+    await storage.createUser({
+      username: "admin",
+      password: simplePassword,
+      name: "Admin User",
+      role: "admin",
+      email: "admin@chaiiwala.com"
+    });
+  }
+
+  // Create test users with simple password if they don't exist
+  const testUsers = [
+    { username: "shabnam", name: "Shabnam Essa", role: "admin" as const, email: "shabnam@chaiiwala.com" },
+    { username: "usman", name: "Usman Aftab", role: "regional" as const, email: "usman@chaiiwala.com" },
+    { username: "jubayed", name: "Jubayed Chowdhury", role: "store" as const, storeId: 5, email: "jubayed@chaiiwala.com" }
+  ];
+
+  for (const user of testUsers) {
+    const existingUser = await storage.getUserByUsername(user.username);
+    if (!existingUser) {
+      console.log(`Creating test user ${user.username} with simple password`);
+      const simplePassword = await hashPassword("password123");
+      await storage.createUser({
+        ...user,
+        password: simplePassword
+      });
+    }
+  }
+
   // Use session store from storage
   const sessionStore = storage.sessionStore;
 
