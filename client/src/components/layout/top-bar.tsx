@@ -52,6 +52,15 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
             </div>
           </div>
           
+          {/* Chaiiwala Logo */}
+          <div className="hidden md:flex items-center justify-center bg-white rounded-md px-2 py-1 shadow-sm">
+            <img 
+              src="/attached_assets/chaiiwala.png" 
+              alt="Chaiiwala Logo" 
+              className="h-8 w-auto"
+            />
+          </div>
+          
           {/* Notifications */}
           <div className="relative">
             <Button
@@ -100,8 +109,12 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-2">
-                <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center text-white font-semibold border-2 border-chai-gold">
-                  {username.charAt(0).toUpperCase()}
+                <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center border-2 border-chai-gold overflow-hidden">
+                  <img 
+                    src="/attached_assets/chaiiwala.png" 
+                    alt="Chaiiwala Logo" 
+                    className="h-6 w-auto"
+                  />
                 </div>
                 <span className="hidden md:inline-block text-sm font-medium">{username}</span>
                 <ChevronDown className="h-5 w-5 text-gray-400" />
