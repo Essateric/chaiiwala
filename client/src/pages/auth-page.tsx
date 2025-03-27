@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { 
   Card, 
@@ -23,6 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -45,49 +46,14 @@ export default function AuthPage() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
   const { toast } = useToast();
+  const { user, loginMutation, registerMutation } = useAuth();
   
-  // Direct login/register mutations without useAuth hook
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginFormValues) => {
-      const res = await apiRequest("POST", "/api/login", data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Login successful",
-        description: "Welcome to the Chaiiwala Dashboard",
-      });
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
       navigate("/");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterFormValues) => {
-      const res = await apiRequest("POST", "/api/register", data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Account created",
-        description: "Your account has been created successfully",
-      });
-      navigate("/");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+    }
+  }, [user, navigate]);
 
   // Login form
   const loginForm = useForm<LoginFormValues>({
