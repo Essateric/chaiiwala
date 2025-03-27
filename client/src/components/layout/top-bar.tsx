@@ -34,9 +34,16 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="ml-2 lg:ml-0 font-montserrat font-bold text-xl capitalize">
-            {title}
-          </h1>
+          <div className="flex items-center">
+            <img 
+              src="/attached_assets/chaiiwala.png" 
+              alt="Chaiiwala Logo" 
+              className="h-8 w-auto mr-3"
+            />
+            <h1 className="ml-2 lg:ml-0 font-montserrat font-bold text-xl capitalize">
+              {title}
+            </h1>
+          </div>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -52,14 +59,6 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
             </div>
           </div>
           
-          {/* Chaiiwala Logo */}
-          <div className="hidden md:flex items-center justify-center bg-white rounded-md px-2 py-1 shadow-sm">
-            <img 
-              src="/attached_assets/chaiiwala.png" 
-              alt="Chaiiwala Logo" 
-              className="h-8 w-auto"
-            />
-          </div>
           
           {/* Notifications */}
           <div className="relative">
