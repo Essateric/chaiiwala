@@ -4,18 +4,19 @@ import { useAuth } from "@/hooks/use-auth";
 
 type Role = "admin" | "regional" | "store" | "staff";
 
-export function ProtectedRoute({
-  path,
-  component: Component,
-  roles,
-}: {
+type ProtectedRouteProps = {
   path: string;
   component: React.ComponentType;
   roles?: Role[];
-}) {
+};
+
+// The actual route component
+export function ProtectedRoute({ path, component: Component, roles }: ProtectedRouteProps) {
   return (
     <Route path={path}>
-      {(params) => {
+      {() => {
+        // This function creates a new React element each time it's called
+        // which ensures the hooks are called in the same order each render
         const { user, isLoading } = useAuth();
         const [, navigate] = useLocation();
         
