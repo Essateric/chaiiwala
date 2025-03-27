@@ -1,588 +1,500 @@
-import { users, stores, regions, inventory, staffSchedules, tasks, checklists, checklistItems, announcements } from "@shared/schema";
-import type { 
+import { 
   User, InsertUser, 
-  Store, InsertStore, 
-  Region, InsertRegion, 
-  Inventory, InsertInventory, 
-  StaffSchedule, InsertStaffSchedule, 
-  Task, InsertTask, 
-  Checklist, InsertChecklist, 
-  ChecklistItem, InsertChecklistItem, 
-  Announcement, InsertAnnouncement 
+  Store, InsertStore,
+  Inventory, InsertInventory,
+  Task, InsertTask,
+  Checklist, InsertChecklist,
+  ChecklistTask, InsertChecklistTask,
+  Schedule, InsertSchedule,
+  Announcement, InsertAnnouncement
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 
-// Create a type for the session store
-type SessionStore = ReturnType<typeof createMemoryStore>;
 const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
-  // Users
+  // Session store
+  sessionStore: session.SessionStore;
+
+  // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, user: Partial<User>): Promise<User | undefined>;
-  getUsers(): Promise<User[]>;
-  getUsersByRole(role: string): Promise<User[]>;
-  getUsersByStore(storeId: number): Promise<User[]>;
-  getUsersByRegion(regionId: number): Promise<User[]>;
+  getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; }[]>;
 
-  // Stores
+  // Store methods
+  getAllStores(): Promise<Store[]>;
   getStore(id: number): Promise<Store | undefined>;
-  getStores(): Promise<Store[]>;
-  getStoresByRegion(regionId: number): Promise<Store[]>;
   createStore(store: InsertStore): Promise<Store>;
-  updateStore(id: number, store: Partial<Store>): Promise<Store | undefined>;
 
-  // Regions
-  getRegion(id: number): Promise<Region | undefined>;
-  getRegions(): Promise<Region[]>;
-  createRegion(region: InsertRegion): Promise<Region>;
-
-  // Inventory
-  getInventoryItem(id: number): Promise<Inventory | undefined>;
-  getInventoryByStore(storeId: number): Promise<Inventory[]>;
-  getLowStockItems(storeId: number): Promise<Inventory[]>;
+  // Inventory methods
+  getAllInventory(): Promise<Inventory[]>;
   createInventoryItem(item: InsertInventory): Promise<Inventory>;
-  updateInventoryItem(id: number, item: Partial<Inventory>): Promise<Inventory | undefined>;
+  updateInventoryItem(id: number, data: Partial<Inventory>): Promise<Inventory | undefined>;
 
-  // Staff Schedules
-  getStaffSchedule(id: number): Promise<StaffSchedule | undefined>;
-  getStaffSchedulesByStore(storeId: number): Promise<StaffSchedule[]>;
-  getStaffSchedulesByUser(userId: number): Promise<StaffSchedule[]>;
-  createStaffSchedule(schedule: InsertStaffSchedule): Promise<StaffSchedule>;
-  updateStaffSchedule(id: number, schedule: Partial<StaffSchedule>): Promise<StaffSchedule | undefined>;
-  deleteStaffSchedule(id: number): Promise<boolean>;
-
-  // Tasks
-  getTask(id: number): Promise<Task | undefined>;
-  getTasksByStore(storeId: number): Promise<Task[]>;
-  getTasksByUser(userId: number): Promise<Task[]>;
+  // Task methods
+  getAllTasks(): Promise<Task[]>;
+  getTodayTasks(): Promise<{ id: string; title: string; location: string; dueDate: string; completed: boolean; }[]>;
   createTask(task: InsertTask): Promise<Task>;
-  updateTask(id: number, task: Partial<Task>): Promise<Task | undefined>;
-  deleteTask(id: number): Promise<boolean>;
+  updateTask(id: number, data: Partial<Task>): Promise<Task | undefined>;
 
-  // Checklists
-  getChecklist(id: number): Promise<Checklist | undefined>;
-  getChecklistsByStore(storeId: number): Promise<Checklist[]>;
+  // Checklist methods
+  getAllChecklists(): Promise<(Checklist & { tasks: ChecklistTask[] })[]>;
   createChecklist(checklist: InsertChecklist): Promise<Checklist>;
-  updateChecklist(id: number, checklist: Partial<Checklist>): Promise<Checklist | undefined>;
+  createChecklistTask(task: InsertChecklistTask): Promise<ChecklistTask>;
+  updateChecklistTask(checklistId: number, taskId: number, completed: boolean): Promise<ChecklistTask | undefined>;
 
-  // Checklist Items
-  getChecklistItem(id: number): Promise<ChecklistItem | undefined>;
-  getChecklistItemsByChecklist(checklistId: number): Promise<ChecklistItem[]>;
-  createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
-  updateChecklistItem(id: number, item: Partial<ChecklistItem>): Promise<ChecklistItem | undefined>;
-  resetWeeklyChecklists(): Promise<void>;
+  // Schedule methods
+  getAllSchedules(): Promise<{ id: string; staffId: number; staffName: string; role: string; start: string; end: string; day: number; }[]>;
+  createSchedule(schedule: InsertSchedule): Promise<Schedule>;
+  deleteSchedule(id: number): Promise<void>;
 
-  // Announcements
-  getAnnouncement(id: number): Promise<Announcement | undefined>;
-  getAnnouncementsByStore(storeId: number): Promise<Announcement[]>;
-  getAnnouncementsByRegion(regionId: number): Promise<Announcement[]>;
-  getGlobalAnnouncements(): Promise<Announcement[]>;
+  // Announcement methods
+  getAllAnnouncements(): Promise<Announcement[]>;
+  getRecentAnnouncements(): Promise<{ id: string; title: string; description: string; date: string; isHighlighted: boolean; }[]>;
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
-
-  // Session store
-  sessionStore: SessionStore;
+  likeAnnouncement(id: number): Promise<Announcement | undefined>;
 }
 
 export class MemStorage implements IStorage {
+  sessionStore: session.SessionStore;
+  
   private users: Map<number, User>;
   private stores: Map<number, Store>;
-  private regions: Map<number, Region>;
   private inventory: Map<number, Inventory>;
-  private staffSchedules: Map<number, StaffSchedule>;
   private tasks: Map<number, Task>;
   private checklists: Map<number, Checklist>;
-  private checklistItems: Map<number, ChecklistItem>;
+  private checklistTasks: Map<number, ChecklistTask>;
+  private schedules: Map<number, Schedule>;
   private announcements: Map<number, Announcement>;
   
-  sessionStore: SessionStore;
-  currentUserId: number;
-  currentStoreId: number;
-  currentRegionId: number;
-  currentInventoryId: number;
-  currentScheduleId: number;
-  currentTaskId: number;
-  currentChecklistId: number;
-  currentChecklistItemId: number;
-  currentAnnouncementId: number;
+  private userId: number;
+  private storeId: number;
+  private inventoryId: number;
+  private taskId: number;
+  private checklistId: number;
+  private checklistTaskId: number;
+  private scheduleId: number;
+  private announcementId: number;
 
   constructor() {
+    // Initialize session store
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    });
+
+    // Initialize storage
     this.users = new Map();
     this.stores = new Map();
-    this.regions = new Map();
     this.inventory = new Map();
-    this.staffSchedules = new Map();
     this.tasks = new Map();
     this.checklists = new Map();
-    this.checklistItems = new Map();
+    this.checklistTasks = new Map();
+    this.schedules = new Map();
     this.announcements = new Map();
-    
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
-    });
-    
-    this.currentUserId = 1;
-    this.currentStoreId = 1;
-    this.currentRegionId = 1;
-    this.currentInventoryId = 1;
-    this.currentScheduleId = 1;
-    this.currentTaskId = 1;
-    this.currentChecklistId = 1;
-    this.currentChecklistItemId = 1;
-    this.currentAnnouncementId = 1;
-    
-    // Initialize with sample data
-    this.initializeData();
-  }
-  
-  private initializeData() {
-    // Create admin user
-    const adminUser: InsertUser = {
-      username: "admin",
-      password: "$2b$10$dKLfHMBJtqTH2O7mwFW/6eNMYOWHzq7p.ZmYS1/fMbZ96qKU4D/iy", // password is 'admin123'
-      name: "Admin User",
-      role: "admin",
-      email: "admin@chaiiwala.com",
-      storeId: null,
-      regionId: null
-    };
-    
-    this.createUser(adminUser);
-    
-    // Create a region
-    const region: InsertRegion = {
-      name: "North West"
-    };
-    
-    this.createRegion(region).then(createdRegion => {
-      // Create a store in the region
-      const store: InsertStore = {
-        name: "Manchester Central",
-        location: "Manchester",
-        address: "123 Smith Street, Manchester, M1 2AB",
-        regionId: createdRegion.id
-      };
-      
-      this.createStore(store).then(createdStore => {
-        // Create a store manager
-        const storeManager: InsertUser = {
-          username: "manager",
-          password: "$2b$10$dKLfHMBJtqTH2O7mwFW/6eNMYOWHzq7p.ZmYS1/fMbZ96qKU4D/iy", // password is 'admin123'
-          name: "Store Manager",
-          role: "store_manager",
-          email: "manager@chaiiwala.com",
-          storeId: createdStore.id,
-          regionId: createdRegion.id
-        };
-        
-        this.createUser(storeManager).then(createdManager => {
-          // Create some inventory items
-          const tea: InsertInventory = {
-            name: "Chai Tea",
-            itemCode: "TEA001",
-            quantity: 85,
-            unit: "kg",
-            threshold: 20,
-            storeId: createdStore.id
-          };
-          
-          const milk: InsertInventory = {
-            name: "Milk",
-            itemCode: "MILK001",
-            quantity: 15,
-            unit: "liters",
-            threshold: 20,
-            storeId: createdStore.id
-          };
-          
-          const sugar: InsertInventory = {
-            name: "Sugar",
-            itemCode: "SUGAR001",
-            quantity: 25,
-            unit: "kg",
-            threshold: 10,
-            storeId: createdStore.id
-          };
-          
-          Promise.all([
-            this.createInventoryItem(tea),
-            this.createInventoryItem(milk),
-            this.createInventoryItem(sugar)
-          ]).then(_ => {
-            // Create a checklist
-            const checklist: InsertChecklist = {
-              title: "Morning Opening Procedures",
-              description: "Tasks to complete when opening the store",
-              isWeekly: false,
-              storeId: createdStore.id
-            };
-            
-            this.createChecklist(checklist).then(createdChecklist => {
-              // Add checklist items
-              const items = [
-                { title: "Clean the counters", checklistId: createdChecklist.id, isCompleted: false },
-                { title: "Start the tea brewing", checklistId: createdChecklist.id, isCompleted: false },
-                { title: "Check stock levels", checklistId: createdChecklist.id, isCompleted: false },
-                { title: "Turn on all equipment", checklistId: createdChecklist.id, isCompleted: false }
-              ];
-              
-              items.forEach(item => this.createChecklistItem(item));
-            });
-            
-            // Create a task
-            const task: InsertTask = {
-              title: "Order more milk",
-              description: "Milk stock is getting low, please order more",
-              assignedTo: createdManager.id,
-              dueDate: new Date(Date.now() + 86400000), // tomorrow
-              status: "to_do",
-              priority: "high",
-              storeId: createdStore.id,
-              createdBy: 1 // admin
-            };
-            
-            this.createTask(task);
-            
-            // Create an announcement
-            const announcement: InsertAnnouncement = {
-              title: "New chai recipe",
-              content: "We have updated our signature chai recipe. Please check the updated preparation instructions.",
-              fromUser: 1, // admin
-              priority: "high",
-              storeId: createdStore.id,
-              regionId: null,
-              isGlobal: false
-            };
-            
-            this.createAnnouncement(announcement);
-          });
-        });
-      });
-    });
+
+    // Initialize IDs
+    this.userId = 1;
+    this.storeId = 1;
+    this.inventoryId = 1;
+    this.taskId = 1;
+    this.checklistId = 1;
+    this.checklistTaskId = 1;
+    this.scheduleId = 1;
+    this.announcementId = 1;
+
+    // Seed data
+    this.seedInitialData();
   }
 
-  // User Methods
+  // User methods
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { 
-      ...insertUser, 
-      id,
-      role: insertUser.role || "staff",
-      email: insertUser.email || null,
-      storeId: insertUser.storeId || null,
-      regionId: insertUser.regionId || null
-    };
+    const id = this.userId++;
+    const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
   }
-  
-  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updatedUser = { ...user, ...userData };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+
+  async getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; }[]> {
+    const staffColors = ["#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF6"];
+    return Array.from(this.users.values())
+      .filter(user => user.role === 'staff' || user.role === 'store')
+      .map((user, index) => ({
+        id: user.id,
+        name: user.name,
+        role: user.role === 'staff' ? 'Staff' : 'Store Manager',
+        color: staffColors[index % staffColors.length]
+      }));
   }
-  
-  async getUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+
+  // Store methods
+  async getAllStores(): Promise<Store[]> {
+    return Array.from(this.stores.values());
   }
-  
-  async getUsersByRole(role: string): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.role === role);
-  }
-  
-  async getUsersByStore(storeId: number): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.storeId === storeId);
-  }
-  
-  async getUsersByRegion(regionId: number): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.regionId === regionId);
-  }
-  
-  // Store Methods
+
   async getStore(id: number): Promise<Store | undefined> {
     return this.stores.get(id);
   }
-  
-  async getStores(): Promise<Store[]> {
-    return Array.from(this.stores.values());
+
+  async createStore(insertStore: InsertStore): Promise<Store> {
+    const id = this.storeId++;
+    const store: Store = { ...insertStore, id };
+    this.stores.set(id, store);
+    return store;
   }
-  
-  async getStoresByRegion(regionId: number): Promise<Store[]> {
-    return Array.from(this.stores.values()).filter(store => store.regionId === regionId);
+
+  // Inventory methods
+  async getAllInventory(): Promise<Inventory[]> {
+    return Array.from(this.inventory.values());
   }
-  
-  async createStore(store: InsertStore): Promise<Store> {
-    const id = this.currentStoreId++;
-    const newStore: Store = { 
-      ...store, 
-      id,
-      address: store.address || null,
-      regionId: store.regionId || null
+
+  async createInventoryItem(insertInventory: InsertInventory): Promise<Inventory> {
+    const id = this.inventoryId++;
+    const item: Inventory = { 
+      ...insertInventory, 
+      id, 
+      lastUpdated: new Date()
     };
-    this.stores.set(id, newStore);
-    return newStore;
+    this.inventory.set(id, item);
+    return item;
   }
-  
-  async updateStore(id: number, storeData: Partial<Store>): Promise<Store | undefined> {
-    const store = this.stores.get(id);
-    if (!store) return undefined;
-    
-    const updatedStore = { ...store, ...storeData };
-    this.stores.set(id, updatedStore);
-    return updatedStore;
-  }
-  
-  // Region Methods
-  async getRegion(id: number): Promise<Region | undefined> {
-    return this.regions.get(id);
-  }
-  
-  async getRegions(): Promise<Region[]> {
-    return Array.from(this.regions.values());
-  }
-  
-  async createRegion(region: InsertRegion): Promise<Region> {
-    const id = this.currentRegionId++;
-    const newRegion: Region = { ...region, id };
-    this.regions.set(id, newRegion);
-    return newRegion;
-  }
-  
-  // Inventory Methods
-  async getInventoryItem(id: number): Promise<Inventory | undefined> {
-    return this.inventory.get(id);
-  }
-  
-  async getInventoryByStore(storeId: number): Promise<Inventory[]> {
-    return Array.from(this.inventory.values()).filter(item => item.storeId === storeId);
-  }
-  
-  async getLowStockItems(storeId: number): Promise<Inventory[]> {
-    return Array.from(this.inventory.values())
-      .filter(item => item.storeId === storeId && item.quantity <= item.threshold);
-  }
-  
-  async createInventoryItem(item: InsertInventory): Promise<Inventory> {
-    const id = this.currentInventoryId++;
-    const newItem: Inventory = { 
-      ...item, 
-      id,
-      quantity: item.quantity || 0,
-      threshold: item.threshold || 10
-    };
-    this.inventory.set(id, newItem);
-    return newItem;
-  }
-  
-  async updateInventoryItem(id: number, itemData: Partial<Inventory>): Promise<Inventory | undefined> {
+
+  async updateInventoryItem(id: number, data: Partial<Inventory>): Promise<Inventory | undefined> {
     const item = this.inventory.get(id);
     if (!item) return undefined;
     
-    const updatedItem = { ...item, ...itemData };
+    const updatedItem: Inventory = { 
+      ...item, 
+      ...data, 
+      lastUpdated: new Date() 
+    };
     this.inventory.set(id, updatedItem);
     return updatedItem;
   }
-  
-  // Staff Schedule Methods
-  async getStaffSchedule(id: number): Promise<StaffSchedule | undefined> {
-    return this.staffSchedules.get(id);
+
+  // Task methods
+  async getAllTasks(): Promise<Task[]> {
+    return Array.from(this.tasks.values());
   }
-  
-  async getStaffSchedulesByStore(storeId: number): Promise<StaffSchedule[]> {
-    return Array.from(this.staffSchedules.values()).filter(schedule => schedule.storeId === storeId);
-  }
-  
-  async getStaffSchedulesByUser(userId: number): Promise<StaffSchedule[]> {
-    return Array.from(this.staffSchedules.values()).filter(schedule => schedule.userId === userId);
-  }
-  
-  async createStaffSchedule(schedule: InsertStaffSchedule): Promise<StaffSchedule> {
-    const id = this.currentScheduleId++;
-    const newSchedule: StaffSchedule = { ...schedule, id };
-    this.staffSchedules.set(id, newSchedule);
-    return newSchedule;
-  }
-  
-  async updateStaffSchedule(id: number, scheduleData: Partial<StaffSchedule>): Promise<StaffSchedule | undefined> {
-    const schedule = this.staffSchedules.get(id);
-    if (!schedule) return undefined;
+
+  async getTodayTasks(): Promise<{ id: string; title: string; location: string; dueDate: string; completed: boolean; }[]> {
+    const tasks = Array.from(this.tasks.values());
     
-    const updatedSchedule = { ...schedule, ...scheduleData };
-    this.staffSchedules.set(id, updatedSchedule);
-    return updatedSchedule;
+    return tasks.slice(0, 3).map(task => {
+      const store = this.stores.get(task.storeId);
+      return {
+        id: task.id.toString(),
+        title: task.title,
+        location: store ? store.name : 'Unknown',
+        dueDate: task.dueDate,
+        completed: task.status === 'completed'
+      };
+    });
   }
-  
-  async deleteStaffSchedule(id: number): Promise<boolean> {
-    return this.staffSchedules.delete(id);
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const id = this.taskId++;
+    const task: Task = { ...insertTask, id };
+    this.tasks.set(id, task);
+    return task;
   }
-  
-  // Task Methods
-  async getTask(id: number): Promise<Task | undefined> {
-    return this.tasks.get(id);
-  }
-  
-  async getTasksByStore(storeId: number): Promise<Task[]> {
-    return Array.from(this.tasks.values()).filter(task => task.storeId === storeId);
-  }
-  
-  async getTasksByUser(userId: number): Promise<Task[]> {
-    return Array.from(this.tasks.values()).filter(task => task.assignedTo === userId);
-  }
-  
-  async createTask(task: InsertTask): Promise<Task> {
-    const id = this.currentTaskId++;
-    const newTask: Task = { 
-      ...task, 
-      id, 
-      createdAt: new Date(),
-      status: task.status || "to_do",
-      priority: task.priority || "medium",
-      description: task.description || null,
-      assignedTo: task.assignedTo || null,
-      dueDate: task.dueDate || null,
-      storeId: task.storeId || null
-    };
-    this.tasks.set(id, newTask);
-    return newTask;
-  }
-  
-  async updateTask(id: number, taskData: Partial<Task>): Promise<Task | undefined> {
+
+  async updateTask(id: number, data: Partial<Task>): Promise<Task | undefined> {
     const task = this.tasks.get(id);
     if (!task) return undefined;
     
-    const updatedTask = { ...task, ...taskData };
+    const updatedTask: Task = { ...task, ...data };
     this.tasks.set(id, updatedTask);
     return updatedTask;
   }
-  
-  async deleteTask(id: number): Promise<boolean> {
-    return this.tasks.delete(id);
-  }
-  
-  // Checklist Methods
-  async getChecklist(id: number): Promise<Checklist | undefined> {
-    return this.checklists.get(id);
-  }
-  
-  async getChecklistsByStore(storeId: number): Promise<Checklist[]> {
-    return Array.from(this.checklists.values()).filter(checklist => checklist.storeId === storeId);
-  }
-  
-  async createChecklist(checklist: InsertChecklist): Promise<Checklist> {
-    const id = this.currentChecklistId++;
-    const newChecklist: Checklist = { 
-      ...checklist, 
-      id,
-      description: checklist.description || null,
-      isWeekly: checklist.isWeekly ?? true
-    };
-    this.checklists.set(id, newChecklist);
-    return newChecklist;
-  }
-  
-  async updateChecklist(id: number, checklistData: Partial<Checklist>): Promise<Checklist | undefined> {
-    const checklist = this.checklists.get(id);
-    if (!checklist) return undefined;
+
+  // Checklist methods
+  async getAllChecklists(): Promise<(Checklist & { tasks: ChecklistTask[] })[]> {
+    const checklists = Array.from(this.checklists.values());
+    const allTasks = Array.from(this.checklistTasks.values());
     
-    const updatedChecklist = { ...checklist, ...checklistData };
-    this.checklists.set(id, updatedChecklist);
-    return updatedChecklist;
+    return checklists.map(checklist => {
+      const tasks = allTasks.filter(task => task.checklistId === checklist.id);
+      return {
+        ...checklist,
+        tasks
+      };
+    });
   }
-  
-  // Checklist Item Methods
-  async getChecklistItem(id: number): Promise<ChecklistItem | undefined> {
-    return this.checklistItems.get(id);
-  }
-  
-  async getChecklistItemsByChecklist(checklistId: number): Promise<ChecklistItem[]> {
-    return Array.from(this.checklistItems.values()).filter(item => item.checklistId === checklistId);
-  }
-  
-  async createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem> {
-    const id = this.currentChecklistItemId++;
-    const newItem: ChecklistItem = { 
-      ...item, 
-      id,
-      isCompleted: item.isCompleted ?? false,
-      completedBy: item.completedBy || null,
-      completedAt: item.completedAt || null 
-    };
-    this.checklistItems.set(id, newItem);
-    return newItem;
-  }
-  
-  async updateChecklistItem(id: number, itemData: Partial<ChecklistItem>): Promise<ChecklistItem | undefined> {
-    const item = this.checklistItems.get(id);
-    if (!item) return undefined;
+
+  async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
+    const id = this.checklistId++;
+    const checklist: Checklist = { ...insertChecklist, id };
+    this.checklists.set(id, checklist);
     
-    const updatedItem = { ...item, ...itemData };
-    this.checklistItems.set(id, updatedItem);
-    return updatedItem;
-  }
-  
-  async resetWeeklyChecklists(): Promise<void> {
-    // Reset all weekly checklist items to uncompleted
-    const weeklyChecklists = Array.from(this.checklists.values()).filter(cl => cl.isWeekly);
+    // Create some default tasks for the checklist
+    const defaultTasks = [
+      "Verify inventory levels",
+      "Clean work area",
+      "Check equipment",
+      "Update daily log"
+    ];
     
-    for (const checklist of weeklyChecklists) {
-      const items = await this.getChecklistItemsByChecklist(checklist.id);
-      
-      for (const item of items) {
-        await this.updateChecklistItem(item.id, {
-          isCompleted: false,
-          completedBy: null,
-          completedAt: null
-        });
-      }
-    }
+    defaultTasks.forEach(title => {
+      this.createChecklistTask({
+        checklistId: id,
+        title,
+        completed: false
+      });
+    });
+    
+    return checklist;
   }
-  
-  // Announcement Methods
-  async getAnnouncement(id: number): Promise<Announcement | undefined> {
-    return this.announcements.get(id);
+
+  async createChecklistTask(insertTask: InsertChecklistTask): Promise<ChecklistTask> {
+    const id = this.checklistTaskId++;
+    const task: ChecklistTask = { ...insertTask, id };
+    this.checklistTasks.set(id, task);
+    return task;
   }
-  
-  async getAnnouncementsByStore(storeId: number): Promise<Announcement[]> {
-    return Array.from(this.announcements.values())
-      .filter(ann => ann.storeId === storeId || ann.isGlobal);
+
+  async updateChecklistTask(checklistId: number, taskId: number, completed: boolean): Promise<ChecklistTask | undefined> {
+    const task = this.checklistTasks.get(taskId);
+    if (!task || task.checklistId !== checklistId) return undefined;
+    
+    const updatedTask: ChecklistTask = { ...task, completed };
+    this.checklistTasks.set(taskId, updatedTask);
+    return updatedTask;
   }
-  
-  async getAnnouncementsByRegion(regionId: number): Promise<Announcement[]> {
-    return Array.from(this.announcements.values())
-      .filter(ann => ann.regionId === regionId || ann.isGlobal);
+
+  // Schedule methods
+  async getAllSchedules(): Promise<{ id: string; staffId: number; staffName: string; role: string; start: string; end: string; day: number; }[]> {
+    const schedules = Array.from(this.schedules.values());
+    
+    return schedules.map(schedule => {
+      const staff = this.users.get(schedule.staffId);
+      return {
+        id: schedule.id.toString(),
+        staffId: schedule.staffId,
+        staffName: staff ? staff.name : 'Unknown',
+        role: staff ? staff.role : 'unknown',
+        start: schedule.start,
+        end: schedule.end,
+        day: schedule.day
+      };
+    });
   }
-  
-  async getGlobalAnnouncements(): Promise<Announcement[]> {
-    return Array.from(this.announcements.values()).filter(ann => ann.isGlobal);
+
+  async createSchedule(insertSchedule: InsertSchedule): Promise<Schedule> {
+    const id = this.scheduleId++;
+    const schedule: Schedule = { ...insertSchedule, id };
+    this.schedules.set(id, schedule);
+    return schedule;
   }
-  
-  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
-    const id = this.currentAnnouncementId++;
-    const newAnnouncement: Announcement = { 
-      ...announcement, 
+
+  async deleteSchedule(id: number): Promise<void> {
+    this.schedules.delete(id);
+  }
+
+  // Announcement methods
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return Array.from(this.announcements.values());
+  }
+
+  async getRecentAnnouncements(): Promise<{ id: string; title: string; description: string; date: string; isHighlighted: boolean; }[]> {
+    const announcements = Array.from(this.announcements.values())
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    return announcements.slice(0, 2).map(announcement => ({
+      id: announcement.id.toString(),
+      title: announcement.title,
+      description: announcement.content,
+      date: this.formatAnnouncementDate(announcement.date),
+      isHighlighted: announcement.important
+    }));
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const id = this.announcementId++;
+    const announcement: Announcement = { 
+      ...insertAnnouncement, 
       id, 
-      createdAt: new Date(),
-      priority: announcement.priority || "normal",
-      storeId: announcement.storeId || null,
-      regionId: announcement.regionId || null,
-      isGlobal: announcement.isGlobal ?? false
+      date: new Date(),
+      likes: 0
     };
-    this.announcements.set(id, newAnnouncement);
-    return newAnnouncement;
+    this.announcements.set(id, announcement);
+    return announcement;
+  }
+
+  async likeAnnouncement(id: number): Promise<Announcement | undefined> {
+    const announcement = this.announcements.get(id);
+    if (!announcement) return undefined;
+    
+    const updatedAnnouncement: Announcement = { 
+      ...announcement, 
+      likes: announcement.likes + 1 
+    };
+    this.announcements.set(id, updatedAnnouncement);
+    return updatedAnnouncement;
+  }
+
+  // Helper methods
+  private formatAnnouncementDate(date: Date): string {
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
+  }
+
+  // Seed data
+  private seedInitialData() {
+    // Seed stores
+    const storeData: InsertStore[] = [
+      { name: "Cheetham Hill", address: "74 Bury Old Rd, Manchester M8 5BW", area: 1, manager: "MGR_CH" },
+      { name: "Oxford Road", address: "149 Oxford Rd, Manchester M1 7EE", area: 1, manager: "MGR_OX" },
+      { name: "Old Trafford", address: "Ayres Rd, Old Trafford, Stretford, M16 7GS", area: 1, manager: "MGR_OT" },
+      { name: "Trafford Centre", address: "Kiosk K14, The Trafford Centre, Trafford Blvd", area: 2, manager: "MGR_TC" },
+      { name: "Stockport", address: "884-886 Stockport Rd, Levenshulme, Manchester", area: 1, manager: "MGR_SR" },
+      { name: "Rochdale", address: "35 Milkstone Rd, Rochdale OL11 1EB", area: 2, manager: "MGR_RD" },
+      { name: "Oldham", address: "66 George St, Oldham OL1 1LS", area: 2, manager: "MGR_OL" }
+    ];
+    
+    storeData.forEach(store => {
+      this.createStore(store);
+    });
+
+    // Seed users with password 'password123'
+    const hashPassword = 'c8680ca3ea7be0ac4fef3954ccf3bb114ba12f8fab964e0a6f55ff9386c022a4f4a78e71343bd0e2213c11c86266a8c1a13d507752bdd80b492ae04a5ee9f2b6.b6e5be78c42ffc3595c7352fbd88fe9f'; 
+    
+    const userData: InsertUser[] = [
+      { username: "admin", password: hashPassword, name: "Admin User", role: "admin" },
+      { username: "regional1", password: hashPassword, name: "Fatima Khan", role: "regional" },
+      { username: "manager1", password: hashPassword, name: "Ahmed Khan", role: "store", storeId: 1 },
+      { username: "manager2", password: hashPassword, name: "Sarah Smith", role: "store", storeId: 2 },
+      { username: "staff1", password: hashPassword, name: "Mohammed Ali", role: "staff", storeId: 1 },
+      { username: "staff2", password: hashPassword, name: "Jessica Patel", role: "staff", storeId: 2 },
+      { username: "staff3", password: hashPassword, name: "David Chen", role: "staff", storeId: 3 }
+    ];
+    
+    userData.forEach(user => {
+      this.createUser(user);
+    });
+
+    // Seed inventory
+    const inventoryData: InsertInventory[] = [
+      { name: "Chai Masala", sku: "INV-001", category: "Tea & Chai", storeId: 2, quantity: "5 kg", status: "low_stock", lastUpdated: new Date() },
+      { name: "Milk", sku: "INV-002", category: "Beverages", storeId: 1, quantity: "24 liters", status: "in_stock", lastUpdated: new Date() },
+      { name: "To-Go Cups (16oz)", sku: "INV-003", category: "Packaging", storeId: 4, quantity: "150 pcs", status: "on_order", lastUpdated: new Date() },
+      { name: "Sugar", sku: "INV-004", category: "Food Ingredients", storeId: 3, quantity: "12 kg", status: "in_stock", lastUpdated: new Date() },
+      { name: "Karak Tea Bags", sku: "INV-005", category: "Tea & Chai", storeId: 6, quantity: "0 boxes", status: "out_of_stock", lastUpdated: new Date() }
+    ];
+    
+    inventoryData.forEach(item => {
+      this.createInventoryItem(item);
+    });
+
+    // Seed tasks
+    const taskData: InsertTask[] = [
+      { title: "Review weekly inventory reports", description: "Check inventory levels across all stores", storeId: 1, assignedTo: 2, dueDate: "2023-07-15", status: "todo", priority: "medium" },
+      { title: "Schedule staff for next week", description: "Ensure all shifts are covered", storeId: 2, assignedTo: 4, dueDate: "2023-07-14", status: "in_progress", priority: "high" },
+      { title: "Follow up on low stock orders", description: "Contact suppliers for pending orders", storeId: 1, assignedTo: 3, dueDate: "2023-07-16", status: "todo", priority: "medium" },
+      { title: "Train new staff on POS system", description: "Schedule 2-hour training session", storeId: 3, assignedTo: 5, dueDate: "2023-07-20", status: "todo", priority: "low" },
+      { title: "Update menu pricing", description: "Implement new pricing structure", storeId: 4, assignedTo: 2, dueDate: "2023-07-25", status: "todo", priority: "high" }
+    ];
+    
+    taskData.forEach(task => {
+      this.createTask(task);
+    });
+
+    // Seed checklists
+    const checklistData: InsertChecklist[] = [
+      { title: "Morning Opening Procedures", description: "Tasks to complete before opening the store", category: "opening", assignedTo: "store_manager", storeId: 1 },
+      { title: "Evening Closing Procedures", description: "Tasks to complete before closing the store", category: "closing", assignedTo: "staff", storeId: 2 },
+      { title: "Weekly Health & Safety Check", description: "Ensure all safety protocols are followed", category: "health", assignedTo: "store_manager", dueDate: "2023-07-20", storeId: 3 }
+    ];
+    
+    checklistData.forEach(checklist => {
+      this.createChecklist(checklist);
+    });
+
+    // Seed schedules for staff
+    const scheduleData: InsertSchedule[] = [
+      { staffId: 5, day: 1, start: "09:00", end: "17:00", storeId: 1 },
+      { staffId: 5, day: 2, start: "09:00", end: "17:00", storeId: 1 },
+      { staffId: 5, day: 3, start: "12:00", end: "20:00", storeId: 1 },
+      { staffId: 6, day: 1, start: "12:00", end: "20:00", storeId: 2 },
+      { staffId: 6, day: 4, start: "09:00", end: "17:00", storeId: 2 },
+      { staffId: 6, day: 5, start: "09:00", end: "17:00", storeId: 2 },
+      { staffId: 7, day: 2, start: "12:00", end: "20:00", storeId: 3 },
+      { staffId: 7, day: 3, start: "12:00", end: "20:00", storeId: 3 },
+      { staffId: 7, day: 6, start: "10:00", end: "18:00", storeId: 3 }
+    ];
+    
+    scheduleData.forEach(schedule => {
+      this.createSchedule(schedule);
+    });
+
+    // Seed announcements
+    const announcementData: InsertAnnouncement[] = [
+      { 
+        title: "New Chai Smoothie Launching Next Month", 
+        content: "Training sessions will be scheduled starting next week.", 
+        author: "Admin User", 
+        category: "product", 
+        important: true 
+      },
+      { 
+        title: "Updated Health & Safety Guidelines", 
+        content: "All store managers please review and implement immediately.", 
+        author: "Fatima Khan", 
+        category: "operations", 
+        important: false 
+      },
+      { 
+        title: "Staff Appreciation Week", 
+        content: "Next week is Staff Appreciation Week. Special activities planned for all locations.", 
+        author: "Admin User", 
+        category: "hr", 
+        important: true 
+      }
+    ];
+    
+    // Set dates to appear like they were posted at different times
+    const now = new Date();
+    const twoDaysAgo = new Date(now);
+    twoDaysAgo.setDate(now.getDate() - 2);
+    
+    const oneWeekAgo = new Date(now);
+    oneWeekAgo.setDate(now.getDate() - 7);
+    
+    const twoWeeksAgo = new Date(now);
+    twoWeeksAgo.setDate(now.getDate() - 14);
+    
+    this.createAnnouncement(announcementData[0])
+      .then(announcement => {
+        this.announcements.set(announcement.id, { ...announcement, date: twoDaysAgo });
+      });
+    
+    this.createAnnouncement(announcementData[1])
+      .then(announcement => {
+        this.announcements.set(announcement.id, { ...announcement, date: oneWeekAgo });
+      });
+    
+    this.createAnnouncement(announcementData[2])
+      .then(announcement => {
+        this.announcements.set(announcement.id, { ...announcement, date: twoWeeksAgo });
+      });
   }
 }
 

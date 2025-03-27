@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { 
   HomeIcon, 
@@ -21,7 +21,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, navigate] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logoutMutation } = useAuth();
 
   if (!user) return null;
 
@@ -168,7 +168,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Logout Button */}
       <div className="absolute bottom-0 w-full p-4 border-t border-gray-700">
         <button
-          onClick={() => logout.mutate()}
+          onClick={() => logoutMutation.mutate()}
           className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-md transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

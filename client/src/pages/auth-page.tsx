@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { 
   Card, 
@@ -40,7 +40,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
-  const { user, login, register, isLoading } = useAuth();
+  const { user, loginMutation, registerMutation, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
 
@@ -72,11 +72,11 @@ export default function AuthPage() {
   });
 
   const onLoginSubmit = (data: LoginFormValues) => {
-    login.mutate(data);
+    loginMutation.mutate(data);
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    register.mutate(data);
+    registerMutation.mutate(data);
   };
 
   if (isLoading) {
@@ -149,9 +149,9 @@ export default function AuthPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-chai-gold hover:bg-yellow-700"
-                      disabled={login.isPending}
+                      disabled={loginMutation.isPending}
                     >
-                      {login.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign In
                     </Button>
                   </form>
@@ -237,9 +237,9 @@ export default function AuthPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-chai-gold hover:bg-yellow-700"
-                      disabled={register.isPending}
+                      disabled={registerMutation.isPending}
                     >
-                      {register.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Register
                     </Button>
                   </form>

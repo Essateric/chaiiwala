@@ -1,5 +1,5 @@
 import { Route, Switch } from "wouter";
-import { ProtectedRoute } from "./lib/auth";
+import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import InventoryPage from "@/pages/inventory-page";
@@ -16,7 +16,6 @@ function App() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
       <ProtectedRoute path="/tasks" component={TasksPage} />
@@ -25,6 +24,7 @@ function App() {
       <ProtectedRoute path="/stores" component={StoresPage} roles={["admin", "regional"]} />
       <ProtectedRoute path="/users" component={UserManagementPage} roles={["admin"]} />
       <ProtectedRoute path="/settings" component={SettingsPage} roles={["admin", "regional", "store"]} />
+      <ProtectedRoute path="/" component={DashboardPage} />
       <Route component={NotFound} />
     </Switch>
   );

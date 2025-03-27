@@ -1,326 +1,285 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { useAuth } from "@/hooks/use-auth";
-import { useAnnouncements } from "@/hooks/use-announcements";
-import { AnnouncementCard } from "@/components/announcements/announcement-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DashboardLayout from "@/components/layout/dashboard-layout";
+import AnnouncementCard from "@/components/announcements/announcement-card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Loader2, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { PlusCircle } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
-const formSchema = z.object({
-  title: z.string().min(3, { message: "Title is required" }),
-  content: z.string().min(10, { message: "Content must be at least 10 characters" }),
-  priority: z.string().default("normal"),
-  storeId: z.coerce.number().optional().nullable(),
-  regionId: z.coerce.number().optional().nullable(),
-  isGlobal: z.boolean().default(false),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  date: Date;
+  category: string;
+  important: boolean;
+  likes: number;
+}
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth();
+  const [showAddAnnouncementDialog, setShowAddAnnouncementDialog] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const { toast } = useToast();
-  const [filter, setFilter] = useState<string>("all");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  const { 
-    announcements, 
-    isLoading, 
-    createAnnouncement,
-    isCreating
-  } = useAnnouncements();
+  const { user } = useAuth();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      content: "",
-      priority: "normal",
-      storeId: user?.storeId || null,
-      regionId: user?.regionId || null,
-      isGlobal: false,
-    }
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: "",
+    content: "",
+    category: "general",
+    important: false
   });
 
-  const onSubmit = async (data: FormValues) => {
-    try {
-      // If global is selected, clear store and region IDs
-      if (data.isGlobal) {
-        data.storeId = null;
-        data.regionId = null;
-      }
-      
-      await createAnnouncement(data);
-      setIsDialogOpen(false);
-      form.reset();
-      toast({
-        title: "Success",
-        description: "Announcement created successfully.",
-      });
-    } catch (error) {
+  // Fetch announcements
+  const { data: announcements = [] } = useQuery<Announcement[]>({
+    queryKey: ["/api/announcements"],
+  });
+
+  // Filter announcements based on category
+  const filteredAnnouncements = categoryFilter === "all" 
+    ? announcements 
+    : announcements.filter(announcement => announcement.category === categoryFilter);
+
+  // Like announcement mutation
+  const likeAnnouncementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/announcements/${id}/like`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+    },
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to create announcement.",
-        variant: "destructive"
+        description: `Failed to like announcement: ${error.message}`,
+        variant: "destructive",
       });
     }
-  };
-
-  // Watch the isGlobal field to conditionally show/hide other fields
-  const isGlobal = form.watch("isGlobal");
-
-  // Filter announcements based on priority or scope
-  const filteredAnnouncements = announcements?.filter(announcement => {
-    if (filter === "all") return true;
-    if (filter === "high") return announcement.priority === "high";
-    if (filter === "medium") return announcement.priority === "medium";
-    if (filter === "normal") return announcement.priority === "normal";
-    if (filter === "global") return announcement.isGlobal;
-    if (filter === "regional") return announcement.regionId !== null;
-    if (filter === "store") return announcement.storeId !== null;
-    return true;
   });
 
+  // Add announcement mutation
+  const addAnnouncementMutation = useMutation({
+    mutationFn: async (data: typeof newAnnouncement) => {
+      const res = await apiRequest("POST", "/api/announcements", {
+        ...data,
+        author: user?.name || "Unknown"
+      });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements/recent"] });
+      setShowAddAnnouncementDialog(false);
+      setNewAnnouncement({
+        title: "",
+        content: "",
+        category: "general",
+        important: false
+      });
+      toast({
+        title: "Announcement Created",
+        description: "Your announcement has been posted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create announcement: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleLikeAnnouncement = (id: string) => {
+    likeAnnouncementMutation.mutate(id);
+  };
+
+  const handleAddAnnouncement = () => {
+    setShowAddAnnouncementDialog(true);
+  };
+
+  const submitNewAnnouncement = () => {
+    if (!newAnnouncement.title || !newAnnouncement.content) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    addAnnouncementMutation.mutate(newAnnouncement);
+  };
+
   return (
-    <DashboardLayout 
-      title="Announcements" 
-      breadcrumbs={[
-        { label: "Home", href: "/" },
-        { label: "Announcements" }
-      ]}
-    >
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle>Announcements & Communications</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Tabs
-                defaultValue="all"
-                value={filter}
-                onValueChange={setFilter}
-                className="w-full sm:w-auto"
-              >
-                <TabsList className="grid grid-cols-3 sm:grid-cols-7 w-full sm:w-auto">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="high">High</TabsTrigger>
-                  <TabsTrigger value="medium">Medium</TabsTrigger>
-                  <TabsTrigger value="normal">Normal</TabsTrigger>
-                  <TabsTrigger value="global">Global</TabsTrigger>
-                  <TabsTrigger value="regional">Regional</TabsTrigger>
-                  <TabsTrigger value="store">Store</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              
-              {(user?.role === "admin" || user?.role === "regional_manager" || user?.role === "store_manager") && (
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-[#D4AF37] hover:bg-[#B89527]">
-                      <Plus className="h-4 w-4 mr-2" />
-                      New Announcement
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Announcement</DialogTitle>
-                    </DialogHeader>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="title"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Title</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Announcement title" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="content"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Content</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="Announcement content" 
-                                  className="resize-none min-h-[100px]" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="priority"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Priority</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select priority" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="high">High</SelectItem>
-                                  <SelectItem value="medium">Medium</SelectItem>
-                                  <SelectItem value="normal">Normal</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        {user?.role === "admin" && (
-                          <FormField
-                            control={form.control}
-                            name="isGlobal"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Global Announcement</FormLabel>
-                                  <div className="text-sm text-gray-500">
-                                    This announcement will be visible to all users
-                                  </div>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        
-                        {!isGlobal && user?.role === "admin" && (
-                          <FormField
-                            control={form.control}
-                            name="regionId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Region (Optional)</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                                  defaultValue={field.value?.toString() || ""}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a region" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
-                                    <SelectItem value="1">Midlands</SelectItem>
-                                    <SelectItem value="2">London</SelectItem>
-                                    <SelectItem value="3">North West</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        
-                        {!isGlobal && (user?.role === "admin" || user?.role === "regional_manager") && (
-                          <FormField
-                            control={form.control}
-                            name="storeId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Store (Optional)</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                                  defaultValue={field.value?.toString() || ""}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a store" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
-                                    <SelectItem value="1">Leicester</SelectItem>
-                                    <SelectItem value="2">Birmingham</SelectItem>
-                                    <SelectItem value="3">London - Piccadilly</SelectItem>
-                                    <SelectItem value="4">Manchester</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        
-                        <DialogFooter>
-                          <DialogClose asChild>
-                            <Button variant="outline" type="button">Cancel</Button>
-                          </DialogClose>
-                          <Button 
-                            type="submit" 
-                            className="bg-[#D4AF37] hover:bg-[#B89527]"
-                            disabled={isCreating}
-                          >
-                            {isCreating ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Creating...
-                              </>
-                            ) : "Create Announcement"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              )}
+    <DashboardLayout title="Announcements">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-montserrat font-bold mb-1">Announcements & Communications</h2>
+          <p className="text-gray-600">Important updates and communications for all team members</p>
+        </div>
+        {(user?.role === 'admin' || user?.role === 'regional' || user?.role === 'store') && (
+          <div className="mt-4 md:mt-0">
+            <Button className="bg-chai-gold hover:bg-yellow-600" onClick={handleAddAnnouncement}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Post Announcement
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="w-full sm:w-auto">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="general">General</SelectItem>
+                <SelectItem value="product">Product Updates</SelectItem>
+                <SelectItem value="operations">Operations</SelectItem>
+                <SelectItem value="hr">HR & Staff</SelectItem>
+                <SelectItem value="promotion">Promotions</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-sm text-gray-500">
+            Showing {filteredAnnouncements.length} announcements
+          </div>
+        </div>
+      </div>
+      
+      {/* Announcements Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {filteredAnnouncements.length === 0 ? (
+          <div className="col-span-full p-8 bg-white rounded-lg shadow text-center">
+            <p className="text-gray-500 mb-4">No announcements found</p>
+            {(user?.role === 'admin' || user?.role === 'regional' || user?.role === 'store') && (
+              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={handleAddAnnouncement}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Your First Announcement
+              </Button>
+            )}
+          </div>
+        ) : (
+          filteredAnnouncements.map(announcement => (
+            <AnnouncementCard
+              key={announcement.id}
+              id={announcement.id}
+              title={announcement.title}
+              content={announcement.content}
+              author={announcement.author}
+              date={announcement.date}
+              category={announcement.category}
+              important={announcement.important}
+              likes={announcement.likes}
+              onLike={handleLikeAnnouncement}
+            />
+          ))
+        )}
+      </div>
+      
+      {/* Create Announcement Dialog */}
+      <Dialog open={showAddAnnouncementDialog} onOpenChange={setShowAddAnnouncementDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Post New Announcement</DialogTitle>
+            <DialogDescription>
+              Create a new announcement to share with the team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Announcement Title</Label>
+              <Input
+                id="title"
+                value={newAnnouncement.title}
+                onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
+                placeholder="Enter announcement title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="content">Content</Label>
+              <Textarea
+                id="content"
+                value={newAnnouncement.content}
+                onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
+                placeholder="Enter announcement content"
+                rows={5}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Select 
+                  value={newAnnouncement.category} 
+                  onValueChange={(value) => setNewAnnouncement({...newAnnouncement, category: value})}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="product">Product Updates</SelectItem>
+                    <SelectItem value="operations">Operations</SelectItem>
+                    <SelectItem value="hr">HR & Staff</SelectItem>
+                    <SelectItem value="promotion">Promotions</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end space-x-2 mb-2">
+                <Checkbox 
+                  id="important"
+                  checked={newAnnouncement.important}
+                  onCheckedChange={(checked) => 
+                    setNewAnnouncement({...newAnnouncement, important: !!checked})
+                  }
+                />
+                <Label htmlFor="important" className="text-base">
+                  Mark as Important
+                </Label>
+              </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-[#D4AF37]" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredAnnouncements?.length ? (
-                filteredAnnouncements.map(announcement => (
-                  <div key={announcement.id} className="border rounded-lg p-4">
-                    <AnnouncementCard announcement={announcement} expanded />
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <div className="text-gray-500">No announcements found</div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddAnnouncementDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-chai-gold hover:bg-yellow-600" 
+              onClick={submitNewAnnouncement}
+              disabled={addAnnouncementMutation.isPending}
+            >
+              {addAnnouncementMutation.isPending ? "Posting..." : "Post Announcement"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
