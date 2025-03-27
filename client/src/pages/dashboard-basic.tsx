@@ -83,18 +83,17 @@ export default function DashboardBasic() {
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar - desktop only */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-        <div className="flex flex-col flex-grow pt-5 bg-white overflow-y-auto border-r border-gray-200">
-          <div className="flex items-center flex-shrink-0 px-4 py-3 bg-chai-gold rounded-md mx-2">
-            <img 
-              src="/assets/chaiiwala.png" 
-              alt="Chaiiwala Logo" 
-              className="h-10 w-auto"
-            />
+        <div className="flex flex-col flex-grow pt-5 bg-[#1c1f2a] overflow-y-auto">
+          <div className="flex items-center flex-shrink-0 px-4">
+            <div className="h-12 w-12 bg-chai-gold rounded-full flex items-center justify-center mr-3">
+              <span className="text-white font-bold text-xl">C</span>
+            </div>
+            <h1 className="text-white font-bold text-xl">Chaiiwala</h1>
           </div>
           <div className="mt-5 flex-1 flex flex-col">
             <nav className="flex-1 px-2 pb-4 space-y-1">
-              <a href="/" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+              <a href="/" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <Store className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
                 Dashboard
               </a>
               <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
@@ -119,18 +118,17 @@ export default function DashboardBasic() {
       </div>
 
       {/* Mobile menu button */}
-      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-white shadow">
+      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-[#1c1f2a]">
         <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center bg-chai-gold px-3 py-2 rounded-md">
-            <img 
-              src="/assets/chaiiwala.png" 
-              alt="Chaiiwala Logo" 
-              className="h-7 w-auto"
-            />
+          <div className="flex items-center">
+            <div className="h-8 w-8 bg-chai-gold rounded-full flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <h1 className="text-white font-bold text-lg">Chaiiwala</h1>
           </div>
           <button 
             onClick={toggleMobileMenu}
-            className="text-gray-700 focus:outline-none"
+            className="text-white focus:outline-none"
           >
             {isMobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -143,10 +141,10 @@ export default function DashboardBasic() {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-10 bg-chai-black pt-14">
+        <div className="md:hidden fixed inset-0 z-10 bg-[#1c1f2a] pt-14">
           <nav className="px-4 pt-4 pb-5 space-y-1">
-            <a href="/" className="bg-gray-900 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Store className="mr-3 flex-shrink-0 h-6 w-6 text-chai-gold" />
+            <a href="/" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <Store className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
               Dashboard
             </a>
             <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
