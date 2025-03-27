@@ -84,11 +84,14 @@ export default function DashboardBasic() {
       {/* Sidebar - desktop only */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
         <div className="flex flex-col flex-grow pt-5 bg-[#1c1f2a] overflow-y-auto">
-          <div className="flex items-center flex-shrink-0 px-4">
-            <div className="h-12 w-12 bg-chai-gold rounded-full flex items-center justify-center mr-3">
-              <span className="text-white font-bold text-xl">C</span>
+          <div className="flex items-center flex-shrink-0 px-4 py-2">
+            <div className="h-12 w-auto bg-chai-gold rounded-md flex items-center justify-center mr-3 px-2">
+              <img 
+                src="/attached_assets/chaiiwala.png" 
+                alt="Chaiiwala Logo" 
+                className="h-8 w-auto"
+              />
             </div>
-            <h1 className="text-white font-bold text-xl">Chaiiwala</h1>
           </div>
           <div className="mt-5 flex-1 flex flex-col">
             <nav className="flex-1 px-2 pb-4 space-y-1">
@@ -121,10 +124,13 @@ export default function DashboardBasic() {
       <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-[#1c1f2a]">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
-            <div className="h-8 w-8 bg-chai-gold rounded-full flex items-center justify-center mr-2">
-              <span className="text-white font-bold text-sm">C</span>
+            <div className="h-10 w-auto bg-chai-gold rounded-md flex items-center justify-center px-2">
+              <img 
+                src="/attached_assets/chaiiwala.png" 
+                alt="Chaiiwala Logo" 
+                className="h-6 w-auto"
+              />
             </div>
-            <h1 className="text-white font-bold text-lg">Chaiiwala</h1>
           </div>
           <button 
             onClick={toggleMobileMenu}
