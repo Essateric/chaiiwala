@@ -43,8 +43,11 @@ interface User {
   id: number;
   name: string;
   username: string;
+  email: string;
   role: "admin" | "regional" | "store" | "staff";
   storeId?: number;
+  isLoggedIn: boolean;
+  lastLogin: string | null;
 }
 
 interface Store {
@@ -63,6 +66,7 @@ export default function UserManagementPage() {
   const [newUser, setNewUser] = useState({
     name: "",
     username: "",
+    email: "",
     password: "",
     role: "staff",
     storeId: ""
@@ -115,6 +119,7 @@ export default function UserManagementPage() {
     setNewUser({
       name: "",
       username: "",
+      email: "",
       password: "",
       role: "staff",
       storeId: ""
@@ -127,6 +132,7 @@ export default function UserManagementPage() {
     setNewUser({
       name: user.name,
       username: user.username,
+      email: user.email,
       password: "",
       role: user.role,
       storeId: user.storeId?.toString() || ""
@@ -208,6 +214,7 @@ export default function UserManagementPage() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Username</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Assigned Store</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -225,6 +232,7 @@ export default function UserManagementPage() {
                 <TableRow key={user.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.username}</TableCell>
+                  <TableCell>{user.email}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
                   <TableCell>{getStoreName(user.storeId)}</TableCell>
                   <TableCell className="text-right">
@@ -277,6 +285,16 @@ export default function UserManagementPage() {
                   onChange={(e) => setNewUser({...newUser, username: e.target.value})}
                   placeholder="Enter username"
                   disabled={!!selectedUser}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  placeholder="Enter email address"
                 />
               </div>
               {!selectedUser && (
