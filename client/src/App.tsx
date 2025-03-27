@@ -5,7 +5,9 @@ import InventoryView from "@/pages/inventory-view";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
+import { User as SelectUser } from "@shared/schema";
 
 type Role = "admin" | "regional" | "store" | "staff";
 
@@ -16,7 +18,14 @@ function ProtectedComponent({
   children: React.ReactNode;
   roles?: Role[];
 }) {
-  const { user, isLoading } = useAuth();
+  // Direct query instead of using useAuth hook
+  const { 
+    data: user, 
+    isLoading 
+  } = useQuery<SelectUser | undefined, Error>({
+    queryKey: ["/api/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
   
   if (isLoading) {
     return (
@@ -52,7 +61,7 @@ function App() {
   return (
     <Switch>
       <Route path="/auth">
-        {(params) => <AuthPage />}
+        {() => <AuthPage />}
       </Route>
       <Route path="/inventory">
         <ProtectedComponent roles={["admin", "regional"]}>
