@@ -51,7 +51,9 @@ function ProtectedComponent({
 function App() {
   return (
     <Switch>
-      <Route path="/auth" component={AuthPage} />
+      <Route path="/auth">
+        {(params) => <AuthPage />}
+      </Route>
       <Route path="/inventory">
         <ProtectedComponent roles={["admin", "regional"]}>
           <InventoryView />
