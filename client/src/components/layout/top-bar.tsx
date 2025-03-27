@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 
 interface TopBarProps {
@@ -21,7 +21,7 @@ interface TopBarProps {
 export default function TopBar({ title, onMenuClick, username, role }: TopBarProps) {
   const [notificationCount, setNotificationCount] = useState(3);
   const [showNotifications, setShowNotifications] = useState(false);
-  const { logout } = useAuth();
+  const { logoutMutation } = useAuth();
   const [, navigate] = useLocation();
 
   return (
@@ -117,7 +117,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
               <DropdownMenuItem>
                 Help & Support
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => logout.mutate()}>
+              <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
                 Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>

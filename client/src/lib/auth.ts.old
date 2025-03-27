@@ -40,7 +40,7 @@ type RegisterCredentials = LoginCredentials & {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // Provider
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -118,7 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{
+      user: user || null,
+      isLoading,
+      login,
+      register,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
