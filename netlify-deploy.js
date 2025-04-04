@@ -11,29 +11,57 @@
  */
 
 const { execSync } = require('child_process');
-const isProduction = process.argv.includes('--prod');
+const chalk = require('chalk');
+const args = process.argv.slice(2);
+const isProd = args.includes('--prod');
 
-console.log('🔧 Building application...');
-try {
-  execSync('npm run build', { stdio: 'inherit' });
-  console.log('✅ Build completed successfully');
-} catch (error) {
-  console.error('❌ Build failed:', error);
-  process.exit(1);
-}
+// Log with colors
+const log = {
+  info: (msg) => console.log(chalk.blue('INFO: ') + msg),
+  success: (msg) => console.log(chalk.green('SUCCESS: ') + msg),
+  error: (msg) => console.log(chalk.red('ERROR: ') + msg),
+  warning: (msg) => console.log(chalk.yellow('WARNING: ') + msg)
+};
 
-console.log(`🚀 Deploying to Netlify (${isProduction ? 'production' : 'draft'} environment)...`);
-try {
-  const deployCommand = isProduction ? 'netlify deploy --prod' : 'netlify deploy';
-  execSync(deployCommand, { stdio: 'inherit' });
-  console.log('✅ Deployment completed!');
-  
-  if (!isProduction) {
-    console.log('\n📝 To deploy to production, run: node netlify-deploy.js --prod');
+// Execute a command and handle errors
+function execute(command) {
+  try {
+    log.info(`Executing: ${command}`);
+    return execSync(command, { stdio: 'inherit' });
+  } catch (error) {
+    log.error(`Command failed: ${command}`);
+    process.exit(1);
   }
-} catch (error) {
-  console.error('❌ Deployment failed:', error);
-  console.log('\n💡 If you have not authenticated with Netlify yet, run:');
-  console.log('   npx netlify login');
-  process.exit(1);
 }
+
+// Main deployment function
+async function deploy() {
+  try {
+    // 1. Build the application
+    log.info('Building application...');
+    execute('npm run build');
+    
+    // 2. Deploy to Netlify
+    log.info(`Deploying to Netlify ${isProd ? 'production' : 'draft'} environment...`);
+    const deployCommand = isProd
+      ? 'netlify deploy --dir=dist/client --prod --message "Production deploy from script"'
+      : 'netlify deploy --dir=dist/client --message "Draft deploy from script"';
+    
+    execute(deployCommand);
+    
+    // 3. Success message
+    if (isProd) {
+      log.success('Successfully deployed to Netlify production environment!');
+    } else {
+      log.success('Successfully deployed to Netlify draft environment!');
+      log.info('To deploy to production, run: node netlify-deploy.js --prod');
+    }
+  } catch (error) {
+    log.error('Deployment failed');
+    log.error(error.message);
+    process.exit(1);
+  }
+}
+
+// Execute the deployment
+deploy();
