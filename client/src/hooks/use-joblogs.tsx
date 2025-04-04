@@ -9,18 +9,11 @@ export function useJobLogs(storeId?: number) {
   // Fetch all job logs
   const { data: jobLogs = [], isLoading, error } = useQuery<JobLog[]>({
     queryKey: storeId ? ["/api/joblogs", storeId] : ["/api/joblogs"],
-    queryFn: async () => {
-      const endpoint = storeId 
-        ? `/api/joblogs/store/${storeId}` 
-        : "/api/joblogs";
-      
-      const response = await apiRequest("GET", endpoint);
-      return await response.json();
-    },
+    // Remove the custom queryFn to use the default one with on401 handling
   });
 
   // Create a new job log
-  const { mutateAsync: createJobLog } = useMutation({
+  const { mutateAsync: createJobLog, isPending: isCreating } = useMutation({
     mutationFn: async (jobLog: InsertJobLog) => {
       const response = await apiRequest("POST", "/api/joblogs", jobLog);
       return await response.json();
@@ -71,5 +64,6 @@ export function useJobLogs(storeId?: number) {
     error,
     createJobLog,
     updateJobLog,
+    isCreating,
   };
 }
