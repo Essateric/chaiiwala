@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
+import { useJobLogs } from "@/hooks/use-joblogs";
 
 // Types for data
 interface Store {
