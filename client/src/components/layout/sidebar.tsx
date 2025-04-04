@@ -11,7 +11,12 @@ import {
   ShoppingBagIcon, 
   UsersIcon, 
   SettingsIcon, 
-  XIcon 
+  XIcon,
+  ClipboardCheckIcon,
+  ShoppingCartIcon,
+  CalendarDaysIcon,
+  WrenchIcon,
+  PackageIcon
 } from "lucide-react";
 import chaiiwalaLogo from "@assets/chaiiwala.png";
 
@@ -67,10 +72,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
     { 
       name: 'Deep Cleaning', 
-      icon: ClipboardListIcon, 
+      icon: ClipboardCheckIcon, 
       href: '/deep-cleaning', 
       active: currentPage === 'deep-cleaning',
       roles: ['admin', 'regional', 'store'] 
+    },
+    {
+      name: 'Maintenance',
+      icon: WrenchIcon,
+      href: '/maintenance',
+      active: currentPage === 'maintenance',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Event Orders',
+      icon: CalendarDaysIcon,
+      href: '/event-orders',
+      active: currentPage === 'event-orders',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Stock Orders',
+      icon: PackageIcon,
+      href: '/stock-orders',
+      active: currentPage === 'stock-orders',
+      roles: ['admin', 'regional', 'store']
     },
     { 
       name: 'Announcements', 
@@ -151,8 +177,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="p-4 space-y-1">
+      {/* Navigation - with scrollable area */}
+      <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
         {navItems.map((item, index) => (
           item.roles.includes(user.role) && (
             <a
