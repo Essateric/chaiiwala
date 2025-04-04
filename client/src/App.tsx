@@ -30,6 +30,8 @@ function ProtectedComponent({
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: 1, // Don't retry too many times
     staleTime: 5 * 60 * 1000, // 5 minutes - reduce unnecessary refetches
+    refetchOnWindowFocus: false, // Prevent refetches causing flashes
+    refetchOnMount: true, // Always refetch when component mounts
   });
   
   // Show loading state
@@ -61,7 +63,13 @@ function ProtectedComponent({
   // Redirect to login if not authenticated
   if (!user) {
     console.log("User not authenticated, redirecting to /auth");
-    return <Redirect to="/auth" />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-chai-gold mr-2" />
+        <p>Redirecting to login...</p>
+        <Redirect to="/auth" />
+      </div>
+    );
   }
   
   console.log("User authenticated:", user.username, "with role", user.role);
