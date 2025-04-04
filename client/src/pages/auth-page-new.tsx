@@ -61,7 +61,8 @@ export default function AuthPageNew() {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      // Force refetch the user data after successful login
+      // Set user data directly and invalidate queries
+      queryClient.setQueryData(["/api/user"], user);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       toast({
@@ -69,10 +70,8 @@ export default function AuthPageNew() {
         description: `Welcome back, ${user.name}!`,
       });
       
-      // Add a slight delay to ensure session is established
-      setTimeout(() => {
-        navigate("/");
-      }, 500);
+      // Force hard navigation to dashboard which ensures complete page refresh
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
@@ -90,7 +89,8 @@ export default function AuthPageNew() {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      // Force refetch the user data after successful registration
+      // Set user data directly and invalidate queries
+      queryClient.setQueryData(["/api/user"], user);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       toast({
@@ -98,10 +98,8 @@ export default function AuthPageNew() {
         description: `Welcome, ${user.name}!`,
       });
       
-      // Add a slight delay to ensure session is established
-      setTimeout(() => {
-        navigate("/");
-      }, 500);
+      // Force hard navigation to dashboard which ensures complete page refresh
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
