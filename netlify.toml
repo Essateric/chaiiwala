@@ -4,7 +4,7 @@
   functions = "netlify/functions"
   
 [build.environment]
-  NODE_VERSION = "18.x"
+  NODE_VERSION = "18.19.0"
   SESSION_SECRET = "chaiiwala-dashboard-secure-session-key"
 
 [dev]
