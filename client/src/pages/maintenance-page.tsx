@@ -1,9 +1,322 @@
-import React from "react";
+import React, { useState } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { WrenchIcon, ActivityIcon, CheckCircleIcon, BookIcon, ClipboardListIcon, AlertTriangleIcon, PlusIcon, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertJobLogSchema } from "@shared/schema";
+import { useJobLogs } from "@/hooks/use-joblogs";
+import { useAuth } from "@/hooks/use-auth";
+import { format } from "date-fns";
+import { z } from "zod";
+
+// Component for Job Logs
+function JobLogsSection() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
+    user?.role === "store" ? user?.storeId ?? undefined : undefined
+  );
+
+  const { jobLogs, isLoading, createJobLog, isCreating } = useJobLogs(selectedStoreId);
+  
+  const form = useForm({
+    resolver: zodResolver(insertJobLogSchema.extend({
+      storeId: z.number(),
+      logDate: z.string(),
+      logTime: z.string(),
+      description: z.string().min(5, "Description must be at least 5 characters"),
+      loggedBy: z.string().min(2, "Name must be at least 2 characters"),
+      flag: z.enum(["normal", "long_standing", "urgent"]),
+      attachment: z.string().nullable().optional(),
+      comments: z.string().nullable().optional(),
+    })),
+    defaultValues: {
+      storeId: user?.storeId ?? 1,
+      logDate: format(new Date(), "yyyy-MM-dd"),
+      logTime: format(new Date(), "HH:mm"),
+      description: "",
+      loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
+      flag: "normal" as const,
+      attachment: null,
+      comments: null,
+    },
+  });
+
+  async function onSubmit(values: any) {
+    try {
+      await createJobLog(values);
+      setOpen(false);
+      form.reset({
+        storeId: values.storeId,
+        logDate: format(new Date(), "yyyy-MM-dd"),
+        logTime: format(new Date(), "HH:mm"),
+        description: "",
+        loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
+        flag: "normal" as const,
+        attachment: null,
+        comments: null,
+      });
+    } catch (error) {
+      console.error("Error submitting job log:", error);
+    }
+  }
+
+  const getFlagBadgeClass = (flag: string) => {
+    switch (flag) {
+      case "urgent":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      case "long_standing":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+      default:
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+    }
+  };
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Job Logs</CardTitle>
+          <CardDescription>
+            Track and manage maintenance job logs for all equipment and facilities
+          </CardDescription>
+        </div>
+        {(user?.role === "admin" || user?.role === "regional") && (
+          <Select value={selectedStoreId?.toString()} onValueChange={(value) => setSelectedStoreId(value ? parseInt(value) : undefined)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Store" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Stores</SelectItem>
+              <SelectItem value="1">Stockport Road</SelectItem>
+              <SelectItem value="2">Wilmslow Road</SelectItem>
+              <SelectItem value="3">Deansgate</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="flex justify-between mb-4">
+          <Button
+            variant="outline"
+            className="mr-2"
+            onClick={() => setSelectedStoreId(undefined)}
+          >
+            {selectedStoreId ? "View All Jobs" : "Filter Jobs"}
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Log New Job
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle>Create New Job Log</DialogTitle>
+                <DialogDescription>
+                  Log a new maintenance job or issue that needs attention.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {(user?.role === "admin" || user?.role === "regional") && (
+                    <FormField
+                      control={form.control}
+                      name="storeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Store Location</FormLabel>
+                          <Select
+                            value={field.value.toString()}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a store" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Stockport Road</SelectItem>
+                              <SelectItem value="2">Wilmslow Road</SelectItem>
+                              <SelectItem value="3">Deansgate</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="logDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="logTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Time</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Describe the maintenance issue" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="loggedBy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Logged By</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="flag"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="normal">Normal</SelectItem>
+                              <SelectItem value="long_standing">Long-standing</SelectItem>
+                              <SelectItem value="urgent">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="comments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comments (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Any additional comments" {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value || null)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="submit" disabled={isCreating}>
+                      {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Submit
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {isLoading ? (
+          <div className="w-full flex justify-center py-6">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : jobLogs.length === 0 ? (
+          <Alert>
+            <ClipboardListIcon className="h-4 w-4 mr-2" />
+            <AlertDescription>
+              No job logs found. Click "Log New Job" to create your first job log.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Logged By</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Store</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jobLogs.map((job) => (
+                  <TableRow key={job.id}>
+                    <TableCell>
+                      {job.logDate} <span className="text-muted-foreground text-sm">{job.logTime}</span>
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[300px] truncate">
+                      {job.description}
+                    </TableCell>
+                    <TableCell>{job.loggedBy}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getFlagBadgeClass(job.flag)}`}>
+                        {job.flag === "normal" && "Normal"}
+                        {job.flag === "long_standing" && "Long-standing"}
+                        {job.flag === "urgent" && "Urgent"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {job.storeId === 1 && "Stockport Road"}
+                      {job.storeId === 2 && "Wilmslow Road"}
+                      {job.storeId === 3 && "Deansgate"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MaintenancePage() {
   return (
@@ -50,6 +363,9 @@ export default function MaintenancePage() {
             </Tabs>
           </CardContent>
         </Card>
+        
+        {/* Job Logs Section */}
+        <JobLogsSection />
       </div>
     </DashboardLayout>
   );
