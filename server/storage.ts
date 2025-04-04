@@ -403,17 +403,17 @@ export class MemStorage implements IStorage {
         permissions: ["all_access", "admin_panel", "reports"]
       },
       
-      // Regional manager with access to all stores
+      // Regional manager with access to all stores and highest permissions
       { 
         username: "usman", 
-        password: hashPassword, 
+        password: 'c8680ca3ea7be0ac4fef3954ccf3bb114ba12f8fab964e0a6f55ff9386c022a4f4a78e71343bd0e2213c11c86266a8c1a13d507752bdd80b492ae04a5ee9f2b6.b6e5be78c42ffc3595c7352fbd88fe9f', // password123
         firstName: "Usman", 
         lastName: "Aftab", 
         name: "Usman Aftab", 
-        email: "usman@chaiiwala.com", 
+        email: "usman.aftab@chaiiwala.co.uk", 
         title: "Regional Director", 
         role: "regional", 
-        permissions: ["view_all_stores", "inventory_management", "staff_scheduling"]
+        permissions: ["view_all_stores", "inventory_management", "staff_scheduling", "reporting", "task_management", "all_features"]
       },
       
       // Store manager with access limited to Stockport Road store
