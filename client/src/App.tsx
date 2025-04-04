@@ -103,6 +103,11 @@ function App() {
           <DeepCleaningPage />
         </ProtectedComponent>
       </Route>
+      <Route path="/dashboard">
+        <ProtectedComponent>
+          <DashboardBasic />
+        </ProtectedComponent>
+      </Route>
       <Route path="/">
         <ProtectedComponent>
           <DashboardBasic />
