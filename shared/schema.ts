@@ -7,6 +7,7 @@ export const roleEnum = pgEnum('role', ['admin', 'regional', 'store', 'staff']);
 export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'completed']);
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
 export const inventoryStatusEnum = pgEnum('inventory_status', ['in_stock', 'low_stock', 'out_of_stock', 'on_order']);
+export const jobFlagEnum = pgEnum('job_flag', ['normal', 'long_standing', 'urgent']);
 
 // Users Table
 export const users = pgTable("users", {
@@ -97,6 +98,20 @@ export const announcements = pgTable("announcements", {
   likes: integer("likes").notNull().default(0),
 });
 
+// Job Logs Table
+export const jobLogs = pgTable("job_logs", {
+  id: serial("id").primaryKey(),
+  logDate: text("log_date").notNull(), // Date of the job log in YYYY-MM-DD format
+  logTime: text("log_time").notNull(), // Time of the job log in HH:MM format
+  loggedBy: text("logged_by").notNull(), // Name of person who logged the job
+  storeId: integer("store_id").notNull(), // Store where the job is logged
+  description: text("description").notNull(), // Description of the job
+  attachment: text("attachment"), // URL or path to any uploaded attachment
+  comments: text("comments"), // Additional comments
+  flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
+  createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
+});
+
 // Schema Validation
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true });
@@ -106,6 +121,7 @@ export const insertChecklistSchema = createInsertSchema(checklists).omit({ id: t
 export const insertChecklistTaskSchema = createInsertSchema(checklistTasks).omit({ id: true });
 export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
+export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -131,3 +147,6 @@ export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
 
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+
+export type JobLog = typeof jobLogs.$inferSelect;
+export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
