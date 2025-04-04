@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
+import { getQueryFn } from "@/lib/queryClient";
+import { User as SelectUser } from "@shared/schema";
 import { 
   BarChart, 
   Bar, 
@@ -61,9 +63,14 @@ const notifications = [
 ];
 
 export default function DashboardBasic() {
-  const [username] = useState('Store Manager');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Fetch user data directly - matches approach in ProtectedComponent
+  const { data: user } = useQuery<SelectUser | undefined, Error>({
+    queryKey: ["/api/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
   
   // Simulate query for stores to be ready for real API integration later
   const { data: stores = chaiiwalaStores, isLoading } = useQuery({
@@ -185,10 +192,10 @@ export default function DashboardBasic() {
                 </p>
               </div>
               <div className="mt-4 md:mt-0 flex items-center">
-                <span className="mr-4 text-sm text-gray-700">Welcome, {username}</span>
-                <button onClick={() => toast({ title: "Not implemented", description: "Login functionality is currently in development" })} className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors">
+                <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username || 'User'}</span>
+                <a href="/auth" className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors">
                   Logout
-                </button>
+                </a>
               </div>
             </div>
 
