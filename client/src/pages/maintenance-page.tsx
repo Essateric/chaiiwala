@@ -8,15 +8,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
+import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon, BookIcon, ClipboardListIcon, AlertTriangleIcon, PlusIcon, Loader2 } from "lucide-react";
+import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
-import { format } from "date-fns";
 import { z } from "zod";
 
 // Component for Job Logs
@@ -298,7 +299,7 @@ function JobLogsSection() {
                 {jobLogs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell>
-                      {job.logDate} <span className="text-muted-foreground text-sm">{job.logTime}</span>
+                      {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
                     </TableCell>
                     <TableCell className="font-medium max-w-[300px] truncate">
                       {job.description}
