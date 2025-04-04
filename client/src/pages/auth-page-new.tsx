@@ -223,14 +223,28 @@ export default function AuthPageNew() {
                         </FormItem>
                       )}
                     />
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-chai-gold hover:bg-yellow-700"
-                      disabled={loginMutation.isPending}
-                    >
-                      {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Sign In
-                    </Button>
+                    <div className="flex flex-col space-y-4">
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-chai-gold hover:bg-yellow-700"
+                        disabled={loginMutation.isPending}
+                      >
+                        {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Sign In
+                      </Button>
+                      <div className="text-center">
+                        <button 
+                          type="button"
+                          onClick={() => toast({
+                            title: "Password Reset",
+                            description: "Please contact your administrator to reset your password.",
+                          })}
+                          className="text-sm text-gray-600 hover:text-chai-gold transition-colors"
+                        >
+                          Forgot your password?
+                        </button>
+                      </div>
+                    </div>
                   </form>
                 </Form>
               </TabsContent>
