@@ -30,9 +30,10 @@ import {
   FormLabel 
 } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useQuery } from '@tanstack/react-query';
 
 // Deep cleaning tasks
 const DEEP_CLEANING_TASKS = [
@@ -84,6 +85,8 @@ interface DeepCleaningEvent {
   start: Date;
   end: Date;
   allDay?: boolean;
+  storeId?: number;
+  storeName?: string;
   resource?: any;
 }
 
@@ -93,6 +96,12 @@ interface AddEventFormValues {
   endTime: string;
 }
 
+// Define interface for store locations
+interface StoreLocation {
+  id: number;
+  name: string;
+}
+
 export default function DeepCleaningPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -100,6 +109,12 @@ export default function DeepCleaningPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<string>(user?.storeId ? String(user.storeId) : 'all');
+  
+  // Fetch store locations - in a real app, this would come from an API
+  const { data: locations = [] } = useQuery<StoreLocation[]>({
+    queryKey: ["/api/locations"],
+  });
 
   // Create form
   const form = useForm<AddEventFormValues>({
@@ -112,33 +127,59 @@ export default function DeepCleaningPage() {
 
   // Mock loading events
   useEffect(() => {
-    // In a real app, you would fetch these from the API
+    // In a real app, you would fetch these from the API based on role and selected store
     const mockEvents: DeepCleaningEvent[] = [
       {
         id: '1',
         title: 'Clean Fridge Condensers',
         start: new Date(new Date().setDate(new Date().getDate() - 1)),
         end: new Date(new Date().setDate(new Date().getDate() - 1)),
-        allDay: true
+        allDay: true,
+        storeId: 1,
+        storeName: 'Cheetham Hill'
       },
       {
         id: '2',
         title: 'Defrost Freezers',
         start: new Date(),
         end: new Date(),
-        allDay: true
+        allDay: true,
+        storeId: 2,
+        storeName: 'Oxford Road'
       },
       {
         id: '3',
         title: 'Deep Clean Fryer',
         start: new Date(new Date().setDate(new Date().getDate() + 2)),
         end: new Date(new Date().setDate(new Date().getDate() + 2)),
-        allDay: true
+        allDay: true,
+        storeId: 3,
+        storeName: 'Old Trafford'
+      },
+      {
+        id: '4',
+        title: 'Clean Air Vents',
+        start: new Date(new Date().setDate(new Date().getDate() + 1)),
+        end: new Date(new Date().setDate(new Date().getDate() + 1)),
+        allDay: true,
+        storeId: 5,
+        storeName: 'Stockport Road'
       }
     ];
     
-    setEvents(mockEvents);
-  }, []);
+    // Filter events based on user role and selected store
+    let filteredEvents = [...mockEvents];
+    
+    if (user?.role === 'store') {
+      // Store managers can only see their own store's events
+      filteredEvents = filteredEvents.filter(event => event.storeId === user.storeId);
+    } else if ((user?.role === 'admin' || user?.role === 'regional') && selectedStore !== 'all') {
+      // Admin and regional managers can filter by specific store
+      filteredEvents = filteredEvents.filter(event => event.storeId === Number(selectedStore));
+    }
+    
+    setEvents(filteredEvents);
+  }, [user, selectedStore]);
 
   const handleSelectSlot = ({ start }: { start: Date }) => {
     setSelectedDate(start);
