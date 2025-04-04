@@ -19,7 +19,7 @@ export function useStaff() {
 
 export function useStaffByStore(storeId?: number) {
   const { data: staff = [], isLoading } = useQuery<Staff[]>({
-    queryKey: ["/api/staff/store", storeId],
+    queryKey: [`/api/staff/store/${storeId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!storeId // Only fetch when storeId is provided
   });
