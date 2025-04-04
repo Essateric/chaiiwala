@@ -2,6 +2,10 @@
   command = "npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
   publish = "dist/public"
   functions = "netlify/functions"
+  
+[build.environment]
+  NODE_VERSION = "18.x"
+  SESSION_SECRET = "chaiiwala-dashboard-secure-session-key"
 
 [dev]
   framework = "#custom"

@@ -6,9 +6,9 @@ import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import cors from 'cors';
 
-// Import server setup
-import { setupAuth } from '../../server/auth';
-import { registerRoutes } from '../../server/routes';
+// Import server setup - using Netlify-compatible modules
+import { setupAuth } from '../auth';
+import { registerRoutes } from '../routes';
 
 // Create Express app
 const app = express();
@@ -21,28 +21,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Set up session
-const sessionConfig = {
-  secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24 // 24 hours
-  }
-};
-
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-  sessionConfig.cookie.secure = true;
-}
-
-app.use(session(sessionConfig));
-
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Session and passport will be initialized by the setupAuth function
 
 // Set up authentication
 setupAuth(app);
