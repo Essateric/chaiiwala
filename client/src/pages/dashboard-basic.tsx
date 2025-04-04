@@ -193,9 +193,23 @@ export default function DashboardBasic() {
               </div>
               <div className="mt-4 md:mt-0 flex items-center">
                 <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username || 'User'}</span>
-                <a href="/auth" className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors">
+                <button 
+                  onClick={async () => {
+                    try {
+                      await fetch('/api/logout', { method: 'POST' });
+                      window.location.href = '/auth';
+                    } catch (error) {
+                      toast({ 
+                        title: "Logout failed", 
+                        description: "There was an error logging out. Please try again.", 
+                        variant: "destructive" 
+                      });
+                    }
+                  }} 
+                  className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors"
+                >
                   Logout
-                </a>
+                </button>
               </div>
             </div>
 
