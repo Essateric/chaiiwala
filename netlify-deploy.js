@@ -44,8 +44,8 @@ async function deploy() {
     // 2. Deploy to Netlify
     log.info(`Deploying to Netlify ${isProd ? 'production' : 'draft'} environment...`);
     const deployCommand = isProd
-      ? 'netlify deploy --dir=dist/client --prod --message "Production deploy from script"'
-      : 'netlify deploy --dir=dist/client --message "Draft deploy from script"';
+      ? 'netlify deploy --dir=dist/public --prod --message "Production deploy from script"'
+      : 'netlify deploy --dir=dist/public --message "Draft deploy from script"';
     
     execute(deployCommand);
     

@@ -1,12 +1,12 @@
 [build]
-  command = "npm run build"
-  publish = "dist/client"
+  command = "node build-netlify.js"
+  publish = "dist/public"
   functions = "netlify/functions"
 
 [dev]
   framework = "#custom"
   port = 8888
-  publish = "dist/client"
+  publish = "dist/public"
   autoLaunch = false
 
 [[redirects]]
