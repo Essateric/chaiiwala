@@ -33,7 +33,11 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
   name: z.string().min(3, "Name must be at least 3 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  title: z.string().optional(),
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["admin", "regional", "store", "staff"]).default("staff"),
@@ -130,7 +134,11 @@ export default function AuthPageNew() {
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
       name: "",
+      email: "",
+      title: "",
       username: "",
       password: "",
       role: "staff"
@@ -142,7 +150,18 @@ export default function AuthPageNew() {
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    registerMutation.mutate(data);
+    // If name is empty, create it from first and last name
+    if (!data.name && data.firstName && data.lastName) {
+      data.name = `${data.firstName} ${data.lastName}`;
+    }
+    
+    // Auto-generate empty permissions if not set
+    const userData = {
+      ...data,
+      permissions: [] // Default empty permissions array
+    };
+    
+    registerMutation.mutate(userData);
   };
 
   return (
@@ -220,15 +239,50 @@ export default function AuthPageNew() {
               <TabsContent value="register">
                 <Form {...registerForm}>
                   <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="First name" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Last name" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
                     <FormField
                       control={registerForm.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Full Name</FormLabel>
+                          <FormLabel>Display Name</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Enter your full name" 
+                              placeholder="Enter your full name (for display)" 
                               {...field} 
                             />
                           </FormControl>
@@ -236,6 +290,43 @@ export default function AuthPageNew() {
                         </FormItem>
                       )}
                     />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email"
+                              placeholder="Enter your email address" 
+                              {...field} 
+                              autoComplete="email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Job Title</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Your job title (optional)" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
                     <FormField
                       control={registerForm.control}
                       name="username"
@@ -253,6 +344,7 @@ export default function AuthPageNew() {
                         </FormItem>
                       )}
                     />
+                    
                     <FormField
                       control={registerForm.control}
                       name="password"
@@ -271,6 +363,7 @@ export default function AuthPageNew() {
                         </FormItem>
                       )}
                     />
+                    
                     <FormField
                       control={registerForm.control}
                       name="role"
@@ -292,6 +385,7 @@ export default function AuthPageNew() {
                         </FormItem>
                       )}
                     />
+                    
                     <Button 
                       type="submit" 
                       className="w-full bg-chai-gold hover:bg-yellow-700"
