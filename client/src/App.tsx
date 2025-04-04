@@ -3,6 +3,9 @@ import AuthPageNew from "@/pages/auth-page-new";
 import DashboardBasic from "@/pages/dashboard-basic";
 import InventoryView from "@/pages/inventory-view";
 import DeepCleaningPage from "@/pages/deep-cleaning-page";
+import MaintenancePage from "@/pages/maintenance-page";
+import EventOrdersPage from "@/pages/event-orders-page";
+import StockOrdersPage from "@/pages/stock-orders-page";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
@@ -99,6 +102,21 @@ function App() {
       <Route path="/deep-cleaning">
         <ProtectedComponent roles={["admin", "regional", "store"]}>
           <DeepCleaningPage />
+        </ProtectedComponent>
+      </Route>
+      <Route path="/maintenance">
+        <ProtectedComponent roles={["admin", "regional", "store"]}>
+          <MaintenancePage />
+        </ProtectedComponent>
+      </Route>
+      <Route path="/event-orders">
+        <ProtectedComponent roles={["admin", "regional", "store"]}>
+          <EventOrdersPage />
+        </ProtectedComponent>
+      </Route>
+      <Route path="/stock-orders">
+        <ProtectedComponent roles={["admin", "regional", "store"]}>
+          <StockOrdersPage />
         </ProtectedComponent>
       </Route>
       <Route path="/dashboard">
