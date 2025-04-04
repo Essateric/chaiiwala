@@ -6,7 +6,8 @@ import {
   Checklist, InsertChecklist,
   ChecklistTask, InsertChecklistTask,
   Schedule, InsertSchedule,
-  Announcement, InsertAnnouncement
+  Announcement, InsertAnnouncement,
+  JobLog, InsertJobLog
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -55,6 +56,13 @@ export interface IStorage {
   getRecentAnnouncements(): Promise<{ id: string; title: string; description: string; date: string; isHighlighted: boolean; }[]>;
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
   likeAnnouncement(id: number): Promise<Announcement | undefined>;
+  
+  // Job Logs methods
+  getAllJobLogs(): Promise<JobLog[]>;
+  getJobLogsByStore(storeId: number): Promise<JobLog[]>;
+  getJobLog(id: number): Promise<JobLog | undefined>;
+  createJobLog(jobLog: InsertJobLog): Promise<JobLog>;
+  updateJobLog(id: number, data: Partial<JobLog>): Promise<JobLog | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -68,6 +76,7 @@ export class MemStorage implements IStorage {
   private checklistTasks: Map<number, ChecklistTask>;
   private schedules: Map<number, Schedule>;
   private announcements: Map<number, Announcement>;
+  private jobLogs: Map<number, JobLog>;
   
   private userId: number;
   private storeId: number;
@@ -77,6 +86,7 @@ export class MemStorage implements IStorage {
   private checklistTaskId: number;
   private scheduleId: number;
   private announcementId: number;
+  private jobLogId: number;
 
   constructor() {
     // Initialize session store
@@ -93,6 +103,7 @@ export class MemStorage implements IStorage {
     this.checklistTasks = new Map();
     this.schedules = new Map();
     this.announcements = new Map();
+    this.jobLogs = new Map();
 
     // Initialize IDs
     this.userId = 1;
@@ -103,6 +114,7 @@ export class MemStorage implements IStorage {
     this.checklistTaskId = 1;
     this.scheduleId = 1;
     this.announcementId = 1;
+    this.jobLogId = 1;
 
     // Seed data
     this.seedInitialData();
@@ -356,6 +368,43 @@ export class MemStorage implements IStorage {
     return updatedAnnouncement;
   }
 
+  // Job Logs methods
+  async getAllJobLogs(): Promise<JobLog[]> {
+    return Array.from(this.jobLogs.values());
+  }
+
+  async getJobLogsByStore(storeId: number): Promise<JobLog[]> {
+    return Array.from(this.jobLogs.values())
+      .filter(log => log.storeId === storeId);
+  }
+
+  async getJobLog(id: number): Promise<JobLog | undefined> {
+    return this.jobLogs.get(id);
+  }
+
+  async createJobLog(insertJobLog: InsertJobLog): Promise<JobLog> {
+    const id = this.jobLogId++;
+    const jobLog: JobLog = {
+      ...insertJobLog,
+      id,
+      createdAt: new Date()
+    };
+    this.jobLogs.set(id, jobLog);
+    return jobLog;
+  }
+
+  async updateJobLog(id: number, data: Partial<JobLog>): Promise<JobLog | undefined> {
+    const jobLog = this.jobLogs.get(id);
+    if (!jobLog) return undefined;
+    
+    const updatedJobLog: JobLog = {
+      ...jobLog,
+      ...data
+    };
+    this.jobLogs.set(id, updatedJobLog);
+    return updatedJobLog;
+  }
+
   // Helper methods
   private formatAnnouncementDate(date: Date): string {
     const now = new Date();
@@ -371,6 +420,8 @@ export class MemStorage implements IStorage {
 
   // Seed data
   private seedInitialData() {
+    // Initialize jobLogId
+    this.jobLogId = 1;
     // Seed stores
     const storeData: InsertStore[] = [
       { name: "Cheetham Hill", address: "74 Bury Old Rd, Manchester M8 5BW", area: 1, manager: "MGR_CH" },
@@ -827,6 +878,64 @@ export class MemStorage implements IStorage {
       .then(announcement => {
         this.announcements.set(announcement.id, { ...announcement, date: twoWeeksAgo });
       });
+      
+    // Seed job logs
+    const jobLogData: InsertJobLog[] = [
+      {
+        storeId: 1,
+        description: "Coffee machine needs service - steam wand not working properly",
+        logDate: "2023-07-15",
+        logTime: "09:30",
+        loggedBy: "Ahmed Khan",
+        attachment: null,
+        comments: "Engineer scheduled for tomorrow",
+        flag: "normal"
+      },
+      {
+        storeId: 1,
+        description: "Refrigerator temperature fluctuating",
+        logDate: "2023-07-14",
+        logTime: "16:45",
+        loggedBy: "Mohammed Ali",
+        attachment: null,
+        comments: "Called maintenance, waiting for callback",
+        flag: "urgent"
+      },
+      {
+        storeId: 2,
+        description: "Payment terminal occasionally freezing during transactions",
+        logDate: "2023-07-10",
+        logTime: "14:20",
+        loggedBy: "Sarah Smith",
+        attachment: null,
+        comments: "Support ticket opened with provider #45692",
+        flag: "long_standing"
+      },
+      {
+        storeId: 3,
+        description: "Leaking pipe under sink in back kitchen",
+        logDate: "2023-07-13",
+        logTime: "11:15",
+        loggedBy: "David Chen",
+        attachment: null,
+        comments: "Plumber booked for next Tuesday",
+        flag: "normal"
+      },
+      {
+        storeId: 5,
+        description: "Front door hinge loose, door not closing properly",
+        logDate: "2023-07-12",
+        logTime: "08:00",
+        loggedBy: "Jubayed Chowdhury",
+        attachment: null,
+        comments: "Temporary fix applied, needs proper repair",
+        flag: "long_standing"
+      }
+    ];
+    
+    jobLogData.forEach(jobLog => {
+      this.createJobLog(jobLog);
+    });
   }
 }
 

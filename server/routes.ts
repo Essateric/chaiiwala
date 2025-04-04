@@ -11,9 +11,11 @@ import {
   insertChecklistTaskSchema,
   insertScheduleSchema,
   insertAnnouncementSchema,
+  insertJobLogSchema,
   taskStatusEnum,
   priorityEnum,
-  inventoryStatusEnum
+  inventoryStatusEnum,
+  jobFlagEnum
 } from "@shared/schema";
 
 // Helper middleware to check if user is authenticated
@@ -270,6 +272,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       name: store.name
     }));
     res.json(locations);
+  });
+
+  // Job Logs
+  app.get("/api/joblogs", isAuthenticated, async (req, res) => {
+    const jobLogs = await storage.getAllJobLogs();
+    res.json(jobLogs);
+  });
+
+  app.get("/api/joblogs/store/:storeId", isAuthenticated, async (req, res) => {
+    const storeId = parseInt(req.params.storeId);
+    const jobLogs = await storage.getJobLogsByStore(storeId);
+    res.json(jobLogs);
+  });
+
+  app.get("/api/joblogs/:id", isAuthenticated, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const jobLog = await storage.getJobLog(id);
+    if (jobLog) {
+      res.json(jobLog);
+    } else {
+      res.status(404).json({ message: "Job log not found" });
+    }
+  });
+
+  app.post("/api/joblogs", isAuthenticated, hasRole(["admin", "regional", "store", "staff"]), async (req, res) => {
+    try {
+      const jobLogData = insertJobLogSchema.parse(req.body);
+      const jobLog = await storage.createJobLog(jobLogData);
+      res.status(201).json(jobLog);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create job log" });
+      }
+    }
+  });
+
+  app.patch("/api/joblogs/:id", isAuthenticated, hasRole(["admin", "regional", "store"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedJobLog = await storage.updateJobLog(id, req.body);
+      if (updatedJobLog) {
+        res.json(updatedJobLog);
+      } else {
+        res.status(404).json({ message: "Job log not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update job log" });
+    }
   });
 
   const httpServer = createServer(app);
