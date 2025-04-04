@@ -1,29 +1,54 @@
-// Import required dependencies
+// Netlify serverless function for the Chaiiwala Dashboard API
 import express from 'express';
 import serverless from 'serverless-http';
 import session from 'express-session';
+import cookieParser from 'cookie-parser';
+import passport from 'passport';
+import cors from 'cors';
+
+// Import server setup
+import { setupAuth } from '../../server/auth';
 import { registerRoutes } from '../../server/routes';
 
 // Create Express app
 const app = express();
 
-// Configure Express
+// Configure middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(cors({
+  origin: process.env.URL || 'http://localhost:3000',
+  credentials: true
+}));
 
-// Setup session (this would need to be configured appropriately for production)
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'chaiiwala-session-secret',
+// Set up session
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 24 // 24 hours
   }
-}));
+};
 
-// Register the API routes from our existing routes.ts file
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+  sessionConfig.cookie.secure = true;
+}
+
+app.use(session(sessionConfig));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Set up authentication
+setupAuth(app);
+
+// Register API routes
 registerRoutes(app);
 
-// Export the serverless function
+// Export the handler for Netlify Functions
 export const handler = serverless(app);
