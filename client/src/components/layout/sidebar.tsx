@@ -34,6 +34,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const currentPage = location === "/" ? "dashboard" : location.substring(1);
 
   // Navigation items with role-based access
+  // Force console log to debug items and roles
+  console.log("Current user role:", user.role);
+  console.log("Current page:", currentPage);
+  
   const navItems = [
     { 
       name: 'Dashboard', 
@@ -48,6 +52,35 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: '/inventory', 
       active: currentPage === 'inventory',
       roles: ['admin', 'regional'] 
+    },
+    // New items placed higher in the list for better visibility
+    {
+      name: 'Maintenance',
+      icon: WrenchIcon,
+      href: '/maintenance',
+      active: currentPage === 'maintenance',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Event Orders',
+      icon: CalendarDaysIcon,
+      href: '/event-orders',
+      active: currentPage === 'event-orders',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Stock Orders',
+      icon: PackageIcon,
+      href: '/stock-orders',
+      active: currentPage === 'stock-orders',
+      roles: ['admin', 'regional', 'store']
+    },
+    { 
+      name: 'Deep Cleaning', 
+      icon: ClipboardCheckIcon, 
+      href: '/deep-cleaning', 
+      active: currentPage === 'deep-cleaning',
+      roles: ['admin', 'regional', 'store'] 
     },
     { 
       name: 'Staff Schedule', 
@@ -69,34 +102,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: '/tasks', 
       active: currentPage === 'tasks',
       roles: ['admin', 'regional', 'store', 'staff'] 
-    },
-    { 
-      name: 'Deep Cleaning', 
-      icon: ClipboardCheckIcon, 
-      href: '/deep-cleaning', 
-      active: currentPage === 'deep-cleaning',
-      roles: ['admin', 'regional', 'store'] 
-    },
-    {
-      name: 'Maintenance',
-      icon: WrenchIcon,
-      href: '/maintenance',
-      active: currentPage === 'maintenance',
-      roles: ['admin', 'regional', 'store']
-    },
-    {
-      name: 'Event Orders',
-      icon: CalendarDaysIcon,
-      href: '/event-orders',
-      active: currentPage === 'event-orders',
-      roles: ['admin', 'regional', 'store']
-    },
-    {
-      name: 'Stock Orders',
-      icon: PackageIcon,
-      href: '/stock-orders',
-      active: currentPage === 'stock-orders',
-      roles: ['admin', 'regional', 'store']
     },
     { 
       name: 'Announcements', 
