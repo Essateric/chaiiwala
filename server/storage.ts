@@ -574,6 +574,78 @@ export class MemStorage implements IStorage {
         role: "staff", 
         storeId: 3, 
         permissions: ["basic_access"] 
+      },
+      { 
+        username: "aisha", 
+        password: hashPassword, 
+        firstName: "Aisha", 
+        lastName: "Khan", 
+        name: "Aisha Khan", 
+        email: "aisha@chaiiwala.com",
+        title: "Team Lead",
+        role: "staff", 
+        storeId: 1, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "liam", 
+        password: hashPassword, 
+        firstName: "Liam", 
+        lastName: "Smith", 
+        name: "Liam Smith", 
+        email: "liam@chaiiwala.com",
+        title: "Barista",
+        role: "staff", 
+        storeId: 1, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "raj", 
+        password: hashPassword, 
+        firstName: "Raj", 
+        lastName: "Patel", 
+        name: "Raj Patel", 
+        email: "raj@chaiiwala.com",
+        title: "Team Lead",
+        role: "staff", 
+        storeId: 2, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "emily", 
+        password: hashPassword, 
+        firstName: "Emily", 
+        lastName: "Johnson", 
+        name: "Emily Johnson", 
+        email: "emily@chaiiwala.com",
+        title: "Barista",
+        role: "staff", 
+        storeId: 2, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "jayesh", 
+        password: hashPassword, 
+        firstName: "Jayesh", 
+        lastName: "Mehta", 
+        name: "Jayesh Mehta", 
+        email: "jayesh@chaiiwala.com",
+        title: "Team Lead",
+        role: "staff", 
+        storeId: 3, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "sonya", 
+        password: hashPassword, 
+        firstName: "Sonya", 
+        lastName: "Williams", 
+        name: "Sonya Williams", 
+        email: "sonya@chaiiwala.com",
+        title: "Barista",
+        role: "staff", 
+        storeId: 3, 
+        permissions: ["basic_access"] 
       }
     ];
     
