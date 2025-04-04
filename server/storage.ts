@@ -150,7 +150,7 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; }[]> {
+  async getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]> {
     const staffColors = ["#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF6"];
     return Array.from(this.users.values())
       .filter(user => user.role === 'staff' || user.role === 'store')
@@ -158,7 +158,18 @@ export class MemStorage implements IStorage {
         id: user.id,
         name: user.name,
         role: user.role === 'staff' ? 'Staff' : 'Store Manager',
-        color: staffColors[index % staffColors.length]
+        color: staffColors[index % staffColors.length],
+        storeId: user.storeId
+      }));
+  }
+  
+  async getStaffByStore(storeId: number): Promise<{ id: number; name: string; role: string; }[]> {
+    return Array.from(this.users.values())
+      .filter(user => (user.role === 'staff' || user.role === 'store') && user.storeId === storeId)
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        role: user.role === 'staff' ? 'Staff' : 'Store Manager'
       }));
   }
 

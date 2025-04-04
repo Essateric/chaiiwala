@@ -224,6 +224,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const staff = await storage.getAllStaff();
     res.json(staff);
   });
+  
+  app.get("/api/staff/store/:storeId", isAuthenticated, async (req, res) => {
+    const storeId = parseInt(req.params.storeId);
+    const staff = await storage.getStaffByStore(storeId);
+    res.json(staff);
+  });
 
   // Announcements
   app.get("/api/announcements", isAuthenticated, async (req, res) => {

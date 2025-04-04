@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
+import { useStaffByStore } from "@/hooks/use-staff";
 import { z } from "zod";
 
 // Component for Job Logs
@@ -27,6 +28,11 @@ function JobLogsSection() {
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" ? user?.storeId ?? undefined : undefined
   );
+  
+  // Get store staff for the "Logged By" dropdown
+  const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; // Default to first store if not a store manager
+  const [formStoreId, setFormStoreId] = useState<number>(initialStoreId);
+  const { staff: storeStaff, isLoading: isLoadingStaff } = useStaffByStore(formStoreId);
 
   const { jobLogs: allJobLogs, isLoading, createJobLog, isCreating } = useJobLogs();
   
@@ -155,7 +161,11 @@ function JobLogsSection() {
                           <FormLabel>Store Location</FormLabel>
                           <Select
                             value={field.value?.toString() || "1"}
-                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            onValueChange={(value) => {
+                              const storeId = parseInt(value);
+                              field.onChange(storeId);
+                              setFormStoreId(storeId); // Update the form store ID to fetch appropriate staff
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select a store" />
@@ -220,7 +230,28 @@ function JobLogsSection() {
                         <FormItem>
                           <FormLabel>Logged By</FormLabel>
                           <FormControl>
-                            <Input placeholder="Your name" {...field} />
+                            {isLoadingStaff ? (
+                              <div className="flex items-center space-x-2">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Loading staff...</span>
+                              </div>
+                            ) : storeStaff.length > 0 ? (
+                              <Select
+                                value={field.value}
+                                onValueChange={field.onChange}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select staff member" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {storeStaff.map(staff => (
+                                    <SelectItem key={staff.id} value={staff.name}>{staff.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input placeholder="Your name" {...field} />
+                            )}
                           </FormControl>
                           <FormMessage />
                         </FormItem>
