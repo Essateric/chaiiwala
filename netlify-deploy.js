@@ -38,8 +38,11 @@ function execute(command) {
 async function deploy() {
   try {
     // 1. Build the application
-    log.info('Building application...');
-    execute('npm run build');
+    log.info('Building frontend...');
+    execute('npx vite build');
+    
+    log.info('Building server...');
+    execute('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist');
     
     // 2. Deploy to Netlify
     log.info(`Deploying to Netlify ${isProd ? 'production' : 'draft'} environment...`);
