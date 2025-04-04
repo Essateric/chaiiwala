@@ -13,9 +13,13 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  name: text("name").notNull(),
-  email: text("email"),
-  role: roleEnum("role").notNull().default('staff'),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  name: text("name").notNull(), // Keeping this for backward compatibility
+  email: text("email").notNull(),
+  title: text("title"), // Job title
+  role: roleEnum("role").notNull().default('staff'), // Role for permissions
+  permissions: text("permissions").array(), // Array of specific permissions
   storeId: integer("store_id"),
 });
 

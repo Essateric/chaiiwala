@@ -121,7 +121,19 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.userId++;
-    const user: User = { ...insertUser, id };
+    
+    // Ensure the user has all required fields
+    const user: User = { 
+      ...insertUser, 
+      id,
+      firstName: insertUser.firstName || "",
+      lastName: insertUser.lastName || "",
+      name: insertUser.name || `${insertUser.firstName || ""} ${insertUser.lastName || ""}`.trim(),
+      email: insertUser.email || "",
+      title: insertUser.title || null,
+      permissions: insertUser.permissions || [] 
+    };
+    
     this.users.set(id, user);
     return user;
   }
@@ -379,22 +391,128 @@ export class MemStorage implements IStorage {
     
     const userData: InsertUser[] = [
       // Admin with unlimited access
-      { username: "shabnam", password: hashPassword, name: "Shabnam Essa", role: "admin", email: "shabnam@chaiiwala.com" },
+      { 
+        username: "shabnam", 
+        password: hashPassword, 
+        firstName: "Shabnam", 
+        lastName: "Essa", 
+        name: "Shabnam Essa", 
+        email: "shabnam@chaiiwala.com", 
+        title: "CEO", 
+        role: "admin", 
+        permissions: ["all_access", "admin_panel", "reports"]
+      },
       
       // Regional manager with access to all stores
-      { username: "usman", password: hashPassword, name: "Usman Aftab", role: "regional", email: "usman@chaiiwala.com" },
+      { 
+        username: "usman", 
+        password: hashPassword, 
+        firstName: "Usman", 
+        lastName: "Aftab", 
+        name: "Usman Aftab", 
+        email: "usman@chaiiwala.com", 
+        title: "Regional Director", 
+        role: "regional", 
+        permissions: ["view_all_stores", "inventory_management", "staff_scheduling"]
+      },
       
       // Store manager with access limited to Stockport Road store
-      { username: "jubayed", password: hashPassword, name: "Jubayed Chowdhury", role: "store", storeId: 5, email: "jubayed@chaiiwala.com" },
+      { 
+        username: "jubayed", 
+        password: hashPassword, 
+        firstName: "Jubayed", 
+        lastName: "Chowdhury", 
+        name: "Jubayed Chowdhury", 
+        email: "jubayed@chaiiwala.com", 
+        title: "Store Manager", 
+        role: "store", 
+        storeId: 5, 
+        permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
+      },
       
-      // Original seed data
-      { username: "admin", password: hashPassword, name: "Admin User", role: "admin" },
-      { username: "regional1", password: hashPassword, name: "Fatima Khan", role: "regional" },
-      { username: "manager1", password: hashPassword, name: "Ahmed Khan", role: "store", storeId: 1 },
-      { username: "manager2", password: hashPassword, name: "Sarah Smith", role: "store", storeId: 2 },
-      { username: "staff1", password: hashPassword, name: "Mohammed Ali", role: "staff", storeId: 1 },
-      { username: "staff2", password: hashPassword, name: "Jessica Patel", role: "staff", storeId: 2 },
-      { username: "staff3", password: hashPassword, name: "David Chen", role: "staff", storeId: 3 }
+      // Original seed data with updated fields
+      { 
+        username: "admin", 
+        password: hashPassword, 
+        firstName: "Admin", 
+        lastName: "User", 
+        name: "Admin User", 
+        email: "admin@chaiiwala.com",
+        title: "System Administrator",
+        role: "admin", 
+        permissions: ["all_access"] 
+      },
+      { 
+        username: "regional1", 
+        password: hashPassword, 
+        firstName: "Fatima", 
+        lastName: "Khan", 
+        name: "Fatima Khan", 
+        email: "fatima@chaiiwala.com",
+        title: "Regional Manager",
+        role: "regional", 
+        permissions: ["view_all_stores", "inventory_management"] 
+      },
+      { 
+        username: "manager1", 
+        password: hashPassword, 
+        firstName: "Ahmed", 
+        lastName: "Khan", 
+        name: "Ahmed Khan", 
+        email: "ahmed@chaiiwala.com",
+        title: "Store Manager",
+        role: "store", 
+        storeId: 1, 
+        permissions: ["manage_store"] 
+      },
+      { 
+        username: "manager2", 
+        password: hashPassword, 
+        firstName: "Sarah", 
+        lastName: "Smith", 
+        name: "Sarah Smith", 
+        email: "sarah@chaiiwala.com",
+        title: "Store Manager",
+        role: "store", 
+        storeId: 2, 
+        permissions: ["manage_store"] 
+      },
+      { 
+        username: "staff1", 
+        password: hashPassword, 
+        firstName: "Mohammed", 
+        lastName: "Ali", 
+        name: "Mohammed Ali", 
+        email: "mohammed@chaiiwala.com",
+        title: "Store Associate",
+        role: "staff", 
+        storeId: 1, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "staff2", 
+        password: hashPassword, 
+        firstName: "Jessica", 
+        lastName: "Patel", 
+        name: "Jessica Patel", 
+        email: "jessica@chaiiwala.com",
+        title: "Store Associate",
+        role: "staff", 
+        storeId: 2, 
+        permissions: ["basic_access"] 
+      },
+      { 
+        username: "staff3", 
+        password: hashPassword, 
+        firstName: "David", 
+        lastName: "Chen", 
+        name: "David Chen", 
+        email: "david@chaiiwala.com",
+        title: "Store Associate",
+        role: "staff", 
+        storeId: 3, 
+        permissions: ["basic_access"] 
+      }
     ];
     
     userData.forEach(user => {
