@@ -11,7 +11,7 @@ export interface Staff {
 export function useStaff() {
   const { data: staff = [], isLoading } = useQuery<Staff[]>({
     queryKey: ["/api/staff"],
-    queryFn: getQueryFn()
+    queryFn: getQueryFn({ on401: "throw" })
   });
   
   return { staff, isLoading };
@@ -20,7 +20,7 @@ export function useStaff() {
 export function useStaffByStore(storeId?: number) {
   const { data: staff = [], isLoading } = useQuery<Staff[]>({
     queryKey: ["/api/staff/store", storeId],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!storeId // Only fetch when storeId is provided
   });
   
