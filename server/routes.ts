@@ -38,6 +38,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
+  // Redirect root to auth page for easier access
+  app.get("/", (req, res) => {
+    if (!req.isAuthenticated()) {
+      res.redirect("/auth");
+    } else {
+      // If already authenticated, let the client handle it
+      res.redirect("/dashboard");
+    }
+  });
+
   // Stores
   app.get("/api/stores", isAuthenticated, async (req, res) => {
     const stores = await storage.getAllStores();
