@@ -97,7 +97,7 @@ function JobLogsSection() {
               <SelectValue placeholder="Select Store" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Stores</SelectItem>
+              <SelectItem value="all">All Stores</SelectItem>
               <SelectItem value="1">Stockport Road</SelectItem>
               <SelectItem value="2">Wilmslow Road</SelectItem>
               <SelectItem value="3">Deansgate</SelectItem>
