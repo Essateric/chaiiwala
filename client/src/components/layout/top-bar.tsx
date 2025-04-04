@@ -36,11 +36,6 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center">
-            <img 
-              src={chaiiwalaLogo} 
-              alt="Chaiiwala Logo" 
-              className="h-8 w-auto mr-3"
-            />
             <h1 className="ml-2 lg:ml-0 font-montserrat font-bold text-xl capitalize">
               {title}
             </h1>
