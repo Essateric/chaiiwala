@@ -1,6 +1,5 @@
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import StatsCard from "@/components/dashboard/stats-card";
-import StoreTable from "@/components/dashboard/store-table";
 import TaskItem from "@/components/dashboard/task-item";
 import AnnouncementItem from "@/components/dashboard/announcement-item";
 import { 
@@ -147,13 +146,8 @@ export default function DashboardPage() {
             />
           </div>
           
-          {/* Store Locations & Quick Access */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Store Locations */}
-            <div className="lg:col-span-2">
-              <StoreTable stores={stores} limit={4} />
-            </div>
-            
+          {/* Quick Access Section */}
+          <div className="grid grid-cols-1 gap-6">
             {/* Quick Access */}
             <div className="space-y-6">
               {/* Today's Tasks */}
