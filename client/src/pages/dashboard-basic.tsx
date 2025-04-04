@@ -192,7 +192,7 @@ export default function DashboardBasic() {
                 </p>
               </div>
               <div className="mt-4 md:mt-0 flex items-center">
-                <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username || 'User'}</span>
+                <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'User'}</span>
                 <button 
                   onClick={async () => {
                     try {
