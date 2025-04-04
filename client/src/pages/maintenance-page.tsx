@@ -27,7 +27,13 @@ function JobLogsSection() {
     user?.role === "store" ? user?.storeId ?? undefined : undefined
   );
 
-  const { jobLogs, isLoading, createJobLog, isCreating } = useJobLogs(selectedStoreId);
+  const { jobLogs: allJobLogs, isLoading, createJobLog, isCreating } = useJobLogs();
+  
+  // Filter job logs based on selected store
+  const jobLogs = React.useMemo(() => {
+    if (!selectedStoreId) return allJobLogs;
+    return allJobLogs.filter(log => log.storeId === selectedStoreId);
+  }, [allJobLogs, selectedStoreId]);
   
   const form = useForm({
     resolver: zodResolver(insertJobLogSchema.extend({
@@ -92,7 +98,10 @@ function JobLogsSection() {
           </CardDescription>
         </div>
         {(user?.role === "admin" || user?.role === "regional") && (
-          <Select value={selectedStoreId?.toString()} onValueChange={(value) => setSelectedStoreId(value ? parseInt(value) : undefined)}>
+          <Select 
+            value={selectedStoreId?.toString() || "all"} 
+            onValueChange={(value) => setSelectedStoreId(value === "all" ? undefined : parseInt(value))}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Store" />
             </SelectTrigger>
