@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout";
 import StatsCard from "@/components/dashboard/stats-card";
 import TaskItem from "@/components/dashboard/task-item";
 import AnnouncementItem from "@/components/dashboard/announcement-item";
+import JobLogsWidget from "@/components/dashboard/job-logs-widget";
 import { 
   Building, 
   Users, 
@@ -209,6 +210,9 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>
+              
+              {/* Job Logs Widget */}
+              <JobLogsWidget />
             </div>
           </div>
         </TabsContent>

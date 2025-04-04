@@ -1,72 +1,69 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { JobLog, InsertJobLog } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
+import { JobLog, InsertJobLog } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useJobLogs(storeId?: number) {
-  const { user } = useAuth();
   const { toast } = useToast();
-  
-  const queryKey = storeId 
-    ? ['/api/joblogs/store', storeId] 
-    : ['/api/joblogs'];
-  
+
+  // Fetch all job logs
   const { data: jobLogs = [], isLoading, error } = useQuery<JobLog[]>({
-    queryKey,
-    enabled: !!user,
+    queryKey: storeId ? ["/api/joblogs", storeId] : ["/api/joblogs"],
+    queryFn: async () => {
+      const endpoint = storeId 
+        ? `/api/joblogs/store/${storeId}` 
+        : "/api/joblogs";
+      
+      const response = await apiRequest("GET", endpoint);
+      return await response.json();
+    },
   });
 
-  const createJobLogMutation = useMutation({
+  // Create a new job log
+  const { mutateAsync: createJobLog } = useMutation({
     mutationFn: async (jobLog: InsertJobLog) => {
-      const res = await apiRequest("POST", "/api/joblogs", jobLog);
-      return await res.json();
+      const response = await apiRequest("POST", "/api/joblogs", jobLog);
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
-      if (storeId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/joblogs/store', storeId] });
-      }
+      // Invalidate all job logs queries
+      queryClient.invalidateQueries({ queryKey: ["/api/joblogs"] });
       toast({
         title: "Job Log Created",
-        description: "The job log has been successfully created.",
+        description: "The job log has been created successfully.",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error Creating Job Log",
-        description: error.message || "An error occurred while creating the job log.",
+        description: error.message || "Failed to create job log. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const updateJobLogMutation = useMutation({
+  // Update job log
+  const { mutateAsync: updateJobLog } = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<JobLog> }) => {
-      const res = await apiRequest("PATCH", `/api/joblogs/${id}`, data);
-      return await res.json();
+      const response = await apiRequest("PUT", `/api/joblogs/${id}`, data);
+      return await response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
-      if (storeId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/joblogs/store', storeId] });
-      }
+    onSuccess: () => {
+      // Invalidate all job logs queries
+      queryClient.invalidateQueries({ queryKey: ["/api/joblogs"] });
       toast({
         title: "Job Log Updated",
-        description: "The job log has been successfully updated.",
+        description: "The job log has been updated successfully.",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error Updating Job Log",
-        description: error.message || "An error occurred while updating the job log.",
+        description: error.message || "Failed to update job log. Please try again.",
         variant: "destructive",
       });
     },
   });
-
-  const createJobLog = (jobLog: InsertJobLog) => createJobLogMutation.mutateAsync(jobLog);
-  const updateJobLog = (id: number, data: Partial<JobLog>) => updateJobLogMutation.mutateAsync({ id, data });
 
   return {
     jobLogs,
@@ -74,7 +71,5 @@ export function useJobLogs(storeId?: number) {
     error,
     createJobLog,
     updateJobLog,
-    isCreating: createJobLogMutation.isPending,
-    isUpdating: updateJobLogMutation.isPending,
   };
 }
