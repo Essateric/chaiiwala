@@ -101,7 +101,13 @@ function JobLogsSection() {
         {(user?.role === "admin" || user?.role === "regional") && (
           <Select 
             value={selectedStoreId?.toString() || "all"} 
-            onValueChange={(value) => setSelectedStoreId(value === "all" ? undefined : parseInt(value))}
+            onValueChange={(value) => {
+              if (value === "all") {
+                setSelectedStoreId(undefined);
+              } else {
+                setSelectedStoreId(parseInt(value));
+              }
+            }}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Store" />
@@ -148,7 +154,7 @@ function JobLogsSection() {
                         <FormItem>
                           <FormLabel>Store Location</FormLabel>
                           <Select
-                            value={field.value.toString()}
+                            value={field.value?.toString() || "1"}
                             onValueChange={(value) => field.onChange(parseInt(value))}
                           >
                             <SelectTrigger>

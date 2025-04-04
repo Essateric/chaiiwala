@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { StoresList } from "@/components/stores/stores-list";
 
 interface Store {
   id: number;
@@ -151,6 +152,11 @@ export default function StoresPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+      </div>
+      
+      {/* Stores List (matches format from image) */}
+      <div className="mb-6">
+        <StoresList />
       </div>
       
       {/* Stores Table */}
