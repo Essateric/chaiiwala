@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, Clock } from "lucide-react";
+import { Loader2, AlertCircle, Clock, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
 import { JobLog } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 
 export default function JobLogsWidget() {
   const { user } = useAuth();
@@ -17,8 +18,10 @@ export default function JobLogsWidget() {
   );
   const [flagFilter, setFlagFilter] = useState<string | undefined>(undefined);
   
-  // Fetch all job logs
-  const { jobLogs: allJobLogs, isLoading } = useJobLogs();
+  // Direct fetch to ensure it loads properly in the dashboard
+  const { data: allJobLogs = [], isLoading } = useQuery<JobLog[]>({
+    queryKey: ["/api/joblogs"],
+  });
   
   // Filter job logs based on selected store and flag
   const filteredJobLogs = useMemo(() => {
