@@ -14,14 +14,14 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  name: text("name").notNull(), // Keeping this for backward compatibility
-  email: text("email").notNull(),
-  title: text("title"), // Job title
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  name: text("name"), // Making this nullable too for compatibility with existing data
+  email: text("email"),
+  title: text("title"), // Job title can be null
   role: roleEnum("role").notNull().default('staff'), // Role for permissions
   permissions: text("permissions").array(), // Array of specific permissions
-  storeId: integer("store_id"),
+  storeId: integer("store_id"), // Store assignment, can be null
 });
 
 // Stores Table
