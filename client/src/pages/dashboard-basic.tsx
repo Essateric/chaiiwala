@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { 
   BarChart, 
   Bar, 
@@ -13,16 +14,10 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { 
-  Coffee, 
   Store, 
   Users, 
-  CheckSquare, 
   AlertTriangle,
-  Sparkles,
-  Bell,
-  Menu,
-  ShoppingBasket,
-  X
+  Sparkles
 } from 'lucide-react';
 
 // Store data from the user's input
@@ -63,7 +58,6 @@ const notifications = [
 ];
 
 export default function DashboardBasic() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   
   // Fetch user data directly - matches approach in ProtectedComponent
@@ -82,352 +76,234 @@ export default function DashboardBasic() {
     enabled: false // Disable actual fetching since we're using sample data
   });
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar - desktop only */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-        <div className="flex flex-col flex-grow pt-5 bg-[#1c1f2a] overflow-y-auto">
-          <div className="flex items-center flex-shrink-0 px-4 py-2">
-            <div className="h-12 w-auto bg-chai-gold rounded-md flex items-center justify-center mr-3 px-2">
-              <img 
-                src="/assets/chaiiwala.png" 
-                alt="Chaiiwala Logo" 
-                className="h-8 w-auto"
-              />
-            </div>
+    <DashboardLayout title="Dashboard">
+      <div className="py-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              An overview of your Chaiiwala stores performance
+            </p>
           </div>
-          <div className="mt-5 flex-1 flex flex-col">
-            <nav className="flex-1 px-2 pb-4 space-y-1">
-              <a href="/" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Store className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
-                Dashboard
-              </a>
-              <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
-                Inventory
-              </a>
-              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Users className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
-                Staff
-              </a>
-              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <CheckSquare className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
-                Tasks
-              </a>
-              <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Bell className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
-                Announcements
-              </a>
-            </nav>
+          <div className="mt-4 md:mt-0 flex items-center">
+            <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'User'}</span>
           </div>
         </div>
-      </div>
 
-      {/* Mobile menu button */}
-      <div className="md:hidden fixed top-0 left-0 z-20 w-full bg-[#1c1f2a]">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="h-10 w-auto bg-chai-gold rounded-md flex items-center justify-center px-2">
-              <img 
-                src="/assets/chaiiwala.png" 
-                alt="Chaiiwala Logo" 
-                className="h-6 w-auto"
-              />
-            </div>
-          </div>
-          <button 
-            onClick={toggleMobileMenu}
-            className="text-white focus:outline-none"
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-10 bg-[#1c1f2a] pt-14">
-          <nav className="px-4 pt-4 pb-5 space-y-1">
-            <a href="/" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Store className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
-              Dashboard
-            </a>
-            <a href="/inventory" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
-              Inventory
-            </a>
-            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Users className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
-              Staff
-            </a>
-            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <CheckSquare className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
-              Tasks
-            </a>
-            <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Bell className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
-              Announcements
-            </a>
-          </nav>
-        </div>
-      )}
-
-      {/* Main content */}
-      <div className="md:pl-64 flex flex-col flex-1">
-        <main className="flex-1">
-          <div className="py-6 px-4 sm:px-6 lg:px-8 mt-12 md:mt-0">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  An overview of your Chaiiwala stores performance
-                </p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                  <Store className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
+                    <dd>
+                      <div className="text-lg font-semibold text-gray-900">{stores.length}</div>
+                    </dd>
+                  </dl>
+                </div>
               </div>
-              <div className="mt-4 md:mt-0 flex items-center">
-                <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'User'}</span>
-                <button 
-                  onClick={async () => {
-                    try {
-                      await fetch('/api/logout', { method: 'POST' });
-                      window.location.href = '/auth';
-                    } catch (error) {
-                      toast({ 
-                        title: "Logout failed", 
-                        description: "There was an error logging out. Please try again.", 
-                        variant: "destructive" 
-                      });
-                    }
-                  }} 
-                  className="bg-chai-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors"
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
+                  <Sparkles className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Sales (Weekly)</dt>
+                    <dd>
+                      <div className="text-lg font-semibold text-gray-900">£ {salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Staff</dt>
+                    <dd>
+                      <div className="text-lg font-semibold text-gray-900">28</div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
+                    <dd>
+                      <div className="text-lg font-semibold text-gray-900">{tasks.filter(task => !task.completed).length}</div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Charts & Tables */}
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+          {/* Sales Chart */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Sales by Store (Weekly)</h3>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={salesData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
                 >
-                  Logout
-                </button>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                      <Store className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
-                        <dd>
-                          <div className="text-lg font-semibold text-gray-900">{stores.length}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                      <Sparkles className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">Total Sales (Weekly)</dt>
-                        <dd>
-                          <div className="text-lg font-semibold text-gray-900">£ {salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                      <Users className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">Total Staff</dt>
-                        <dd>
-                          <div className="text-lg font-semibold text-gray-900">28</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
-                      <AlertTriangle className="h-6 w-6 text-red-600" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
-                        <dd>
-                          <div className="text-lg font-semibold text-gray-900">{tasks.filter(task => !task.completed).length}</div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Charts & Tables */}
-            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-              {/* Sales Chart */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Sales by Store (Weekly)</h3>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={salesData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={70}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis />
-                      <Tooltip formatter={(value) => `£${value}`} />
-                      <Bar dataKey="sales" fill="#D4AF37" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              
-              {/* Tasks */}
-              <div className="bg-white shadow rounded-lg overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900">Upcoming Tasks</h3>
-                </div>
-                <div className="divide-y divide-gray-200">
-                  {tasks.map(task => (
-                    <div key={task.id} className="px-6 py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className={`flex-shrink-0 h-4 w-4 rounded-full ${task.completed ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                            <p className="text-sm text-gray-500">{task.location} • Due {new Date(task.dueDate).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                            {task.completed ? 'Completed' : 'Pending'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-6 py-3 bg-gray-50 text-right">
-                  <button onClick={() => toast({ title: "Coming soon", description: "Task management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
-                    View All Tasks
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {/* Store List */}
-            <div className="mt-8">
-              <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                <div className="px-6 py-5 border-b border-gray-200">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">All Stores</h3>
-                </div>
-                <ul className="divide-y divide-gray-200">
-                  {stores.map((store) => (
-                    <li key={store.id}>
-                      <div className="px-6 py-4 flex items-center">
-                        <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between">
-                          <div>
-                            <div className="flex text-sm">
-                              <p className="font-medium text-chai-gold truncate">{store.name}</p>
-                              <p className="ml-1 flex-shrink-0 font-normal text-gray-500">
-                                • Area {store.area}
-                              </p>
-                            </div>
-                            <div className="mt-2 flex">
-                              <div className="flex items-center text-sm text-gray-500">
-                                <Store className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                                <p>{store.address}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-4 flex-shrink-0 sm:mt-0">
-                            <div className="flex overflow-hidden">
-                              <p className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                                {store.manager}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            
-            {/* Notifications */}
-            <div className="mt-8 mb-12">
-              <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                <div className="px-6 py-5 border-b border-gray-200">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Notifications</h3>
-                </div>
-                <ul className="divide-y divide-gray-200">
-                  {notifications.map((notification) => (
-                    <li key={notification.id} className={notification.isHighlighted ? 'bg-yellow-50' : ''}>
-                      <div className="px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              {notification.isHighlighted && (
-                                <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-                              )}
-                              <p className={`text-sm font-medium ${notification.isHighlighted ? 'text-yellow-800' : 'text-gray-900'}`}>
-                                {notification.title}
-                              </p>
-                            </div>
-                            <p className="mt-1 text-sm text-gray-500">{notification.description}</p>
-                          </div>
-                          <div className="ml-6 flex-shrink-0">
-                            <p className="text-sm text-gray-500">{notification.time}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="px-6 py-3 bg-gray-50 text-right">
-                  <button onClick={() => toast({ title: "Coming soon", description: "Notifications management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
-                    View All Notifications
-                  </button>
-                </div>
-              </div>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={70}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `£${value}`} />
+                  <Bar dataKey="sales" fill="#D4AF37" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        </main>
+          
+          {/* Tasks */}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Upcoming Tasks</h3>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {tasks.map(task => (
+                <div key={task.id} className="px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className={`flex-shrink-0 h-4 w-4 rounded-full ${task.completed ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                        <p className="text-sm text-gray-500">{task.location} • Due {new Date(task.dueDate).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {task.completed ? 'Completed' : 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-3 bg-gray-50 text-right">
+              <button onClick={() => toast({ title: "Coming soon", description: "Task management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
+                View All Tasks
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Store List */}
+        <div className="mt-8">
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-medium leading-6 text-gray-900">All Stores</h3>
+            </div>
+            <ul className="divide-y divide-gray-200">
+              {stores.map((store) => (
+                <li key={store.id}>
+                  <div className="px-6 py-4 flex items-center">
+                    <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex text-sm">
+                          <p className="font-medium text-chai-gold truncate">{store.name}</p>
+                          <p className="ml-1 flex-shrink-0 font-normal text-gray-500">
+                            • Area {store.area}
+                          </p>
+                        </div>
+                        <div className="mt-2 flex">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Store className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                            <p>{store.address}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex-shrink-0 sm:mt-0">
+                        <div className="flex overflow-hidden">
+                          <p className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                            {store.manager}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        
+        {/* Notifications */}
+        <div className="mt-8 mb-12">
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Notifications</h3>
+            </div>
+            <ul className="divide-y divide-gray-200">
+              {notifications.map((notification) => (
+                <li key={notification.id} className={notification.isHighlighted ? 'bg-yellow-50' : ''}>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          {notification.isHighlighted && (
+                            <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+                          )}
+                          <p className={`text-sm font-medium ${notification.isHighlighted ? 'text-yellow-800' : 'text-gray-900'}`}>
+                            {notification.title}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">{notification.description}</p>
+                      </div>
+                      <div className="ml-6 flex-shrink-0">
+                        <p className="text-sm text-gray-500">{notification.time}</p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="px-6 py-3 bg-gray-50 text-right">
+              <button onClick={() => toast({ title: "Coming soon", description: "Notifications management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
+                View All Notifications
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
