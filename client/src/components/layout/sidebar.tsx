@@ -46,14 +46,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       active: currentPage === 'dashboard',
       roles: ['admin', 'regional', 'store', 'staff'] 
     },
-    { 
-      name: 'Inventory', 
-      icon: ArchiveIcon, 
-      href: '/inventory', 
-      active: currentPage === 'inventory',
-      roles: ['admin', 'regional'] 
-    },
-    // New items placed higher in the list for better visibility
+    // New items placed immediately after dashboard
     {
       name: 'Maintenance',
       icon: WrenchIcon,
@@ -74,6 +67,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: '/stock-orders',
       active: currentPage === 'stock-orders',
       roles: ['admin', 'regional', 'store']
+    },
+    { 
+      name: 'Inventory', 
+      icon: ArchiveIcon, 
+      href: '/inventory', 
+      active: currentPage === 'inventory',
+      roles: ['admin', 'regional'] 
     },
     { 
       name: 'Deep Cleaning', 
