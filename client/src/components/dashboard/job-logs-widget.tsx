@@ -49,7 +49,7 @@ export default function JobLogsWidget() {
   }, [allJobLogs, selectedStoreId, flagFilter]);
 
   // Get stores using useStores hook
-  const { data: stores = [] } = useStores();
+  const { stores = [] } = useStores();
 
   function getFlagColor(flag: string) {
     switch (flag) {
