@@ -1,5 +1,5 @@
 import { db } from "../server/db";
-import { jobLogs } from "../shared/schema";
+import { jobLogs, jobFlagEnum } from "../shared/schema";
 
 async function importJobLogs() {
   try {
@@ -15,7 +15,7 @@ async function importJobLogs() {
         description: "AC unit in kitchen making unusual noise. Requires inspection.",
         completionDate: "2025-04-10",
         comments: "Medium priority, still functional but noticeable noise increase over last week.",
-        flag: "normal"
+        flag: "normal" as const
       },
       {
         logDate: "2025-04-02",
@@ -25,7 +25,7 @@ async function importJobLogs() {
         description: "Coffee machine leaking water from base. Needs urgent repair.",
         completionDate: "2025-04-04",
         comments: "High priority, affecting service speed.",
-        flag: "urgent"
+        flag: "urgent" as const
       },
       {
         logDate: "2025-03-15",
@@ -35,7 +35,7 @@ async function importJobLogs() {
         description: "Outdoor signage light flickering. Need electrician to check wiring.",
         completionDate: "2025-03-30",
         comments: "Not urgent but needs addressing for brand image.",
-        flag: "normal"
+        flag: "normal" as const
       },
       {
         logDate: "2025-02-20",
@@ -45,7 +45,7 @@ async function importJobLogs() {
         description: "Hood extraction fan not working properly in kitchen area.",
         completionDate: "2025-03-15",
         comments: "Issue has persisted for over a month. Health inspector mentioned it last visit.",
-        flag: "long_standing"
+        flag: "long_standing" as const
       },
       {
         logDate: "2025-04-03",
@@ -55,7 +55,7 @@ async function importJobLogs() {
         description: "Bathroom sink clogged - not draining properly.",
         completionDate: "2025-04-05",
         comments: "Need plumber visit. Customers have complained.",
-        flag: "urgent"
+        flag: "urgent" as const
       },
       {
         logDate: "2025-03-25",
@@ -65,7 +65,7 @@ async function importJobLogs() {
         description: "Point of sale system freezing periodically during peak hours.",
         completionDate: "2025-04-08",
         comments: "IT support has been notified. May need system update or replacement.",
-        flag: "normal"
+        flag: "normal" as const
       },
       {
         logDate: "2025-04-01",
@@ -75,16 +75,22 @@ async function importJobLogs() {
         description: "Front door hinge broken - door doesn't close properly.",
         completionDate: "2025-04-03",
         comments: "Security risk - needs immediate attention.",
-        flag: "urgent"
+        flag: "urgent" as const
       }
     ];
     
     // Insert job logs into database
     for (const jobLog of jobLogsData) {
       await db.insert(jobLogs).values({
-        ...jobLog,
-        attachments: [],
-        createdAt: new Date()
+        logDate: jobLog.logDate,
+        logTime: jobLog.logTime,
+        loggedBy: jobLog.loggedBy,
+        storeId: jobLog.storeId,
+        description: jobLog.description,
+        completionDate: jobLog.completionDate,
+        comments: jobLog.comments,
+        flag: jobLog.flag,
+        attachments: []
       });
     }
     
@@ -92,9 +98,8 @@ async function importJobLogs() {
   } catch (error) {
     console.error("Failed to import job logs:", error);
   } finally {
-    // Close the database connection
-    await db.client.end?.();
-    console.log("Database connection closed.");
+    // No need to manually close the connection with Drizzle ORM
+    console.log("Database operation completed.");
   }
 }
 
