@@ -9,6 +9,7 @@ export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
 export const inventoryStatusEnum = pgEnum('inventory_status', ['in_stock', 'low_stock', 'out_of_stock', 'on_order']);
 export const jobFlagEnum = pgEnum('job_flag', ['normal', 'long_standing', 'urgent']);
 export const accessLevelEnum = pgEnum('access_level', ['Shop Limited Access', 'Senior Manager Access', 'Admin Access']);
+export const eventStatusEnum = pgEnum('event_status', ['pending', 'confirmed', 'completed', 'cancelled']);
 
 // Users Table
 export const users = pgTable("users", {
@@ -124,6 +125,26 @@ export const managerDetails = pgTable("manager_details", {
   lastLoginDate: text("last_login_date").notNull(),
 });
 
+// Event Orders Table
+export const eventOrders = pgTable("event_orders", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").notNull(), // Store handling the event
+  eventDate: text("event_date").notNull(), // Date of the event
+  eventTime: text("event_time").notNull(), // Time of the event
+  venue: text("venue").notNull(), // Venue/location of the event
+  product: text("product").notNull(), // Product ordered
+  quantity: integer("quantity").notNull(), // Quantity of the product
+  bookingDate: text("booking_date").notNull(), // Date when the booking was made
+  bookingTime: text("booking_time").notNull(), // Time when the booking was made
+  customerName: text("customer_name").notNull(), // Name of the customer
+  customerPhone: text("customer_phone").notNull(), // Customer's phone number
+  customerEmail: text("customer_email"), // Customer's email (optional)
+  bookedBy: text("booked_by").notNull(), // Person who booked the event
+  status: eventStatusEnum("status").notNull().default('pending'), // Status of the event order
+  notes: text("notes"), // Additional notes
+  createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the event was created
+});
+
 // Schema Validation
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true });
@@ -135,6 +156,7 @@ export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: tru
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
 export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
+export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -166,3 +188,6 @@ export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
 
 export type ManagerDetails = typeof managerDetails.$inferSelect;
 export type InsertManagerDetails = z.infer<typeof insertManagerDetailsSchema>;
+
+export type EventOrder = typeof eventOrders.$inferSelect;
+export type InsertEventOrder = z.infer<typeof insertEventOrderSchema>;

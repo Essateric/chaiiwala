@@ -7,7 +7,8 @@ import {
   ChecklistTask, InsertChecklistTask, checklistTasks,
   Schedule, InsertSchedule, schedules,
   Announcement, InsertAnnouncement, announcements,
-  JobLog, InsertJobLog, jobLogs
+  JobLog, InsertJobLog, jobLogs,
+  EventOrder, InsertEventOrder, eventOrders
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -339,6 +340,42 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updatedJobLog;
+  }
+  
+  // Event Orders methods
+  async getAllEventOrders(): Promise<EventOrder[]> {
+    return await db.select().from(eventOrders);
+  }
+
+  async getEventOrdersByStore(storeId: number): Promise<EventOrder[]> {
+    return await db.select()
+      .from(eventOrders)
+      .where(eq(eventOrders.storeId, storeId));
+  }
+
+  async getEventOrder(id: number): Promise<EventOrder | undefined> {
+    const [eventOrder] = await db.select().from(eventOrders).where(eq(eventOrders.id, id));
+    return eventOrder;
+  }
+
+  async createEventOrder(insertEventOrder: InsertEventOrder): Promise<EventOrder> {
+    const [eventOrder] = await db.insert(eventOrders)
+      .values({
+        ...insertEventOrder,
+        createdAt: new Date()
+      })
+      .returning();
+    
+    return eventOrder;
+  }
+
+  async updateEventOrder(id: number, data: Partial<EventOrder>): Promise<EventOrder | undefined> {
+    const [updatedEventOrder] = await db.update(eventOrders)
+      .set(data)
+      .where(eq(eventOrders.id, id))
+      .returning();
+    
+    return updatedEventOrder;
   }
 
   // Helper methods
