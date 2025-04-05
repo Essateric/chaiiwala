@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
+import { useStores } from "@/hooks/use-stores";
 import { JobLog } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 
@@ -47,12 +48,8 @@ export default function JobLogsWidget() {
       .slice(0, 5);
   }, [allJobLogs, selectedStoreId, flagFilter]);
 
-  // Get stores (would ideally come from a hook, but using hardcoded for now)
-  const stores = [
-    { id: 1, name: "Stockport Road" },
-    { id: 2, name: "Wilmslow Road" },
-    { id: 3, name: "Deansgate" }
-  ];
+  // Get stores using useStores hook
+  const { data: stores = [] } = useStores();
 
   function getFlagColor(flag: string) {
     switch (flag) {
