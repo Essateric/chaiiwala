@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useEventOrders } from "@/hooks/use-event-orders";
 import { useStores } from "@/hooks/use-stores";
 import { useAuth } from "@/hooks/use-auth";
@@ -146,8 +146,8 @@ export default function EventOrdersPage() {
   );
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
 
-  // Get event orders using our hook
-  const { eventOrders, isLoading, error, createEventOrder, updateEventOrder, isCreating, isUpdating } = useEventOrders();
+  // Get event orders using our hook, passing the filterStoreId so it can properly update the cache
+  const { eventOrders, isLoading, error, createEventOrder, updateEventOrder, isCreating, isUpdating } = useEventOrders(filterStoreId);
   
   // Get stores for the store selection dropdown
   const { stores = [], isLoading: isLoadingStores } = useStores();
@@ -172,6 +172,22 @@ export default function EventOrdersPage() {
       notes: "",
     },
   });
+  
+  // Update form when user changes or when filterStoreId changes
+  useEffect(() => {
+    // If user is a store manager, set their store ID in the form
+    if (user?.role === "store" && user?.storeId) {
+      form.setValue("storeId", user.storeId);
+    }
+    
+    // Reset form when creating a new event order
+    if (!isFormOpen) {
+      // Set the bookedBy and current time/date when opening the form
+      form.setValue("bookingDate", format(new Date(), "yyyy-MM-dd"));
+      form.setValue("bookingTime", format(new Date(), "HH:mm"));
+      form.setValue("bookedBy", user?.name || "");
+    }
+  }, [user, isFormOpen, form]);
 
   // Filter event orders based on selected filters
   const filteredEventOrders = eventOrders.filter((order) => {
