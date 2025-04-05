@@ -23,8 +23,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
 
 // Types for data
@@ -94,6 +94,11 @@ export default function DashboardPage() {
       <div className="mb-6">
         <h2 className="text-2xl font-montserrat font-bold mb-2">Welcome back, {user?.name}!</h2>
         <p className="text-gray-600">Here's what's happening across your stores today.</p>
+      </div>
+      
+      {/* Maintenance Job Logs Widget - Always visible on dashboard */}
+      <div className="mb-6">
+        <JobLogsWidget />
       </div>
       
       {/* Main Dashboard Categories - Based on handwritten diagram */}
@@ -210,9 +215,6 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>
-              
-              {/* Job Logs Widget */}
-              <JobLogsWidget />
             </div>
           </div>
         </TabsContent>
@@ -377,9 +379,8 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Ensure widget gets rendered with proper data */}
                 <div className="mb-4">
-                  <JobLogsWidget />
+                  <p className="text-muted-foreground">This section provides access to the maintenance management page for handling maintenance tasks.</p>
                 </div>
                 <Separator className="my-4" />
                 {/* Quick actions */}
