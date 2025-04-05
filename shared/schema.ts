@@ -1,152 +1,169 @@
 import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 // Enums
-export const roleEnum = pgEnum('role', ['admin', 'regional', 'store', 'staff']);
-export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'completed']);
-export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
-export const inventoryStatusEnum = pgEnum('inventory_status', ['in_stock', 'low_stock', 'out_of_stock', 'on_order']);
-export const jobFlagEnum = pgEnum('job_flag', ['normal', 'long_standing', 'urgent']);
+export const userRoleEnum = pgEnum('user_role', ['admin', 'regional_manager', 'store_manager']);
+export const jobPriorityEnum = pgEnum('job_priority', ['normal', 'medium', 'high', 'urgent']);
+export const jobStatusEnum = pgEnum('job_status', ['pending', 'in_progress', 'completed', 'cancelled']);
+export const taskStatusEnum = pgEnum('task_status', ['pending', 'in_progress', 'completed']);
 
-// Users Table
+// Users
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
-  name: text("name"), // Making this nullable too for compatibility with existing data
-  email: text("email"),
-  title: text("title"), // Job title can be null
-  role: roleEnum("role").notNull().default('staff'), // Role for permissions
-  permissions: text("permissions").array(), // Array of specific permissions
-  storeId: integer("store_id"), // Store assignment, can be null
+  fullName: text("full_name").notNull(),
+  role: userRoleEnum("role").notNull().default('store_manager'),
+  email: text("email").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Stores Table
+// Stores
 export const stores = pgTable("stores", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   address: text("address").notNull(),
-  area: integer("area").notNull(),
-  manager: text("manager").notNull(),
+  city: text("city").notNull(),
+  phone: text("phone").notNull(),
+  managerId: integer("manager_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Inventory Table
-export const inventory = pgTable("inventory", {
+// Inventory items
+export const inventoryItems = pgTable("inventory_items", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  sku: text("sku").notNull().unique(),
   category: text("category").notNull(),
-  storeId: integer("store_id").notNull(),
-  quantity: text("quantity").notNull(),
-  status: inventoryStatusEnum("status").notNull().default('in_stock'),
-  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  unit: text("unit").notNull(),
+  minStockLevel: integer("min_stock_level").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Tasks Table
+// Store inventory
+export const storeInventory = pgTable("store_inventory", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
+  itemId: integer("item_id").references(() => inventoryItems.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+// Staff
+export const staff = pgTable("staff", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
+  position: text("position").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  joinedDate: timestamp("joined_date").defaultNow(),
+});
+
+// Maintenance jobs
+export const maintenanceJobs = pgTable("maintenance_jobs", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
+  description: text("description").notNull(),
+  priority: jobPriorityEnum("priority").notNull().default('normal'),
+  status: jobStatusEnum("status").notNull().default('pending'),
+  loggedBy: integer("logged_by").references(() => users.id).notNull(),
+  loggedAt: timestamp("logged_at").defaultNow(),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  comments: text("comments"),
+});
+
+// Tasks and checklists
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  storeId: integer("store_id").notNull(),
-  assignedTo: integer("assigned_to").notNull(),
-  dueDate: text("due_date").notNull(),
-  status: taskStatusEnum("status").notNull().default('todo'),
-  priority: priorityEnum("priority").notNull().default('medium'),
+  status: taskStatusEnum("status").notNull().default('pending'),
+  dueDate: timestamp("due_date"),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Checklists Table
-export const checklists = pgTable("checklists", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  category: text("category").notNull(), 
-  assignedTo: text("assigned_to").notNull(),
-  dueDate: text("due_date"),
-  storeId: integer("store_id").notNull(),
-});
-
-// Checklist Tasks Table
-export const checklistTasks = pgTable("checklist_tasks", {
-  id: serial("id").primaryKey(),
-  checklistId: integer("checklist_id").notNull(),
-  title: text("title").notNull(),
-  completed: boolean("completed").notNull().default(false),
-});
-
-// Staff Schedule Table
-export const schedules = pgTable("schedules", {
-  id: serial("id").primaryKey(),
-  staffId: integer("staff_id").notNull(),
-  day: integer("day").notNull(), // 0-6 (Sunday-Saturday)
-  start: text("start_time").notNull(),
-  end: text("end_time").notNull(),
-  storeId: integer("store_id").notNull(),
-});
-
-// Announcements Table
+// Announcements
 export const announcements = pgTable("announcements", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   content: text("content").notNull(),
-  author: text("author").notNull(),
-  date: timestamp("date").notNull().defaultNow(),
-  category: text("category").notNull(),
-  important: boolean("important").notNull().default(false),
-  likes: integer("likes").notNull().default(0),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  isGlobal: boolean("is_global").notNull().default(false),
 });
 
-// Job Logs Table
-export const jobLogs = pgTable("job_logs", {
+// Announcement store targets (if not global)
+export const announcementTargets = pgTable("announcement_targets", {
   id: serial("id").primaryKey(),
-  logDate: text("log_date").notNull(), // Date of the job log in YYYY-MM-DD format
-  logTime: text("log_time").notNull(), // Time of the job log in HH:MM format
-  loggedBy: text("logged_by").notNull(), // Name of person who logged the job
-  storeId: integer("store_id").notNull(), // Store where the job is logged
-  description: text("description").notNull(), // Description of the job
-  attachment: text("attachment"), // URL or path to any uploaded attachment
-  comments: text("comments"), // Additional comments
-  flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
-  createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
+  announcementId: integer("announcement_id").references(() => announcements.id).notNull(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
 });
 
-// Schema Validation
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertStoreSchema = createInsertSchema(stores).omit({ id: true });
-export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true, lastUpdated: true });
-export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
-export const insertChecklistSchema = createInsertSchema(checklists).omit({ id: true });
-export const insertChecklistTaskSchema = createInsertSchema(checklistTasks).omit({ id: true });
-export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true });
-export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
-export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
+// Define relations
+export const storesRelations = relations(stores, ({ one, many }) => ({
+  manager: one(users, { fields: [stores.managerId], references: [users.id] }),
+  inventory: many(storeInventory),
+  maintenanceJobs: many(maintenanceJobs),
+  tasks: many(tasks),
+  staff: many(staff),
+}));
 
-// Type Exports
-export type User = typeof users.$inferSelect;
+export const usersRelations = relations(users, ({ many }) => ({
+  managedStores: many(stores),
+  createdAnnouncements: many(announcements, { relationName: "createdAnnouncements" }),
+  assignedTasks: many(tasks, { relationName: "assignedTasks" }),
+  createdTasks: many(tasks, { relationName: "createdTasks" }),
+  loggedMaintenanceJobs: many(maintenanceJobs, { relationName: "loggedMaintenanceJobs" }),
+  assignedMaintenanceJobs: many(maintenanceJobs, { relationName: "assignedMaintenanceJobs" }),
+}));
+
+// Create schemas and types
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+  fullName: true,
+  email: true,
+  role: true,
+});
+
+export const insertStoreSchema = createInsertSchema(stores).pick({
+  name: true,
+  address: true,
+  city: true,
+  phone: true,
+  managerId: true,
+});
+
+export const insertMaintenanceJobSchema = createInsertSchema(maintenanceJobs).pick({
+  storeId: true,
+  description: true,
+  priority: true,
+  status: true,
+  loggedBy: true,
+  comments: true,
+  assignedTo: true,
+});
+
+export const updateMaintenanceJobSchema = createInsertSchema(maintenanceJobs).pick({
+  description: true,
+  priority: true,
+  status: true,
+  comments: true,
+  assignedTo: true,
+}).partial();
+
+// Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
 
-export type Store = typeof stores.$inferSelect;
 export type InsertStore = z.infer<typeof insertStoreSchema>;
+export type Store = typeof stores.$inferSelect;
 
-export type Inventory = typeof inventory.$inferSelect;
-export type InsertInventory = z.infer<typeof insertInventorySchema>;
-
-export type Task = typeof tasks.$inferSelect;
-export type InsertTask = z.infer<typeof insertTaskSchema>;
-
-export type Checklist = typeof checklists.$inferSelect;
-export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
-
-export type ChecklistTask = typeof checklistTasks.$inferSelect;
-export type InsertChecklistTask = z.infer<typeof insertChecklistTaskSchema>;
-
-export type Schedule = typeof schedules.$inferSelect;
-export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
-
-export type Announcement = typeof announcements.$inferSelect;
-export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
-
-export type JobLog = typeof jobLogs.$inferSelect;
-export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
+export type InsertMaintenanceJob = z.infer<typeof insertMaintenanceJobSchema>;
+export type UpdateMaintenanceJob = z.infer<typeof updateMaintenanceJobSchema>;
+export type MaintenanceJob = typeof maintenanceJobs.$inferSelect;
