@@ -366,48 +366,18 @@ export default function DashboardPage() {
           </div>
         </TabsContent>
         
-        {/* Maintenance Tab - Info from handwritten diagram */}
+        {/* Maintenance Tab - Active Job Logs */}
         <TabsContent value="maintenance">
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Maintenance Management</CardTitle>
                 <CardDescription>
-                  Track and manage store repairs and maintenance
+                  Track and manage active maintenance jobs across all stores
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Wrench className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Store Repairs</h3>
-                          <p className="text-sm text-muted-foreground">Facility maintenance</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <ClipboardList className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Job Log</h3>
-                          <p className="text-sm text-muted-foreground">Track ongoing repairs</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <BadgeAlert className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Emergency Jobs</h3>
-                          <p className="text-sm text-muted-foreground">Urgent maintenance</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
+                <JobLogsWidget />
               </CardContent>
             </Card>
           </div>
