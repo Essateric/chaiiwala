@@ -29,8 +29,14 @@ function JobLogsSection() {
     user?.role === "store" ? user?.storeId ?? undefined : undefined
   );
   
+  // Check if user can create maintenance logs
+  // Only admin or users with maintenance permission
+  const canCreateLogs = 
+    user?.role === "admin" || 
+    (user?.permissions && user.permissions.includes("maintenance"));
+  
   // Get store staff for the "Logged By" dropdown
-  const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; // Default to first store if not a store manager
+  const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; 
   const [formStoreId, setFormStoreId] = useState<number>(initialStoreId);
   const { staff: storeStaff, isLoading: isLoadingStaff } = useStaffByStore(formStoreId);
 
@@ -58,7 +64,7 @@ function JobLogsSection() {
       logDate: format(new Date(), "yyyy-MM-dd"),
       logTime: format(new Date(), "HH:mm"),
       description: "",
-      loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
+      loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
       flag: "normal" as const,
       attachment: null,
       comments: null,
@@ -74,7 +80,7 @@ function JobLogsSection() {
         logDate: format(new Date(), "yyyy-MM-dd"),
         logTime: format(new Date(), "HH:mm"),
         description: "",
-        loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
+        loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
         flag: "normal" as const,
         attachment: null,
         comments: null,
@@ -136,177 +142,168 @@ function JobLogsSection() {
           >
             {selectedStoreId ? "View All Jobs" : "Filter Jobs"}
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Log New Job
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle>Create New Job Log</DialogTitle>
-                <DialogDescription>
-                  Log a new maintenance job or issue that needs attention.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  {(user?.role === "admin" || user?.role === "regional") && (
-                    <FormField
-                      control={form.control}
-                      name="storeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Store Location</FormLabel>
-                          <Select
-                            value={field.value?.toString() || "1"}
-                            onValueChange={(value) => {
-                              const storeId = parseInt(value);
-                              field.onChange(storeId);
-                              setFormStoreId(storeId); // Update the form store ID to fetch appropriate staff
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a store" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">Stockport Road</SelectItem>
-                              <SelectItem value="2">Wilmslow Road</SelectItem>
-                              <SelectItem value="3">Deansgate</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="logDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="logTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Time</FormLabel>
-                          <FormControl>
-                            <Input type="time" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Describe the maintenance issue" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+          
+          {/* Only show Create button for admin or maintenance staff */}
+          {canCreateLogs && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Log New Job
+                </Button>
+              </DialogTrigger>
+              
+              <DialogContent className="sm:max-w-[550px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Job Log</DialogTitle>
+                  <DialogDescription>
+                    Log a new maintenance job or issue that needs attention.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {(user?.role === "admin" || user?.role === "regional") && (
+                      <FormField
+                        control={form.control}
+                        name="storeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Store Location</FormLabel>
+                            <Select
+                              value={field.value?.toString() || "1"}
+                              onValueChange={(value) => {
+                                const storeId = parseInt(value);
+                                field.onChange(storeId);
+                                setFormStoreId(storeId); // Update the form store ID to fetch appropriate staff
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a store" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Stockport Road</SelectItem>
+                                <SelectItem value="2">Wilmslow Road</SelectItem>
+                                <SelectItem value="3">Deansgate</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="logDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="logTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Time</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={form.control}
-                      name="loggedBy"
+                      name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Logged By</FormLabel>
+                          <FormLabel>Description</FormLabel>
                           <FormControl>
-                            {isLoadingStaff ? (
-                              <div className="flex items-center space-x-2">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Loading staff...</span>
-                              </div>
-                            ) : storeStaff.length > 0 ? (
-                              <Select
-                                value={field.value}
-                                onValueChange={field.onChange}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select staff member" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {storeStaff.map(staff => (
-                                    <SelectItem key={staff.id} value={staff.name}>{staff.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Input placeholder="Your name" {...field} />
-                            )}
+                            <Textarea placeholder="Describe the maintenance issue" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="loggedBy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Logged By</FormLabel>
+                            <FormControl>
+                              <Input 
+                                value={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || ''} 
+                                disabled 
+                                className="bg-muted cursor-not-allowed"
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              Automatically assigned to your account
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="flag"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Priority</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="normal">Normal</SelectItem>
+                                <SelectItem value="long_standing">Long-standing</SelectItem>
+                                <SelectItem value="urgent">Urgent</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={form.control}
-                      name="flag"
+                      name="comments"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Priority</FormLabel>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="normal">Normal</SelectItem>
-                              <SelectItem value="long_standing">Long-standing</SelectItem>
-                              <SelectItem value="urgent">Urgent</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Comments (Optional)</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Any additional comments" {...field} 
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value || null)}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="comments"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Comments (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Any additional comments" {...field} 
-                            value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value || null)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit" disabled={isCreating}>
-                      {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Submit
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isCreating}>
+                        {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Submit
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {isLoading ? (
