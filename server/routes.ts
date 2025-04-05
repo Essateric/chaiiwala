@@ -15,10 +15,12 @@ import {
   insertScheduleSchema,
   insertAnnouncementSchema,
   insertJobLogSchema,
+  insertEventOrderSchema,
   taskStatusEnum,
   priorityEnum,
   inventoryStatusEnum,
-  jobFlagEnum
+  jobFlagEnum,
+  eventStatusEnum
 } from "@shared/schema";
 
 // Helper middleware to check if user is authenticated
@@ -375,6 +377,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const fileName = req.params.fileName;
     const filePath = path.join(__dirname, '..', 'public', 'uploads', fileName);
     res.sendFile(filePath);
+  });
+
+  // Event Orders
+  app.get("/api/event-orders", isAuthenticated, async (req, res) => {
+    const eventOrders = await storage.getAllEventOrders();
+    res.json(eventOrders);
+  });
+
+  app.get("/api/event-orders/store/:storeId", isAuthenticated, async (req, res) => {
+    const storeId = parseInt(req.params.storeId);
+    const eventOrders = await storage.getEventOrdersByStore(storeId);
+    res.json(eventOrders);
+  });
+
+  app.get("/api/event-orders/:id", isAuthenticated, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const eventOrder = await storage.getEventOrder(id);
+    if (eventOrder) {
+      res.json(eventOrder);
+    } else {
+      res.status(404).json({ message: "Event order not found" });
+    }
+  });
+
+  app.post("/api/event-orders", isAuthenticated, hasRole(["admin", "regional", "store"]), async (req, res) => {
+    try {
+      const eventOrderData = insertEventOrderSchema.parse(req.body);
+      const eventOrder = await storage.createEventOrder(eventOrderData);
+      res.status(201).json(eventOrder);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create event order" });
+      }
+    }
+  });
+
+  app.patch("/api/event-orders/:id", isAuthenticated, hasRole(["admin", "regional", "store"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedEventOrder = await storage.updateEventOrder(id, req.body);
+      if (updatedEventOrder) {
+        res.json(updatedEventOrder);
+      } else {
+        res.status(404).json({ message: "Event order not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update event order" });
+    }
   });
 
   const httpServer = createServer(app);

@@ -7,7 +7,8 @@ import {
   ChecklistTask, InsertChecklistTask,
   Schedule, InsertSchedule,
   Announcement, InsertAnnouncement,
-  JobLog, InsertJobLog
+  JobLog, InsertJobLog,
+  EventOrder, InsertEventOrder
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -63,6 +64,13 @@ export interface IStorage {
   getJobLog(id: number): Promise<JobLog | undefined>;
   createJobLog(jobLog: InsertJobLog): Promise<JobLog>;
   updateJobLog(id: number, data: Partial<JobLog>): Promise<JobLog | undefined>;
+  
+  // Event Orders methods
+  getAllEventOrders(): Promise<EventOrder[]>;
+  getEventOrdersByStore(storeId: number): Promise<EventOrder[]>;
+  getEventOrder(id: number): Promise<EventOrder | undefined>;
+  createEventOrder(eventOrder: InsertEventOrder): Promise<EventOrder>;
+  updateEventOrder(id: number, data: Partial<EventOrder>): Promise<EventOrder | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -77,6 +85,7 @@ export class MemStorage implements IStorage {
   private schedules: Map<number, Schedule>;
   private announcements: Map<number, Announcement>;
   private jobLogs: Map<number, JobLog>;
+  private eventOrders: Map<number, EventOrder>;
   
   private userId: number;
   private storeId: number;
@@ -87,6 +96,7 @@ export class MemStorage implements IStorage {
   private scheduleId: number;
   private announcementId: number;
   private jobLogId: number;
+  private eventOrderId: number;
 
   constructor() {
     // Initialize session store
@@ -104,6 +114,7 @@ export class MemStorage implements IStorage {
     this.schedules = new Map();
     this.announcements = new Map();
     this.jobLogs = new Map();
+    this.eventOrders = new Map();
 
     // Initialize IDs
     this.userId = 1;
@@ -115,6 +126,7 @@ export class MemStorage implements IStorage {
     this.scheduleId = 1;
     this.announcementId = 1;
     this.jobLogId = 1;
+    this.eventOrderId = 1;
 
     // Seed data
     this.seedInitialData();
@@ -426,6 +438,44 @@ export class MemStorage implements IStorage {
     return updatedJobLog;
   }
 
+  // Event Orders methods
+  async getAllEventOrders(): Promise<EventOrder[]> {
+    return Array.from(this.eventOrders.values());
+  }
+
+  async getEventOrdersByStore(storeId: number): Promise<EventOrder[]> {
+    return Array.from(this.eventOrders.values())
+      .filter(order => order.storeId === storeId);
+  }
+
+  async getEventOrder(id: number): Promise<EventOrder | undefined> {
+    return this.eventOrders.get(id);
+  }
+
+  async createEventOrder(insertEventOrder: InsertEventOrder): Promise<EventOrder> {
+    const id = this.eventOrderId++;
+    const eventOrder: EventOrder = {
+      ...insertEventOrder,
+      id,
+      createdAt: new Date()
+    };
+    this.eventOrders.set(id, eventOrder);
+    return eventOrder;
+  }
+
+  async updateEventOrder(id: number, data: Partial<EventOrder>): Promise<EventOrder | undefined> {
+    const eventOrder = this.eventOrders.get(id);
+    if (!eventOrder) return undefined;
+    
+    const updatedEventOrder: EventOrder = {
+      ...eventOrder,
+      ...data
+    };
+    
+    this.eventOrders.set(id, updatedEventOrder);
+    return updatedEventOrder;
+  }
+
   // Helper methods
   private formatAnnouncementDate(date: Date): string {
     const now = new Date();
@@ -441,8 +491,67 @@ export class MemStorage implements IStorage {
 
   // Seed data
   private seedInitialData() {
-    // Initialize jobLogId
+    // Initialize IDs
     this.jobLogId = 1;
+    this.eventOrderId = 1;
+    
+    // Seed event orders
+    const eventOrdersData: InsertEventOrder[] = [
+      {
+        storeId: 1,
+        eventDate: "2025-04-15",
+        eventTime: "14:00",
+        venue: "Manchester Business Center",
+        product: "Chai Tea Service",
+        quantity: 50,
+        bookingDate: "2025-04-01",
+        bookingTime: "10:30",
+        customerName: "John Smith",
+        customerPhone: "07712345678",
+        customerEmail: "john.smith@example.com",
+        bookedBy: "Sarah Smith",
+        status: "confirmed",
+        notes: "Customer requests dairy alternatives for 10 guests"
+      },
+      {
+        storeId: 2,
+        eventDate: "2025-04-20",
+        eventTime: "17:30",
+        venue: "Oxford Road Conference Hall",
+        product: "Full Catering Package",
+        quantity: 75,
+        bookingDate: "2025-03-25",
+        bookingTime: "15:45",
+        customerName: "Amara Patel",
+        customerPhone: "07798765432",
+        customerEmail: "amara.patel@example.com",
+        bookedBy: "Ahmed Khan",
+        status: "pending",
+        notes: "Needs setup one hour before event"
+      },
+      {
+        storeId: 8,
+        eventDate: "2025-05-10",
+        eventTime: "13:00",
+        venue: "Manchester University",
+        product: "Karak Tea and Samosa Platter",
+        quantity: 100,
+        bookingDate: "2025-04-02",
+        bookingTime: "09:15",
+        customerName: "Professor Williams",
+        customerPhone: "07733445566",
+        customerEmail: "prof.williams@manchester.ac.uk",
+        bookedBy: "Imran Khan",
+        status: "confirmed",
+        notes: "For graduation ceremony reception"
+      }
+    ];
+    
+    // Create seed event orders
+    eventOrdersData.forEach(eventOrder => {
+      this.createEventOrder(eventOrder);
+    });
+    
     // Seed stores - updated from CSV data
     const storeData: InsertStore[] = [
       { name: "Cheetham Hill", address: "74 Bury Old Rd, Manchester M8 5BW", area: 1, manager: "MGR_CH" },
@@ -1057,6 +1166,94 @@ export class MemStorage implements IStorage {
     
     jobLogData.forEach(jobLog => {
       this.createJobLog(jobLog);
+    });
+    
+    // Seed event orders
+    const eventOrderData: InsertEventOrder[] = [
+      {
+        storeId: 1,
+        eventDate: "2023-08-15",
+        eventTime: "18:00",
+        venue: "Saffron Banquet Hall, Manchester",
+        product: "Assorted Chai and Snacks",
+        quantity: 150,
+        bookingDate: "2023-07-01",
+        bookingTime: "14:30",
+        customerName: "Amina Patel",
+        customerPhone: "07700 900123",
+        customerEmail: "amina.patel@example.com",
+        bookedBy: "Shabnam Ahmad",
+        status: "confirmed",
+        notes: "Wedding event, needs setup by 17:00"
+      },
+      {
+        storeId: 2,
+        eventDate: "2023-09-05",
+        eventTime: "12:00",
+        venue: "Wilmslow Community Center",
+        product: "Lunch Boxes with Chai",
+        quantity: 75,
+        bookingDate: "2023-07-10",
+        bookingTime: "10:15",
+        customerName: "James Wilson",
+        customerPhone: "07700 900456",
+        customerEmail: "james.wilson@example.com",
+        bookedBy: "Imran Khan",
+        status: "pending",
+        notes: "Corporate retreat, requires vegetarian options"
+      },
+      {
+        storeId: 3,
+        eventDate: "2023-08-22",
+        eventTime: "15:30",
+        venue: "Deansgate Conference Center",
+        product: "Afternoon Tea Selection",
+        quantity: 50,
+        bookingDate: "2023-07-05",
+        bookingTime: "09:45",
+        customerName: "Sarah Johnson",
+        customerPhone: "07700 900789",
+        customerEmail: "sarah.j@example.com",
+        bookedBy: "Zahra Malik",
+        status: "completed",
+        notes: "Birthday celebration, delivered on time"
+      },
+      {
+        storeId: 1,
+        eventDate: "2023-09-18",
+        eventTime: "19:00",
+        venue: "Grand Plaza Hotel, Manchester",
+        product: "Dinner Buffet with Chai Station",
+        quantity: 200,
+        bookingDate: "2023-07-15",
+        bookingTime: "16:00",
+        customerName: "Raj Sharma",
+        customerPhone: "07700 900234",
+        customerEmail: "raj.sharma@example.com",
+        bookedBy: "Jubayed Chowdhury",
+        status: "confirmed",
+        notes: "Corporate award ceremony, requires branded setup"
+      },
+      {
+        storeId: 4,
+        eventDate: "2023-10-01",
+        eventTime: "11:00",
+        venue: "Rusholme Community Hall",
+        product: "Breakfast Platters with Chai",
+        quantity: 100,
+        bookingDate: "2023-07-20",
+        bookingTime: "13:30",
+        customerName: "Maya Thompson",
+        customerPhone: "07700 900567",
+        customerEmail: "maya.t@example.com",
+        bookedBy: "Usman Ali",
+        status: "pending",
+        notes: "Charity fundraiser, half payment received"
+      }
+    ];
+    
+    eventOrderData.forEach(eventOrder => {
+      this.createEventOrder(eventOrder);
     });
   }
 }
