@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
@@ -38,6 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${user.fullName}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -55,6 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Registration successful",
+        description: `Welcome, ${user.fullName}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -70,17 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      // Clear the user data from cache
       queryClient.setQueryData(["/api/user"], null);
-      
-      // Show success toast
       toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account",
+        title: "Logged out",
+        description: "You have been successfully logged out",
       });
-      
-      // Force redirect to login page
-      window.location.href = "/auth";
     },
     onError: (error: Error) => {
       toast({

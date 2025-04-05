@@ -1,610 +1,282 @@
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import StatsCard from "@/components/dashboard/stats-card";
-import TaskItem from "@/components/dashboard/task-item";
-import AnnouncementItem from "@/components/dashboard/announcement-item";
-import JobLogsWidget from "@/components/dashboard/job-logs-widget";
-import { 
-  Building, 
-  Users, 
-  ClipboardList, 
-  Package,
-  Calendar,
-  Brush, // Instead of CleaningServices
-  ShoppingCart,
-  Wrench, // Instead of Tools
-  UserX,
-  CalendarCheck,
-  CalendarPlus,
-  Clipboard
-} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
-import { useJobLogs } from "@/hooks/use-joblogs";
-
-// Types for data
-interface Store {
-  id: number;
-  name: string;
-  address: string;
-  area: number;
-  manager: string;
-}
-
-interface Task {
-  id: string;
-  title: string;
-  location: string;
-  dueDate: string;
-  completed: boolean;
-}
-
-interface Announcement {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  isHighlighted: boolean;
-}
+import AppLayout from "@/components/layout/app-layout";
+import SummaryCard from "@/components/dashboard/summary-card";
+import StoreSelector from "@/components/common/store-selector";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-
-  // Fetch stores data
-  const { data: stores = [] } = useQuery<Store[]>({
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  
+  const { data: stores, isLoading: isLoadingStores } = useQuery({
     queryKey: ["/api/stores"],
   });
-
-  // Fetch tasks data
-  const { data: tasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks/today"],
+  
+  const { data: maintenanceStats, isLoading: isLoadingMaintenanceStats } = useQuery({
+    queryKey: ["/api/maintenance/stats", selectedStoreId],
+    enabled: !!selectedStoreId,
   });
-
-  // Fetch announcements data
-  const { data: announcements = [] } = useQuery<Announcement[]>({
-    queryKey: ["/api/announcements/recent"],
-  });
-
-  const handleTaskComplete = async (id: string, completed: boolean) => {
-    try {
-      await apiRequest("PUT", `/api/tasks/${id}`, { completed });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/today"] });
-      toast({
-        title: completed ? "Task Completed" : "Task Reopened",
-        description: `Task has been marked as ${completed ? "completed" : "reopened"}.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update task status.",
-        variant: "destructive",
-      });
-    }
-  };
+  
+  // Sample data for demo charts - in a real app, this would come from the API
+  const salesData = [
+    { name: 'Mon', sales: 2400 },
+    { name: 'Tue', sales: 1398 },
+    { name: 'Wed', sales: 9800 },
+    { name: 'Thu', sales: 3908 },
+    { name: 'Fri', sales: 4800 },
+    { name: 'Sat', sales: 3800 },
+    { name: 'Sun', sales: 4300 },
+  ];
+  
+  const inventoryData = [
+    { name: 'Tea Leaves', stock: 85 },
+    { name: 'Milk', stock: 90 },
+    { name: 'Sugar', stock: 70 },
+    { name: 'Spices', stock: 65 },
+    { name: 'Cups', stock: 40 },
+  ];
 
   return (
-    <DashboardLayout title="Dashboard">
-      {/* Welcome Section */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-montserrat font-bold mb-2">Welcome back, {user?.name}!</h2>
-        <p className="text-gray-600">Here's what's happening across your stores today.</p>
-      </div>
-      
-      {/* Main Dashboard Categories - Based on handwritten diagram */}
-      <Tabs defaultValue="overview" className="mb-6">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 mb-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="stock">Stock Count</TabsTrigger>
-          <TabsTrigger value="cleaning">Deep Clean</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-          <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
-        </TabsList>
-        
-        {/* Overview Tab - Summary of all categories */}
-        <TabsContent value="overview">
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatsCard 
-              title="Total Stores" 
-              value={stores.length} 
-              icon={Building} 
-              iconColor="text-blue-600" 
-              iconBgColor="bg-blue-100" 
-              change={{ value: "+1 location", isPositive: true, text: "since last month" }}
-            />
-            <StatsCard 
-              title="Staff Members" 
-              value="42" 
-              icon={Users} 
-              iconColor="text-green-600" 
-              iconBgColor="bg-green-100" 
-              change={{ value: "+4 members", isPositive: true, text: "since last month" }}
-            />
-            <StatsCard 
-              title="Open Tasks" 
-              value={tasks.filter(t => !t.completed).length} 
-              icon={ClipboardList} 
-              iconColor="text-yellow-600" 
-              iconBgColor="bg-yellow-100" 
-              change={{ value: "+3 tasks", isPositive: false, text: "from yesterday" }}
-            />
-            <StatsCard 
-              title="Low Stock Items" 
-              value="5" 
-              icon={Package} 
-              iconColor="text-red-600" 
-              iconBgColor="bg-red-100" 
-              change={{ value: "Immediate attention", isPositive: false, text: "" }}
-            />
+    <AppLayout>
+      <div className="p-6">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-semibold">Dashboard</h2>
+            <p className="text-gray-400">View key metrics and performance data for Chaiwala stores</p>
           </div>
           
-          {/* Quick Access Section */}
-          <div className="grid grid-cols-1 gap-6">
-            {/* Quick Access */}
-            <div className="space-y-6">
-              {/* Today's Tasks */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">Today's Tasks</CardTitle>
-                    <a href="/tasks" className="text-chai-gold hover:underline text-sm font-medium">
-                      View All
-                    </a>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {tasks.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No tasks for today</p>
-                    ) : (
-                      tasks.slice(0, 3).map(task => (
-                        <TaskItem 
-                          key={task.id}
-                          id={task.id}
-                          title={task.title}
-                          location={task.location}
-                          dueDate={task.dueDate}
-                          completed={task.completed}
-                          onComplete={handleTaskComplete}
-                        />
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Recent Announcements */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">Recent Announcements</CardTitle>
-                    <a href="/announcements" className="text-chai-gold hover:underline text-sm font-medium">
-                      View All
-                    </a>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {announcements.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No recent announcements</p>
-                    ) : (
-                      announcements.slice(0, 2).map(announcement => (
-                        <AnnouncementItem 
-                          key={announcement.id}
-                          title={announcement.title}
-                          description={announcement.description}
-                          date={announcement.date}
-                          isHighlighted={announcement.isHighlighted}
-                        />
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Job Logs Widget */}
-              <JobLogsWidget />
-            </div>
+          <div>
+            <StoreSelector 
+              stores={stores || []} 
+              selectedStoreId={selectedStoreId} 
+              onSelectStore={setSelectedStoreId}
+              isLoading={isLoadingStores}
+            />
           </div>
-        </TabsContent>
+        </div>
         
-        {/* Stock Count Tab - Info from handwritten diagram */}
-        <TabsContent value="stock">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Stock Count Management</CardTitle>
-                <CardDescription>
-                  Track and manage inventory across all stores
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Calendar className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Daily Count</h3>
-                          <p className="text-sm text-muted-foreground">Regular inventory checks</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <BarChart3 className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Weekly Report</h3>
-                          <p className="text-sm text-muted-foreground">Comprehensive analysis</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <BadgeAlert className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Monthly Trends</h3>
-                          <p className="text-sm text-muted-foreground">Long-term tracking</p>
-                        </div>
-                      </div>
-                    </Card>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <SummaryCard
+            title="Daily Sales"
+            value="£3,850"
+            subValue="+5% vs yesterday"
+            trend="up"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            iconBgColor="bg-green-500"
+          />
+          
+          <SummaryCard
+            title="Open Maintenance"
+            value={maintenanceStats?.openJobs.toString() || "—"}
+            subValue={maintenanceStats ? `${maintenanceStats.highPriorityJobs} high priority` : "Loading..."}
+            trend={maintenanceStats?.jobsLastWeek > 0 ? "down" : "neutral"}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            iconBgColor="bg-red-500"
+            isLoading={isLoadingMaintenanceStats}
+          />
+          
+          <SummaryCard
+            title="Customer Traffic"
+            value="438"
+            subValue="+12% vs last week"
+            trend="up"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            }
+            iconBgColor="bg-blue-500"
+          />
+          
+          <SummaryCard
+            title="Low Stock Items"
+            value="5"
+            subValue="Action required"
+            trend="neutral"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            }
+            iconBgColor="bg-yellow-500"
+          />
+        </div>
+        
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-dark-secondary border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg font-medium text-gray-300">Weekly Sales</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={salesData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1F2937', 
+                        borderColor: '#374151',
+                        color: '#F9FAFB'
+                      }} 
+                    />
+                    <Line type="monotone" dataKey="sales" stroke="#F7D670" strokeWidth={2} activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-dark-secondary border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg font-medium text-gray-300">Inventory Levels</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={inventoryData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1F2937', 
+                        borderColor: '#374151',
+                        color: '#F9FAFB'
+                      }} 
+                    />
+                    <Bar dataKey="stock" fill="#F7D670" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Quick Overview Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="bg-dark-secondary border-gray-700 col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg font-medium text-gray-300">Recent Announcements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingStores ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-gold" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-dark p-3 rounded-md border border-gray-700">
+                    <h3 className="font-medium text-white">New Menu Items Coming</h3>
+                    <p className="text-sm text-gray-400">Three new specialty chai flavors will be available next week.</p>
+                    <p className="text-xs text-gray-500 mt-1">Posted 2 days ago</p>
                   </div>
                   
-                  <Separator />
+                  <div className="bg-dark p-3 rounded-md border border-gray-700">
+                    <h3 className="font-medium text-white">Maintenance Scheduled</h3>
+                    <p className="text-sm text-gray-400">System maintenance scheduled for Sunday night.</p>
+                    <p className="text-xs text-gray-500 mt-1">Posted 3 days ago</p>
+                  </div>
                   
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-lg font-semibold">Additional Resources</h3>
-                      <p className="text-sm text-muted-foreground">Forms and tools for stock management</p>
-                    </div>
-                    <Button variant="outline" className="gap-2">
-                      <Clipboard className="h-4 w-4" />
-                      Stock Templates
-                    </Button>
+                  <div className="bg-dark p-3 rounded-md border border-gray-700">
+                    <h3 className="font-medium text-white">Holiday Hours</h3>
+                    <p className="text-sm text-gray-400">Updated holiday hours for all locations. Please review.</p>
+                    <p className="text-xs text-gray-500 mt-1">Posted 5 days ago</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Deep Clean Tab - Info from handwritten diagram */}
-        <TabsContent value="cleaning">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Deep Cleaning Management</CardTitle>
-                <CardDescription>
-                  Schedule and track cleaning tasks across all locations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <a href="/deep-cleaning" className="block">
-                      <Card className="p-4 border border-border cursor-pointer hover:border-chai-gold">
-                        <div className="flex items-center space-x-3">
-                          <Brush className="h-10 w-10 text-chai-gold" />
-                          <div>
-                            <h3 className="font-semibold">Schedule Jobs</h3>
-                            <p className="text-sm text-muted-foreground">Plan and assign cleaning tasks</p>
+              )}
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-dark-secondary border-gray-700 col-span-1 lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg font-medium text-gray-300">Top Performing Stores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingStores ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-gold" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-dark">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Store
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Sales
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Traffic
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Rating
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700 bg-dark-secondary">
+                      <tr className="hover:bg-dark">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">Wilmslow Road</td>
+                        <td className="px-6 py-4 whitespace-nowrap">£4,875</td>
+                        <td className="px-6 py-4 whitespace-nowrap">532</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-gold">★★★★★</span>
+                            <span className="ml-2">4.9</span>
                           </div>
-                        </div>
-                      </Card>
-                    </a>
-                    <a href="/deep-cleaning" className="block">
-                      <Card className="p-4 border border-border cursor-pointer hover:border-chai-gold">
-                        <div className="flex items-center space-x-3">
-                          <Calendar className="h-10 w-10 text-chai-gold" />
-                          <div>
-                            <h3 className="font-semibold">30-Day Schedule</h3>
-                            <p className="text-sm text-muted-foreground">Monthly cleaning calendar</p>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-dark">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">Stockport Road</td>
+                        <td className="px-6 py-4 whitespace-nowrap">£4,245</td>
+                        <td className="px-6 py-4 whitespace-nowrap">487</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-gold">★★★★</span><span className="text-gray-500">★</span>
+                            <span className="ml-2">4.2</span>
                           </div>
-                        </div>
-                      </Card>
-                    </a>
-                  </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-dark">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">Deansgate</td>
+                        <td className="px-6 py-4 whitespace-nowrap">£3,980</td>
+                        <td className="px-6 py-4 whitespace-nowrap">445</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-gold">★★★★</span><span className="text-gray-500">★</span>
+                            <span className="ml-2">4.3</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Orders Tab - Info from handwritten diagram */}
-        <TabsContent value="orders">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Management</CardTitle>
-                <CardDescription>
-                  Track and manage all orders through various channels
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <ShoppingCart className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Fresh Way</h3>
-                          <p className="text-sm text-muted-foreground">Fresh inventory orders</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Building className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Amazon</h3>
-                          <p className="text-sm text-muted-foreground">Bulk supply orders</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Bell className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Direct Orders</h3>
-                          <p className="text-sm text-muted-foreground">Email & phone orders</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Maintenance Tab - Info from handwritten diagram */}
-        <TabsContent value="maintenance">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Maintenance Management</CardTitle>
-                <CardDescription>
-                  Track and manage store repairs and maintenance
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Wrench className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Store Repairs</h3>
-                          <p className="text-sm text-muted-foreground">Facility maintenance</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <ClipboardList className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Job Log</h3>
-                          <p className="text-sm text-muted-foreground">Track ongoing repairs</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <BadgeAlert className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Emergency Jobs</h3>
-                          <p className="text-sm text-muted-foreground">Urgent maintenance</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Staff Tab - Info from handwritten diagram */}
-        <TabsContent value="staff">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff Management</CardTitle>
-                <CardDescription>
-                  Manage staff schedules and absences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <UserX className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Staff Absences</h3>
-                          <p className="text-sm text-muted-foreground">Manage time off and sick leave</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <CalendarCheck className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Leave Approval</h3>
-                          <p className="text-sm text-muted-foreground">Manager review system</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Bookings Tab - Info from handwritten diagram */}
-        <TabsContent value="bookings">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Large Bookings</CardTitle>
-                <CardDescription>
-                  Manage special events and large party reservations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <CalendarPlus className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Booking Requests</h3>
-                          <p className="text-sm text-muted-foreground">New reservation management</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Clipboard className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Booking Forms</h3>
-                          <p className="text-sm text-muted-foreground">Request documentation</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Audit Tab - Info from handwritten diagram */}
-        <TabsContent value="audit">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Audit Reports</CardTitle>
-                <CardDescription>
-                  Company-wide auditing and compliance tracking
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <Clipboard className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Templates</h3>
-                          <p className="text-sm text-muted-foreground">Standard audit forms</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <ClipboardList className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Audit Findings</h3>
-                          <p className="text-sm text-muted-foreground">Previous results</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <BarChart3 className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Pass Rates</h3>
-                          <p className="text-sm text-muted-foreground">Performance metrics</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-      
-      {/* Access Level Information */}
-      <div className="mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Levels</CardTitle>
-            <CardDescription>Dashboard sections are restricted by user role</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-md">
-                <h3 className="font-semibold text-lg mb-2">Managers</h3>
-                <p className="text-sm text-muted-foreground mb-2">Store-specific access</p>
-                <ul className="text-sm space-y-1">
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Stock count
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Daily cleaning
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Orders
-                  </li>
-                </ul>
-              </div>
-              <div className="p-4 border rounded-md">
-                <h3 className="font-semibold text-lg mb-2">Senior Managers</h3>
-                <p className="text-sm text-muted-foreground mb-2">Multi-store oversight</p>
-                <ul className="text-sm space-y-1">
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    All store access
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Maintenance
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Staff management
-                  </li>
-                </ul>
-              </div>
-              <div className="p-4 border rounded-md">
-                <h3 className="font-semibold text-lg mb-2">Assistant Access</h3>
-                <p className="text-sm text-muted-foreground mb-2">Limited functionality</p>
-                <ul className="text-sm space-y-1">
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    View tasks
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-green-500 rounded-full"></span>
-                    Record stock
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="h-2 w-2 bg-red-500 rounded-full"></span>
-                    No management features
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 }

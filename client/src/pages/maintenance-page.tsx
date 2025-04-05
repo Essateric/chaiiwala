@@ -1,419 +1,289 @@
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import AppLayout from "@/components/layout/app-layout";
+import StoreSelector from "@/components/common/store-selector";
+import SummaryCard from "@/components/dashboard/summary-card";
+import MaintenanceLogTable from "@/components/maintenance/maintenance-log-table";
+import MaintenanceJobForm from "@/components/maintenance/maintenance-job-form";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
-import { enUS } from "date-fns/locale";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertJobLogSchema } from "@shared/schema";
-import { useJobLogs } from "@/hooks/use-joblogs";
-import { useAuth } from "@/hooks/use-auth";
-import { useStaffByStore } from "@/hooks/use-staff";
-import { z } from "zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
+import { Loader2, Plus, FileDown, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-// Component for Job Logs
-function JobLogsSection() {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
-    user?.role === "store" ? user?.storeId ?? undefined : undefined
-  );
+export default function MaintenancePage() {
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
   
-  // Get store staff for the "Logged By" dropdown
-  const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; // Default to first store if not a store manager
-  const [formStoreId, setFormStoreId] = useState<number>(initialStoreId);
-  const { staff: storeStaff, isLoading: isLoadingStaff } = useStaffByStore(formStoreId);
-
-  const { jobLogs: allJobLogs, isLoading, createJobLog, isCreating } = useJobLogs();
+  const { data: stores, isLoading: isLoadingStores } = useQuery({
+    queryKey: ["/api/stores"],
+  });
   
-  // Filter job logs based on selected store
-  const jobLogs = React.useMemo(() => {
-    if (!selectedStoreId) return allJobLogs;
-    return allJobLogs.filter(log => log.storeId === selectedStoreId);
-  }, [allJobLogs, selectedStoreId]);
+  const { data: maintenanceStats, isLoading: isLoadingMaintenanceStats } = useQuery({
+    queryKey: ["/api/maintenance/stats", selectedStoreId],
+    enabled: selectedStoreId !== null,
+  });
   
-  const form = useForm({
-    resolver: zodResolver(insertJobLogSchema.extend({
-      storeId: z.number(),
-      logDate: z.string(),
-      logTime: z.string(),
-      description: z.string().min(5, "Description must be at least 5 characters"),
-      loggedBy: z.string().min(2, "Name must be at least 2 characters"),
-      flag: z.enum(["normal", "long_standing", "urgent"]),
-      attachment: z.string().nullable().optional(),
-      comments: z.string().nullable().optional(),
-    })),
-    defaultValues: {
-      storeId: user?.storeId ?? 1,
-      logDate: format(new Date(), "yyyy-MM-dd"),
-      logTime: format(new Date(), "HH:mm"),
-      description: "",
-      loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
-      flag: "normal" as const,
-      attachment: null,
-      comments: null,
+  const { data: maintenanceJobs, isLoading: isLoadingMaintenanceJobs } = useQuery({
+    queryKey: ["/api/maintenance", selectedStoreId],
+    enabled: selectedStoreId !== null,
+  });
+  
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("GET", `/api/maintenance${selectedStoreId ? `?storeId=${selectedStoreId}` : ''}`);
+      await apiRequest("GET", `/api/maintenance/stats${selectedStoreId ? `?storeId=${selectedStoreId}` : ''}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance/stats"] });
+      toast({
+        title: "Data refreshed",
+        description: "Maintenance data has been updated",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to refresh data",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
-  async function onSubmit(values: any) {
-    try {
-      await createJobLog(values);
-      setOpen(false);
-      form.reset({
-        storeId: values.storeId,
-        logDate: format(new Date(), "yyyy-MM-dd"),
-        logTime: format(new Date(), "HH:mm"),
-        description: "",
-        loggedBy: `${user?.firstName} ${user?.lastName}`.trim() || user?.username || "",
-        flag: "normal" as const,
-        attachment: null,
-        comments: null,
-      });
-    } catch (error) {
-      console.error("Error submitting job log:", error);
-    }
-  }
-
-  const getFlagBadgeClass = (flag: string) => {
-    switch (flag) {
-      case "urgent":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      case "long_standing":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
-      default:
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    }
-  };
-
   return (
-    <Card className="mt-4">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Job Logs</CardTitle>
-          <CardDescription>
-            Track and manage maintenance job logs for all equipment and facilities
-          </CardDescription>
-        </div>
-        {(user?.role === "admin" || user?.role === "regional") && (
-          <Select 
-            value={selectedStoreId?.toString() || "all"} 
-            onValueChange={(value) => {
-              if (value === "all") {
-                setSelectedStoreId(undefined);
-              } else {
-                setSelectedStoreId(parseInt(value));
-              }
-            }}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select Store" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Stores</SelectItem>
-              <SelectItem value="1">Stockport Road</SelectItem>
-              <SelectItem value="2">Wilmslow Road</SelectItem>
-              <SelectItem value="3">Deansgate</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="flex justify-between mb-4">
-          <Button
-            variant="outline"
-            className="mr-2"
-            onClick={() => setSelectedStoreId(undefined)}
-          >
-            {selectedStoreId ? "View All Jobs" : "Filter Jobs"}
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Log New Job
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle>Create New Job Log</DialogTitle>
-                <DialogDescription>
-                  Log a new maintenance job or issue that needs attention.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  {(user?.role === "admin" || user?.role === "regional") && (
-                    <FormField
-                      control={form.control}
-                      name="storeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Store Location</FormLabel>
-                          <Select
-                            value={field.value?.toString() || "1"}
-                            onValueChange={(value) => {
-                              const storeId = parseInt(value);
-                              field.onChange(storeId);
-                              setFormStoreId(storeId); // Update the form store ID to fetch appropriate staff
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a store" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">Stockport Road</SelectItem>
-                              <SelectItem value="2">Wilmslow Road</SelectItem>
-                              <SelectItem value="3">Deansgate</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="logDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="logTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Time</FormLabel>
-                          <FormControl>
-                            <Input type="time" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Describe the maintenance issue" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="loggedBy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Logged By</FormLabel>
-                          <FormControl>
-                            {isLoadingStaff ? (
-                              <div className="flex items-center space-x-2">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Loading staff...</span>
-                              </div>
-                            ) : storeStaff.length > 0 ? (
-                              <Select
-                                value={field.value}
-                                onValueChange={field.onChange}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select staff member" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {storeStaff.map(staff => (
-                                    <SelectItem key={staff.id} value={staff.name}>{staff.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Input placeholder="Your name" {...field} />
-                            )}
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="flag"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Priority</FormLabel>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="normal">Normal</SelectItem>
-                              <SelectItem value="long_standing">Long-standing</SelectItem>
-                              <SelectItem value="urgent">Urgent</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="comments"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Comments (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Any additional comments" {...field} 
-                            value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value || null)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit" disabled={isCreating}>
-                      {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Submit
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {isLoading ? (
-          <div className="w-full flex justify-center py-6">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <AppLayout>
+      <div className="p-6">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-semibold">Maintenance Dashboard</h2>
+            <p className="text-gray-400">Manage and track maintenance issues across all Chaiwala stores</p>
           </div>
-        ) : jobLogs.length === 0 ? (
-          <Alert>
-            <ClipboardListIcon className="h-4 w-4 mr-2" />
-            <AlertDescription>
-              No job logs found. Click "Log New Job" to create your first job log.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Logged By</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Store</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobLogs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell>
-                      {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
-                    </TableCell>
-                    <TableCell className="font-medium max-w-[300px] truncate">
-                      {job.description}
-                    </TableCell>
-                    <TableCell>{job.loggedBy}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getFlagBadgeClass(job.flag)}`}>
-                        {job.flag === "normal" && "Normal"}
-                        {job.flag === "long_standing" && "Long-standing"}
-                        {job.flag === "urgent" && "Urgent"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {job.storeId === 1 && "Stockport Road"}
-                      {job.storeId === 2 && "Wilmslow Road"}
-                      {job.storeId === 3 && "Deansgate"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          
+          <div>
+            <StoreSelector 
+              stores={stores || []} 
+              selectedStoreId={selectedStoreId} 
+              onSelectStore={setSelectedStoreId}
+              isLoading={isLoadingStores}
+            />
           </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-export default function MaintenancePage() {
-  return (
-    <DashboardLayout title="Maintenance">
-      <div className="grid gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>Maintenance Tasks</CardTitle>
-            <CardDescription>
-              Track and manage maintenance tasks for all equipment and facilities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="upcoming">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-              <TabsContent value="upcoming" className="p-4">
-                <Alert>
-                  <WrenchIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No upcoming maintenance tasks scheduled. Click "Create Maintenance Task" to add a new task.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-              <TabsContent value="active" className="p-4">
-                <Alert>
-                  <ActivityIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No active maintenance tasks. Maintenance tasks in progress will appear here.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-              <TabsContent value="completed" className="p-4">
-                <Alert>
-                  <CheckCircleIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No completed maintenance tasks. Completed tasks will be shown here for record keeping.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        </div>
         
-        {/* Job Logs Section */}
-        <JobLogsSection />
+        {/* Maintenance Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <SummaryCard
+            title="Open Issues"
+            value={maintenanceStats?.openJobs.toString() || "—"}
+            subValue={maintenanceStats ? `${maintenanceStats.highPriorityJobs} high priority` : "Loading..."}
+            trend={maintenanceStats?.jobsLastWeek > 0 ? "up" : "neutral"}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            iconBgColor="bg-red-500"
+            isLoading={isLoadingMaintenanceStats}
+          />
+          
+          <SummaryCard
+            title="Resolved Issues"
+            value={maintenanceStats?.resolvedJobs.toString() || "—"}
+            subValue="This month"
+            trend={maintenanceStats?.resolvedJobs > 0 ? "up" : "neutral"}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            }
+            iconBgColor="bg-green-500"
+            isLoading={isLoadingMaintenanceStats}
+          />
+          
+          <SummaryCard
+            title="Avg Resolution Time"
+            value={maintenanceStats?.avgResolutionTime ? maintenanceStats.avgResolutionTime.toFixed(1) : "—"}
+            subValue="Days"
+            trend="down"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            iconBgColor="bg-blue-500"
+            isLoading={isLoadingMaintenanceStats}
+          />
+          
+          <SummaryCard
+            title="Pending Approvals"
+            value={maintenanceStats?.pendingApprovals.toString() || "—"}
+            subValue="Requiring attention"
+            trend="neutral"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            }
+            iconBgColor="bg-yellow-500"
+            isLoading={isLoadingMaintenanceStats}
+          />
+        </div>
+        
+        {/* Maintenance Actions and Log Table */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Actions and Priority Distribution */}
+          <div className="lg:col-span-1">
+            <div className="bg-dark-secondary rounded-lg p-6 border border-gray-700 mb-6">
+              <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
+              
+              <Button 
+                className="w-full bg-gold hover:bg-gold-dark text-dark font-medium py-2 px-4 rounded mb-3 flex items-center justify-center"
+                onClick={() => setIsModalOpen(true)}
+                disabled={!selectedStoreId}
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Create New Job Log
+              </Button>
+              
+              <Button 
+                className="w-full bg-dark-secondary hover:bg-dark border border-gray-700 text-white font-medium py-2 px-4 rounded mb-3 flex items-center justify-center"
+                variant="outline"
+              >
+                <FileDown className="h-5 w-5 mr-2" />
+                Export Reports
+              </Button>
+              
+              <Button 
+                className="w-full bg-dark-secondary hover:bg-dark border border-gray-700 text-white font-medium py-2 px-4 rounded flex items-center justify-center"
+                variant="outline"
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+              >
+                {refreshMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-5 w-5 mr-2" />
+                )}
+                Refresh Data
+              </Button>
+            </div>
+            
+            {maintenanceStats && (
+              <div className="bg-dark-secondary rounded-lg p-6 border border-gray-700">
+                <h3 className="text-lg font-medium mb-4">Priority Distribution</h3>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-red-400">High Priority</span>
+                      <span className="text-sm text-gray-400">{maintenanceStats.priorityDistribution.high} Issues</span>
+                    </div>
+                    <div className="w-full bg-dark rounded-full h-2.5">
+                      <div 
+                        className="bg-red-500 h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${
+                            maintenanceStats.openJobs > 0 
+                              ? (maintenanceStats.priorityDistribution.high / maintenanceStats.openJobs) * 100 
+                              : 0
+                          }%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-yellow-400">Medium Priority</span>
+                      <span className="text-sm text-gray-400">{maintenanceStats.priorityDistribution.medium} Issues</span>
+                    </div>
+                    <div className="w-full bg-dark rounded-full h-2.5">
+                      <div 
+                        className="bg-yellow-500 h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${
+                            maintenanceStats.openJobs > 0 
+                              ? (maintenanceStats.priorityDistribution.medium / maintenanceStats.openJobs) * 100 
+                              : 0
+                          }%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-green-400">Normal Priority</span>
+                      <span className="text-sm text-gray-400">{maintenanceStats.priorityDistribution.normal} Issues</span>
+                    </div>
+                    <div className="w-full bg-dark rounded-full h-2.5">
+                      <div 
+                        className="bg-green-500 h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${
+                            maintenanceStats.openJobs > 0 
+                              ? (maintenanceStats.priorityDistribution.normal / maintenanceStats.openJobs) * 100 
+                              : 0
+                          }%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-blue-400">Low Priority</span>
+                      <span className="text-sm text-gray-400">{maintenanceStats.priorityDistribution.low} Issues</span>
+                    </div>
+                    <div className="w-full bg-dark rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-500 h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${
+                            maintenanceStats.openJobs > 0 
+                              ? (maintenanceStats.priorityDistribution.low / maintenanceStats.openJobs) * 100 
+                              : 0
+                          }%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Right Column - Job Logs Table */}
+          <div className="lg:col-span-2">
+            <MaintenanceLogTable 
+              maintenanceJobs={maintenanceJobs || []} 
+              isLoading={isLoadingMaintenanceJobs} 
+            />
+          </div>
+        </div>
+        
+        {/* Create New Job Modal */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="bg-dark-secondary border-gray-700 text-white max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Job Log</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Log a new maintenance job or issue that needs attention.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedStoreId && (
+              <MaintenanceJobForm 
+                storeId={selectedStoreId} 
+                onSuccess={() => {
+                  setIsModalOpen(false);
+                  queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/maintenance/stats"] });
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 }
