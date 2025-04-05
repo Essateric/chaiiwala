@@ -1,5 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Check if we're in Netlify production environment
+const isNetlify = import.meta.env.PROD || window.location.hostname.includes('netlify.app');
+
+// Helper to transform API URLs for Netlify deployment
+function transformApiUrl(url: string): string {
+  // Only transform API URLs
+  if (url.startsWith('/api/')) {
+    return isNetlify ? `/.netlify/functions/api${url.replace('/api', '')}` : url;
+  }
+  return url;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,7 +24,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const transformedUrl = transformApiUrl(url);
+  
+  const res = await fetch(transformedUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -29,7 +43,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const url = queryKey[0] as string;
+    const transformedUrl = transformApiUrl(url);
+    
+    const res = await fetch(transformedUrl, {
       credentials: "include",
     });
 

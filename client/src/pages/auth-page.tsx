@@ -1,122 +1,162 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation, Link } from "wouter";
-import { useAuth, type RegisterData } from "@/hooks/use-auth";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { InsertUser, User as SelectUser } from "@shared/schema";
 
-// Login form schema
-const loginFormSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+const loginSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-type LoginFormValues = z.infer<typeof loginFormSchema>;
+const registerSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["admin", "regional", "store", "staff"]).default("staff"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
+type LoginData = Pick<InsertUser, "username" | "password">;
 
 export default function AuthPage() {
-  const [location, navigate] = useLocation();
-  const { user, loginMutation, registerMutation, registerSchema, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("login");
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<string>("login");
+  const { toast } = useToast();
   
-  // Get redirect path from URL if present
-  const searchParams = new URLSearchParams(location.split("?")[1] || "");
-  const redirectTo = searchParams.get("redirect") || "/";
+  // Get current user
+  const { data: user, isLoading: isUserLoading } = useQuery<SelectUser | undefined, Error>({
+    queryKey: ["/api/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+  
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: LoginData) => {
+      const res = await apiRequest("POST", "/api/login", credentials);
+      return await res.json();
+    },
+    onSuccess: (user: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${user.name}!`,
+      });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Register mutation
+  const registerMutation = useMutation({
+    mutationFn: async (credentials: InsertUser) => {
+      const res = await apiRequest("POST", "/api/register", credentials);
+      return await res.json();
+    },
+    onSuccess: (user: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Registration successful",
+        description: `Welcome, ${user.name}!`,
+      });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
   
   // Redirect if already logged in
   useEffect(() => {
-    if (user && !isLoading) {
-      navigate(redirectTo);
+    if (user) {
+      navigate("/");
     }
-  }, [user, isLoading, navigate, redirectTo]);
-  
+  }, [user, navigate]);
+
   // Login form
   const loginForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginFormSchema),
+    resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
-      password: "",
-    },
+      password: ""
+    }
   });
-  
+
   // Register form
-  const registerForm = useForm<RegisterData>({
+  const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      name: "",
       username: "",
       password: "",
-      confirmPassword: "",
-      fullName: "",
-      email: "",
-      role: "store_manager",
-    },
+      role: "staff"
+    }
   });
-  
-  function onLoginSubmit(data: LoginFormValues) {
+
+  const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data);
-  }
-  
-  function onRegisterSubmit(data: RegisterData) {
+  };
+
+  const onRegisterSubmit = (data: RegisterFormValues) => {
     registerMutation.mutate(data);
-  }
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#1c1f2a]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#d4af37]" />
-      </div>
-    );
-  }
-  
+  };
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#1c1f2a]">
-      {/* Left side - Form */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <Tabs 
-          defaultValue="login" 
-          value={activeTab} 
-          onValueChange={setActiveTab}
-          className="w-full max-w-md"
-        >
-          <TabsList className="grid w-full grid-cols-2 bg-[#262a38]">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
-          
-          {/* Login Tab */}
-          <TabsContent value="login">
-            <Card className="bg-[#262a38] border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-gray-200">Login</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Enter your credentials to access your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Left Side - Auth Form */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-8 bg-white">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              Chaiiwala Dashboard
+            </CardTitle>
+            <CardDescription className="text-center">
+              Enter your credentials to access the dashboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="register">Register</TabsTrigger>
+              </TabsList>
+
+              {/* Login Form */}
+              <TabsContent value="login">
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
                     <FormField
@@ -124,12 +164,12 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-200">Username</FormLabel>
+                          <FormLabel>Username</FormLabel>
                           <FormControl>
                             <Input 
                               placeholder="Enter your username" 
                               {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
+                              autoComplete="username"
                             />
                           </FormControl>
                           <FormMessage />
@@ -141,13 +181,13 @@ export default function AuthPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-200">Password</FormLabel>
+                          <FormLabel>Password</FormLabel>
                           <FormControl>
                             <Input 
                               type="password" 
                               placeholder="Enter your password" 
                               {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
+                              autoComplete="current-password"
                             />
                           </FormControl>
                           <FormMessage />
@@ -156,50 +196,47 @@ export default function AuthPage() {
                     />
                     <Button 
                       type="submit" 
-                      className="w-full bg-[#d4af37] hover:bg-[#c4a535] text-black"
+                      className="w-full bg-chai-gold hover:bg-yellow-700"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Login
+                      Sign In
                     </Button>
                   </form>
                 </Form>
-              </CardContent>
-              <CardFooter className="flex justify-center">
-                <Button 
-                  variant="link" 
-                  onClick={() => setActiveTab("register")}
-                  className="text-[#d4af37]"
-                >
-                  Don't have an account? Register
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          {/* Register Tab */}
-          <TabsContent value="register">
-            <Card className="bg-[#262a38] border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-gray-200">Register</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Create a new account to manage Chaiiwala stores
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+              </TabsContent>
+
+              {/* Register Form */}
+              <TabsContent value="register">
                 <Form {...registerForm}>
                   <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your full name" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={registerForm.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-200">Username</FormLabel>
+                          <FormLabel>Username</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Create a username" 
+                              placeholder="Choose a username" 
                               {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
+                              autoComplete="username"
                             />
                           </FormControl>
                           <FormMessage />
@@ -208,33 +245,16 @@ export default function AuthPage() {
                     />
                     <FormField
                       control={registerForm.control}
-                      name="fullName"
+                      name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-200">Full Name</FormLabel>
+                          <FormLabel>Password</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Enter your full name" 
+                              type="password" 
+                              placeholder="Create a password" 
                               {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Email</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="email"
-                              placeholder="Enter your email" 
-                              {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
+                              autoComplete="new-password"
                             />
                           </FormControl>
                           <FormMessage />
@@ -246,52 +266,17 @@ export default function AuthPage() {
                       name="role"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-200">Role</FormLabel>
+                          <FormLabel>Role</FormLabel>
                           <FormControl>
-                            <select 
-                              {...field} 
-                              className="flex h-10 w-full rounded-md border border-gray-700 bg-[#2d3142] px-3 py-2 text-sm text-gray-200 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            <select
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              {...field}
                             >
-                              <option value="store_manager">Store Manager</option>
-                              <option value="regional_manager">Regional Manager</option>
-                              <option value="admin">Admin</option>
+                              <option value="admin">Administrator</option>
+                              <option value="regional">Regional Manager</option>
+                              <option value="store">Store Manager</option>
+                              <option value="staff">Staff</option>
                             </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Password</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password" 
-                              placeholder="Create a password" 
-                              {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password" 
-                              placeholder="Confirm your password" 
-                              {...field} 
-                              className="bg-[#2d3142] border-gray-700 text-gray-200"
-                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -299,7 +284,7 @@ export default function AuthPage() {
                     />
                     <Button 
                       type="submit" 
-                      className="w-full bg-[#d4af37] hover:bg-[#c4a535] text-black"
+                      className="w-full bg-chai-gold hover:bg-yellow-700"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -307,45 +292,59 @@ export default function AuthPage() {
                     </Button>
                   </form>
                 </Form>
-              </CardContent>
-              <CardFooter className="flex justify-center">
-                <Button 
-                  variant="link" 
-                  onClick={() => setActiveTab("login")}
-                  className="text-[#d4af37]"
-                >
-                  Already have an account? Login
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
-      
-      {/* Right side - Hero/Branding */}
-      <div className="flex-1 bg-[#2d3142] p-8 flex flex-col justify-center items-center text-center hidden md:flex">
-        <div className="max-w-md">
-          <h1 className="text-4xl font-bold text-[#d4af37] mb-4">Chaiiwala Management Dashboard</h1>
-          <p className="text-gray-300 mb-6">
-            A comprehensive solution for managing your Chaiiwala stores. Track inventory, 
-            schedule staff, manage maintenance, and monitor performance all in one place.
+
+      {/* Right Side - Hero Banner */}
+      <div className="w-full md:w-1/2 bg-chai-black p-8 flex items-center justify-center">
+        <div className="max-w-md text-white">
+          <div className="flex items-center mb-8">
+            <div className="h-12 w-12 bg-chai-gold rounded-full flex items-center justify-center mr-4">
+              <span className="text-white font-bold text-xl">C</span>
+            </div>
+            <h1 className="font-montserrat font-bold text-3xl text-chai-gold">Chaiiwala</h1>
+          </div>
+          <h2 className="text-2xl font-playfair font-bold mb-4">Management Dashboard</h2>
+          <p className="mb-6 text-gray-300">
+            Welcome to the Chaiiwala Management Dashboard. This platform helps you manage inventory, 
+            staff scheduling, store performance, and much more across all your locations.
           </p>
-          <div className="grid grid-cols-2 gap-4 text-left">
-            <div className="bg-[#262a38] p-4 rounded-lg">
-              <h3 className="text-[#d4af37] font-medium mb-2">Inventory Management</h3>
-              <p className="text-gray-400 text-sm">Track stock levels and get alerts when items are running low.</p>
+          <div className="space-y-4">
+            <div className="flex items-start">
+              <div className="bg-chai-gold rounded-full p-1 mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium">Inventory Management</h3>
+                <p className="text-sm text-gray-400">Track stock levels and manage orders across all locations</p>
+              </div>
             </div>
-            <div className="bg-[#262a38] p-4 rounded-lg">
-              <h3 className="text-[#d4af37] font-medium mb-2">Staff Scheduling</h3>
-              <p className="text-gray-400 text-sm">Create and manage staff schedules with ease.</p>
+            <div className="flex items-start">
+              <div className="bg-chai-gold rounded-full p-1 mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium">Staff Scheduling</h3>
+                <p className="text-sm text-gray-400">Create and manage staff schedules with ease</p>
+              </div>
             </div>
-            <div className="bg-[#262a38] p-4 rounded-lg">
-              <h3 className="text-[#d4af37] font-medium mb-2">Maintenance Tracking</h3>
-              <p className="text-gray-400 text-sm">Log and track maintenance issues across all stores.</p>
-            </div>
-            <div className="bg-[#262a38] p-4 rounded-lg">
-              <h3 className="text-[#d4af37] font-medium mb-2">Performance Analytics</h3>
-              <p className="text-gray-400 text-sm">Monitor KPIs and get insights into store performance.</p>
+            <div className="flex items-start">
+              <div className="bg-chai-gold rounded-full p-1 mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium">Task Management</h3>
+                <p className="text-sm text-gray-400">Assign and track tasks for your team members</p>
+              </div>
             </div>
           </div>
         </div>

@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Chaiiwala brand colors */
+  --chai-gold: #D4AF37;
+  --chai-black: #222222;
+}
+
+@layer base {
+  .bg-chai-gold {
+    background-color: var(--chai-gold);
+  }
+  
+  .bg-chai-black {
+    background-color: var(--chai-black);
+  }
+  
+  .text-chai-gold {
+    color: var(--chai-gold);
+  }
+  
+  .hover\:bg-yellow-600:hover {
+    background-color: #B8860B;
+  }
+  
+  .hover\:text-yellow-600:hover {
+    color: #B8860B;
+  }
+}
+
+/* Add some global font settings */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
 @layer base {
   * {
     @apply border-border;

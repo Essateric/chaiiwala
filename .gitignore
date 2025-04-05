@@ -1,6 +1,19 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Local env files
+.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor directories and files
+.vscode/
+.idea/
 .DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
