@@ -8,6 +8,7 @@ export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'com
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
 export const inventoryStatusEnum = pgEnum('inventory_status', ['in_stock', 'low_stock', 'out_of_stock', 'on_order']);
 export const jobFlagEnum = pgEnum('job_flag', ['normal', 'long_standing', 'urgent']);
+export const accessLevelEnum = pgEnum('access_level', ['Shop Limited Access', 'Senior Manager Access', 'Admin Access']);
 
 // Users Table
 export const users = pgTable("users", {
@@ -113,6 +114,16 @@ export const jobLogs = pgTable("job_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
 });
 
+// Manager Details Table
+export const managerDetails = pgTable("manager_details", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id), // Reference to user table
+  phoneNumber: text("phone_number").notNull(),
+  accessLevel: accessLevelEnum("access_level").notNull().default('Shop Limited Access'),
+  dateOfJoining: text("date_of_joining").notNull(),
+  lastLoginDate: text("last_login_date").notNull(),
+});
+
 // Schema Validation
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true });
@@ -123,6 +134,7 @@ export const insertChecklistTaskSchema = createInsertSchema(checklistTasks).omit
 export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
 export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
+export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -151,3 +163,6 @@ export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 
 export type JobLog = typeof jobLogs.$inferSelect;
 export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
+
+export type ManagerDetails = typeof managerDetails.$inferSelect;
+export type InsertManagerDetails = z.infer<typeof insertManagerDetailsSchema>;
