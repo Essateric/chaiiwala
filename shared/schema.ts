@@ -106,7 +106,8 @@ export const jobLogs = pgTable("job_logs", {
   loggedBy: text("logged_by").notNull(), // Name of person who logged the job
   storeId: integer("store_id").notNull(), // Store where the job is logged
   description: text("description").notNull(), // Description of the job
-  attachment: text("attachment"), // URL or path to any uploaded attachment
+  completionDate: text("completion_date"), // Date by which the job should be completed
+  attachments: text("attachments").array(), // URLs or paths to any uploaded attachments
   comments: text("comments"), // Additional comments
   flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged

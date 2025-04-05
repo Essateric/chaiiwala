@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2 } from "lucide-react";
+import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2, X as XIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
@@ -56,7 +56,8 @@ function JobLogsSection() {
       description: z.string().min(5, "Description must be at least 5 characters"),
       loggedBy: z.string().min(2, "Name must be at least 2 characters"),
       flag: z.enum(["normal", "long_standing", "urgent"]),
-      attachment: z.string().nullable().optional(),
+      completionDate: z.string().nullable().optional(),
+      attachments: z.array(z.string()).default([]),
       comments: z.string().nullable().optional(),
     })),
     defaultValues: {
@@ -66,10 +67,14 @@ function JobLogsSection() {
       description: "",
       loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
       flag: "normal" as const,
-      attachment: null,
+      completionDate: null,
+      attachments: [],
       comments: null,
     },
   });
+  
+  // State for managing images before they're added to the form
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
 
   async function onSubmit(values: any) {
     try {
@@ -82,9 +87,11 @@ function JobLogsSection() {
         description: "",
         loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
         flag: "normal" as const,
-        attachment: null,
+        completionDate: null,
+        attachments: [],
         comments: null,
       });
+      setNewImagePreview(null);
     } catch (error) {
       console.error("Error submitting job log:", error);
     }
@@ -199,8 +206,16 @@ function JobLogsSection() {
                           <FormItem>
                             <FormLabel>Date</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <Input 
+                                type="date" 
+                                value={field.value} 
+                                disabled 
+                                className="bg-muted cursor-not-allowed"
+                              />
                             </FormControl>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              Automatically set to today's date
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -212,13 +227,41 @@ function JobLogsSection() {
                           <FormItem>
                             <FormLabel>Time</FormLabel>
                             <FormControl>
-                              <Input type="time" {...field} />
+                              <Input 
+                                type="time" 
+                                value={field.value} 
+                                disabled 
+                                className="bg-muted cursor-not-allowed"
+                              />
                             </FormControl>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              Automatically set to current time
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+                    <FormField
+                      control={form.control}
+                      name="completionDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>To be completed by</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              value={field.value || ''} 
+                              onChange={(e) => field.onChange(e.target.value || null)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Set a target date for this maintenance task to be completed
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="description"
@@ -279,42 +322,91 @@ function JobLogsSection() {
                     </div>
                     <FormField
                       control={form.control}
-                      name="attachment"
+                      name="attachments"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Attachment (Image)</FormLabel>
+                          <FormLabel>Attachments (Images)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="file" 
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  // Convert the file to a base64 string for storage
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    field.onChange(event.target?.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                } else {
-                                  field.onChange(null);
-                                }
-                              }}
-                            />
+                            <div className="space-y-4">
+                              <Input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    // Convert the file to a base64 string for storage
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      setNewImagePreview(event.target?.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  } else {
+                                    setNewImagePreview(null);
+                                  }
+                                }}
+                              />
+                              
+                              {newImagePreview && (
+                                <div className="mt-2 flex items-center space-x-4">
+                                  <img 
+                                    src={newImagePreview} 
+                                    alt="New attachment preview"
+                                    className="h-32 w-32 object-cover rounded-md border" 
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() => {
+                                      // Add the new image to the attachments array
+                                      const updatedAttachments = [...field.value, newImagePreview];
+                                      field.onChange(updatedAttachments);
+                                      // Reset the new image preview
+                                      setNewImagePreview(null);
+                                    }}
+                                  >
+                                    <PlusIcon className="h-4 w-4 mr-2" /> Add Image
+                                  </Button>
+                                </div>
+                              )}
+                              
+                              <div className="mt-4">
+                                {field.value.length > 0 ? (
+                                  <div>
+                                    <h4 className="mb-2 text-sm font-medium">Attached Images ({field.value.length})</h4>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {field.value.map((img, index) => (
+                                        <div key={index} className="relative group">
+                                          <img 
+                                            src={img} 
+                                            alt={`Attachment ${index + 1}`}
+                                            className="h-24 w-24 object-cover rounded-md border" 
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => {
+                                              const updatedAttachments = [...field.value];
+                                              updatedAttachments.splice(index, 1);
+                                              field.onChange(updatedAttachments);
+                                            }}
+                                          >
+                                            <XIcon className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No images attached yet</p>
+                                )}
+                              </div>
+                            </div>
                           </FormControl>
                           <FormDescription>
-                            Upload an image of the maintenance issue (optional)
+                            Upload images of the maintenance issue (optional)
                           </FormDescription>
                           <FormMessage />
-                          {field.value && (
-                            <div className="mt-2">
-                              <img 
-                                src={field.value as string} 
-                                alt="Attachment preview"
-                                className="max-h-32 rounded-md border" 
-                              />
-                            </div>
-                          )}
                         </FormItem>
                       )}
                     />
@@ -394,22 +486,30 @@ function JobLogsSection() {
                       {job.storeId === 3 && "Deansgate"}
                     </TableCell>
                     <TableCell className="w-[80px]">
-                      {job.attachment && (
-                        <div className="flex justify-center">
-                          <a 
-                            href={job.attachment} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="inline-block"
-                          >
-                            <img 
-                              src={job.attachment} 
-                              alt="Attachment" 
-                              className="w-10 h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-                            />
-                          </a>
+                      {job.attachments && job.attachments.length > 0 ? (
+                        <div className="flex justify-start gap-1">
+                          {job.attachments.slice(0, 3).map((attachment, index) => (
+                            <a 
+                              key={index}
+                              href={attachment} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="inline-block"
+                            >
+                              <img 
+                                src={attachment} 
+                                alt={`Attachment ${index + 1}`} 
+                                className="w-8 h-8 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                              />
+                            </a>
+                          ))}
+                          {job.attachments.length > 3 && (
+                            <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-medium">
+                              +{job.attachments.length - 3}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
