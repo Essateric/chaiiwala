@@ -453,7 +453,9 @@ export class MemStorage implements IStorage {
       { name: "Rochdale", address: "35 Milkstone Rd, Rochdale OL11 1EB", area: 2, manager: "MGR_RD" },
       { name: "Oldham", address: "66 George St, Oldham OL1 1LS", area: 2, manager: "MGR_OL" },
       { name: "Wilmslow Road", address: "123 Wilmslow Rd Manchester M14 5TB", area: 1, manager: "MGR_WR" },
-      { name: "Deansgate", address: "456 Deansgate Manchester M3 4LY", area: 1, manager: "MGR_DG" }
+      { name: "Deansgate", address: "456 Deansgate Manchester M3 4LY", area: 1, manager: "MGR_DG" },
+      // Example of adding a new store
+      { name: "Birmingham", address: "789 High Street, Birmingham B1 2AA", area: 3, manager: "MGR_BH" }
     ];
     
     storeData.forEach(store => {
