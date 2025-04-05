@@ -19,6 +19,7 @@ import { insertJobLogSchema } from "@shared/schema";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
 import { useStaffByStore } from "@/hooks/use-staff";
+import { useStores } from "@/hooks/use-stores";
 import { z } from "zod";
 
 // Component for Job Logs
@@ -34,6 +35,9 @@ function JobLogsSection() {
   const canCreateLogs = 
     user?.role === "admin" || 
     (user?.permissions && user.permissions.includes("maintenance"));
+  
+  // Get all stores
+  const { stores, isLoading: isLoadingStores } = useStores();
   
   // Get store staff for the "Logged By" dropdown
   const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; 
@@ -133,9 +137,11 @@ function JobLogsSection() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Stores</SelectItem>
-              <SelectItem value="1">Stockport Road</SelectItem>
-              <SelectItem value="2">Wilmslow Road</SelectItem>
-              <SelectItem value="3">Deansgate</SelectItem>
+              {!isLoadingStores && stores.map((store) => (
+                <SelectItem key={store.id} value={store.id.toString()}>
+                  {store.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
@@ -188,9 +194,11 @@ function JobLogsSection() {
                                 <SelectValue placeholder="Select a store" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="1">Stockport Road</SelectItem>
-                                <SelectItem value="2">Wilmslow Road</SelectItem>
-                                <SelectItem value="3">Deansgate</SelectItem>
+                                {!isLoadingStores && stores.map((store) => (
+                                  <SelectItem key={store.id} value={store.id.toString()}>
+                                    {store.name}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -481,9 +489,7 @@ function JobLogsSection() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {job.storeId === 1 && "Stockport Road"}
-                      {job.storeId === 2 && "Wilmslow Road"}
-                      {job.storeId === 3 && "Deansgate"}
+                      {stores.find(store => store.id === job.storeId)?.name || `Store ID: ${job.storeId}`}
                     </TableCell>
                     <TableCell className="w-[80px]">
                       {job.attachments && job.attachments.length > 0 ? (
