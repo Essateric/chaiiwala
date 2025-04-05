@@ -1,209 +1,225 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  Home,
-  MapPin,
-  Package,
-  Users,
-  CheckSquare,
-  Settings,
-  MessageCircle,
-  Calendar,
-  ShoppingCart,
-  Menu,
-  X
+import { cn } from "@/lib/utils";
+import { 
+  HomeIcon, 
+  ClipboardListIcon, 
+  CalendarIcon, 
+  ArchiveIcon, 
+  CheckSquareIcon, 
+  BellIcon, 
+  ShoppingBagIcon, 
+  UsersIcon, 
+  SettingsIcon, 
+  XIcon,
+  ClipboardCheckIcon,
+  ShoppingCartIcon,
+  CalendarDaysIcon,
+  WrenchIcon,
+  PackageIcon
 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import chaiiwalaLogo from "@assets/chaiiwala.png";
 
-interface NavItemProps {
-  icon: React.ReactNode;
-  label: string;
-  href: string;
-  active: boolean;
-  onClick?: () => void;
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-function NavItem({ icon, label, href, active, onClick }: NavItemProps) {
-  return (
-    <li className="px-2 py-1">
-      <Link href={href} onClick={onClick}>
-        <a
-          className={cn(
-            "flex items-center px-3 py-2 rounded-md hover:bg-dark-secondary text-gray-300 hover:text-white",
-            active && "bg-gold bg-opacity-20 text-gold"
-          )}
-        >
-          <span className="h-5 w-5 mr-3">{icon}</span>
-          {label}
-        </a>
-      </Link>
-    </li>
-  );
-}
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const [location, navigate] = useLocation();
+  const { user, logoutMutation } = useAuth();
 
-export default function Sidebar() {
-  const [location] = useLocation();
-  const { user } = useAuth();
-  const isMobile = useIsMobile();
-  const [isOpen, setIsOpen] = useState(false);
+  if (!user) return null;
+
+  const currentPage = location === "/" ? "dashboard" : location.substring(1);
+
+  // Navigation items with role-based access
+  // Force console log to debug items and roles
+  console.log("Current user role:", user.role);
+  console.log("Current page:", currentPage);
   
-  const isActive = (path: string) => location === path;
-  
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
-  };
-  
-  const closeSidebar = () => {
-    if (isMobile) {
-      setIsOpen(false);
+  const navItems = [
+    { 
+      name: 'Dashboard', 
+      icon: HomeIcon, 
+      href: '/', 
+      active: currentPage === 'dashboard',
+      roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    // New items placed immediately after dashboard
+    {
+      name: 'Maintenance',
+      icon: WrenchIcon,
+      href: '/maintenance',
+      active: currentPage === 'maintenance',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Event Orders',
+      icon: CalendarDaysIcon,
+      href: '/event-orders',
+      active: currentPage === 'event-orders',
+      roles: ['admin', 'regional', 'store']
+    },
+    {
+      name: 'Stock Orders',
+      icon: PackageIcon,
+      href: '/stock-orders',
+      active: currentPage === 'stock-orders',
+      roles: ['admin', 'regional', 'store']
+    },
+    { 
+      name: 'Inventory', 
+      icon: ArchiveIcon, 
+      href: '/inventory', 
+      active: currentPage === 'inventory',
+      roles: ['admin', 'regional'] 
+    },
+    { 
+      name: 'Deep Cleaning', 
+      icon: ClipboardCheckIcon, 
+      href: '/deep-cleaning', 
+      active: currentPage === 'deep-cleaning',
+      roles: ['admin', 'regional', 'store'] 
+    },
+    { 
+      name: 'Staff Schedule', 
+      icon: CalendarIcon, 
+      href: '/schedule', 
+      active: currentPage === 'schedule',
+      roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    { 
+      name: 'Checklists', 
+      icon: CheckSquareIcon, 
+      href: '/checklists', 
+      active: currentPage === 'checklists',
+      roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    { 
+      name: 'Tasks', 
+      icon: ClipboardListIcon, 
+      href: '/tasks', 
+      active: currentPage === 'tasks',
+      roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    { 
+      name: 'Announcements', 
+      icon: BellIcon, 
+      href: '/announcements', 
+      active: currentPage === 'announcements',
+      roles: ['admin', 'regional', 'store', 'staff'] 
+    },
+    { 
+      name: 'Stores', 
+      icon: ShoppingBagIcon, 
+      href: '/stores', 
+      active: currentPage === 'stores',
+      roles: ['admin', 'regional'] 
+    },
+    { 
+      name: 'User Management', 
+      icon: UsersIcon, 
+      href: '/users', 
+      active: currentPage === 'users',
+      roles: ['admin'] 
+    },
+    { 
+      name: 'Settings', 
+      icon: SettingsIcon, 
+      href: '/settings', 
+      active: currentPage === 'settings',
+      roles: ['admin', 'regional', 'store'] 
     }
-  };
+  ];
 
-  const sidebarContent = (
-    <>
+  return (
+    <div 
+      className={cn(
+        "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white transform transition-transform duration-300 ease-in-out",
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}
+    >
+      {/* Logo & Brand */}
+      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
+        <div className="flex items-center space-x-2">
+          <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
+            <img 
+              src={chaiiwalaLogo} 
+              alt="Chaiiwala Logo" 
+              className="h-7 w-auto"
+            />
+          </div>
+          <span className="font-montserrat font-bold text-chai-gold text-xl">Chaiiwala</span>
+        </div>
+        <button 
+          onClick={onClose} 
+          className="lg:hidden text-gray-400 hover:text-white focus:outline-none"
+        >
+          <XIcon className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* User Profile */}
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center space-x-3">
-          <div className="bg-white rounded-full p-1.5">
-            <span className="text-dark-secondary font-semibold text-sm">chaiwala</span>
-            <span className="inline-block w-4 h-4 bg-dark-secondary rounded-full ml-1"></span>
+          <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center text-white font-semibold">
+            {user.name.charAt(0).toUpperCase()}
           </div>
-          <h1 className="text-gold font-semibold text-xl">Chaiwala</h1>
+          <div>
+            <p className="text-sm font-medium">{user.name}</p>
+            <p className="text-xs text-gray-400">
+              {user.role === 'admin' 
+                ? 'Administrator' 
+                : user.role === 'regional' 
+                  ? 'Regional Manager' 
+                  : user.role === 'store' 
+                    ? 'Store Manager' 
+                    : 'Staff'
+              }
+            </p>
+          </div>
         </div>
       </div>
-      
-      <nav className="mt-4">
-        <div className="px-4 py-2 text-xs text-gray-500 uppercase tracking-wider">
-          Main Navigation
-        </div>
-        
-        <ul>
-          <NavItem
-            icon={<Home />}
-            label="Dashboard"
-            href="/"
-            active={isActive("/")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<MapPin />}
-            label="Stores"
-            href="/stores"
-            active={isActive("/stores")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<Package />}
-            label="Inventory"
-            href="/inventory"
-            active={isActive("/inventory")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<Users />}
-            label="Staff"
-            href="/staff"
-            active={isActive("/staff")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<CheckSquare />}
-            label="Tasks"
-            href="/tasks"
-            active={isActive("/tasks")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<Settings />}
-            label="Maintenance"
-            href="/maintenance"
-            active={isActive("/maintenance")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<Calendar />}
-            label="Events"
-            href="/events"
-            active={isActive("/events")}
-            onClick={closeSidebar}
-          />
-          
-          <NavItem
-            icon={<ShoppingCart />}
-            label="Orders"
-            href="/orders"
-            active={isActive("/orders")}
-            onClick={closeSidebar}
-          />
-        </ul>
-        
-        {(user?.role === 'admin' || user?.role === 'regional_manager') && (
-          <>
-            <div className="px-4 py-2 mt-4 text-xs text-gray-500 uppercase tracking-wider">
-              Admin
-            </div>
-            
-            <ul>
-              <NavItem
-                icon={<MessageCircle />}
-                label="Announcements"
-                href="/announcements"
-                active={isActive("/announcements")}
-                onClick={closeSidebar}
-              />
-              
-              <NavItem
-                icon={<Settings />}
-                label="Settings"
-                href="/settings"
-                active={isActive("/settings")}
-                onClick={closeSidebar}
-              />
-            </ul>
-          </>
-        )}
-      </nav>
-    </>
-  );
 
-  return (
-    <>
-      {/* Mobile menu button */}
-      {isMobile && (
+      {/* Navigation - with scrollable area */}
+      <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
+        {navItems.map((item, index) => (
+          item.roles.includes(user.role) && (
+            <a
+              key={index}
+              href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(item.href);
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className={cn(
+                "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                item.active 
+                  ? "bg-chai-gold text-white" 
+                  : "text-gray-300 hover:bg-gray-700"
+              )}
+            >
+              <item.icon className="mr-3 h-5 w-5" />
+              <span>{item.name}</span>
+            </a>
+          )
+        ))}
+      </nav>
+
+      {/* Logout Button */}
+      <div className="absolute bottom-0 w-full p-4 border-t border-gray-700">
         <button
-          className="fixed top-4 left-4 z-50 bg-dark-secondary p-2 rounded-md text-white"
-          onClick={toggleSidebar}
+          onClick={() => logoutMutation.mutate()}
+          className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-md transition-colors"
         >
-          {isOpen ? <X /> : <Menu />}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span>Logout</span>
         </button>
-      )}
-      
-      {/* Sidebar for desktop */}
-      <aside 
-        className={cn(
-          "w-64 bg-dark-secondary min-h-screen flex-shrink-0 border-r border-gray-700",
-          isMobile && "fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out",
-          isMobile && !isOpen && "-translate-x-full",
-          isMobile && isOpen && "translate-x-0"
-        )}
-      >
-        {sidebarContent}
-      </aside>
-      
-      {/* Overlay for mobile */}
-      {isMobile && isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30"
-          onClick={closeSidebar}
-        />
-      )}
-    </>
+      </div>
+    </div>
   );
 }
