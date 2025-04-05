@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, Clock } from "lucide-react";
+import { Loader2, AlertCircle, Clock, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { useJobLogs } from "@/hooks/use-joblogs";
@@ -18,17 +18,19 @@ export default function JobLogsWidget() {
   );
   const [flagFilter, setFlagFilter] = useState<string | undefined>(undefined);
   
-  // Fetch stores
-  const { data: stores = [] } = useQuery<Array<{ id: number; name: string; address: string; manager: string; area: number }>>({
-    queryKey: ["/api/stores"],
+  // Direct fetch to ensure it loads properly in the dashboard
+  const { data: allJobLogs = [], isLoading } = useQuery<JobLog[]>({
+    queryKey: ["/api/joblogs"],
   });
-  
-  // Use the custom hook to fetch job logs
-  const { jobLogs: allJobLogs = [], isLoading } = useJobLogs(selectedStoreId);
   
   // Filter job logs based on selected store and flag
   const filteredJobLogs = useMemo(() => {
-    let logs = [...allJobLogs];
+    let logs = allJobLogs;
+    
+    // Filter by store if selected
+    if (selectedStoreId) {
+      logs = logs.filter(log => log.storeId === selectedStoreId);
+    }
     
     // Filter by flag if selected
     if (flagFilter) {
@@ -43,7 +45,14 @@ export default function JobLogsWidget() {
         return dateB.getTime() - dateA.getTime();
       })
       .slice(0, 5);
-  }, [allJobLogs, flagFilter]);
+  }, [allJobLogs, selectedStoreId, flagFilter]);
+
+  // Get stores (would ideally come from a hook, but using hardcoded for now)
+  const stores = [
+    { id: 1, name: "Stockport Road" },
+    { id: 2, name: "Wilmslow Road" },
+    { id: 3, name: "Deansgate" }
+  ];
 
   function getFlagColor(flag: string) {
     switch (flag) {
@@ -132,8 +141,8 @@ export default function JobLogsWidget() {
               <JobLogItem key={job.id} job={job} stores={stores} />
             ))}
             <div className="pt-2 text-center">
-              <Button variant="link" className="text-chai-gold hover:text-chai-gold/80" asChild>
-                <a href="/maintenance">View All Job Logs</a>
+              <Button variant="link" className="text-chai-gold hover:text-chai-gold/80" onClick={() => window.location.href = "/maintenance"}>
+                View All Job Logs
               </Button>
             </div>
           </div>
