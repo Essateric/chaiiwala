@@ -279,6 +279,47 @@ function JobLogsSection() {
                     </div>
                     <FormField
                       control={form.control}
+                      name="attachment"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Attachment (Image)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  // Convert the file to a base64 string for storage
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    field.onChange(event.target?.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                } else {
+                                  field.onChange(null);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Upload an image of the maintenance issue (optional)
+                          </FormDescription>
+                          <FormMessage />
+                          {field.value && (
+                            <div className="mt-2">
+                              <img 
+                                src={field.value as string} 
+                                alt="Attachment preview"
+                                className="max-h-32 rounded-md border" 
+                              />
+                            </div>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
                       name="comments"
                       render={({ field }) => (
                         <FormItem>
@@ -327,6 +368,7 @@ function JobLogsSection() {
                   <TableHead>Logged By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[100px]">Store</TableHead>
+                  <TableHead className="w-[80px] text-center">Image</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -335,7 +377,7 @@ function JobLogsSection() {
                     <TableCell>
                       {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
                     </TableCell>
-                    <TableCell className="font-medium max-w-[300px] truncate">
+                    <TableCell className="font-medium max-w-[220px] truncate">
                       {job.description}
                     </TableCell>
                     <TableCell>{job.loggedBy}</TableCell>
@@ -350,6 +392,24 @@ function JobLogsSection() {
                       {job.storeId === 1 && "Stockport Road"}
                       {job.storeId === 2 && "Wilmslow Road"}
                       {job.storeId === 3 && "Deansgate"}
+                    </TableCell>
+                    <TableCell className="w-[80px]">
+                      {job.attachment && (
+                        <div className="flex justify-center">
+                          <a 
+                            href={job.attachment} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="inline-block"
+                          >
+                            <img 
+                              src={job.attachment} 
+                              alt="Attachment" 
+                              className="w-10 h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                            />
+                          </a>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
