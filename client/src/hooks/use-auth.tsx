@@ -4,29 +4,57 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+import { insertUserSchema } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
-type AuthContextType = {
-  user: SelectUser | null;
-  isLoading: boolean;
-  error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+// Define user interface without password
+export interface User {
+  id: number;
+  username: string;
+  fullName: string;
+  role: 'admin' | 'regional_manager' | 'store_manager';
+  email: string;
+  createdAt: string;
+}
+
+// Create login data type
+type LoginData = {
+  username: string;
+  password: string;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+// Create registration schema with validation
+const registerSchema = insertUserSchema.extend({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+export type RegisterData = z.infer<typeof registerSchema>;
+
+type AuthContextType = {
+  user: User | null;
+  isLoading: boolean;
+  error: Error | null;
+  loginMutation: UseMutationResult<User, Error, LoginData>;
+  logoutMutation: UseMutationResult<void, Error, void>;
+  registerMutation: UseMutationResult<User, Error, RegisterData>;
+  registerSchema: typeof registerSchema;
+};
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const {
     data: user,
     error,
     isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<User | null, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
@@ -36,8 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (userData: User) => {
+      queryClient.setQueryData(["/api/user"], userData);
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${userData.fullName}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -49,12 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
+    mutationFn: async (data: RegisterData) => {
+      // Remove confirmPassword before sending to server
+      const { confirmPassword, ...userInput } = data;
+      const res = await apiRequest("POST", "/api/register", userInput);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (userData: User) => {
+      queryClient.setQueryData(["/api/user"], userData);
+      toast({
+        title: "Registration successful",
+        description: `Welcome, ${userData.fullName}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -70,17 +108,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      // Clear the user data from cache
       queryClient.setQueryData(["/api/user"], null);
-      
-      // Show success toast
       toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account",
+        title: "Logged out",
+        description: "You have been successfully logged out.",
       });
-      
-      // Force redirect to login page
-      window.location.href = "/auth";
     },
     onError: (error: Error) => {
       toast({
@@ -100,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        registerSchema,
       }}
     >
       {children}
