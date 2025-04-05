@@ -1,7 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // Check if we're in Netlify production environment
-const isNetlify = import.meta.env.PROD || window.location.hostname.includes('netlify.app');
+// Only use Netlify functions when deployed to Netlify
+const isNetlify = window.location.hostname.includes('netlify.app');
 
 // Helper to transform API URLs for Netlify deployment
 function transformApiUrl(url: string): string {
