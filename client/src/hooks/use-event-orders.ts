@@ -22,7 +22,9 @@ export function useEventOrders(storeId?: number) {
         throw new Error('Failed to fetch event orders');
       }
       return response.json();
-    }
+    },
+    // Ensure this query is always fresh when storeId changes
+    refetchOnWindowFocus: true
   });
 
   // Create a new event order
@@ -31,9 +33,22 @@ export function useEventOrders(storeId?: number) {
       const response = await apiRequest("POST", "/api/event-orders", eventOrder);
       return await response.json();
     },
-    onSuccess: () => {
-      // Invalidate event orders queries
+    onSuccess: (newOrder) => {
+      // Update specific query data with the new event order
+      queryClient.setQueryData(["/api/event-orders"], (oldData: EventOrder[] = []) => {
+        return [...oldData, newOrder];
+      });
+      
+      // Also update store-specific query if it exists
+      if (storeId) {
+        queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData: EventOrder[] = []) => {
+          return [...oldData, newOrder];
+        });
+      }
+      
+      // Additionally invalidate all queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
+      
       toast({
         title: "Event Order Created",
         description: "The event order has been created successfully.",
@@ -54,9 +69,26 @@ export function useEventOrders(storeId?: number) {
       const response = await apiRequest("PATCH", `/api/event-orders/${id}`, data);
       return await response.json();
     },
-    onSuccess: () => {
-      // Invalidate event orders queries
+    onSuccess: (updatedOrder) => {
+      // Update specific query data with the updated event order
+      queryClient.setQueryData(["/api/event-orders"], (oldData: EventOrder[] = []) => {
+        return oldData.map(order => 
+          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+        );
+      });
+      
+      // Also update store-specific query if it exists
+      if (storeId) {
+        queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData: EventOrder[] = []) => {
+          return oldData.map(order => 
+            order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+          );
+        });
+      }
+      
+      // Additionally invalidate all queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
+      
       toast({
         title: "Event Order Updated",
         description: "The event order has been updated successfully.",
