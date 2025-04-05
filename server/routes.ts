@@ -1,8 +1,11 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
+import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import { UploadedFile } from "express-fileupload";
 import { 
   insertStoreSchema, 
   insertInventorySchema, 
@@ -328,6 +331,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: "Failed to update job log" });
     }
+  });
+
+  // Upload image for job log
+  app.post("/api/upload/joblog-image", isAuthenticated, async (req: Request, res) => {
+    try {
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No file was uploaded" });
+      }
+
+      const uploadedFile = req.files.image as UploadedFile;
+      
+      // Check file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+      if (!allowedTypes.includes(uploadedFile.mimetype)) {
+        return res.status(400).json({ 
+          message: "Invalid file type. Only JPG, PNG, and GIF images are allowed." 
+        });
+      }
+
+      // Generate unique filename
+      const fileName = `${uuidv4()}${path.extname(uploadedFile.name)}`;
+      const uploadPath = path.join(__dirname, '..', 'public', 'uploads', fileName);
+
+      // Move the file to the uploads directory
+      await uploadedFile.mv(uploadPath);
+
+      // Return the URL path to the uploaded file
+      const fileUrl = `/uploads/${fileName}`;
+      res.json({ 
+        success: true, 
+        fileUrl,
+        message: "File uploaded successfully" 
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ message: "Failed to upload file", error: (error as Error).message });
+    }
+  });
+
+  // Serve uploaded files
+  app.get("/uploads/:fileName", (req, res) => {
+    const fileName = req.params.fileName;
+    const filePath = path.join(__dirname, '..', 'public', 'uploads', fileName);
+    res.sendFile(filePath);
   });
 
   const httpServer = createServer(app);

@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2, X as XIcon } from "lucide-react";
+import { WrenchIcon, ActivityIcon, CheckCircleIcon, ClipboardListIcon, PlusIcon, Loader2, X as XIcon, ImageIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
@@ -20,6 +20,7 @@ import { useJobLogs } from "@/hooks/use-joblogs";
 import { useAuth } from "@/hooks/use-auth";
 import { useStaffByStore } from "@/hooks/use-staff";
 import { useStores } from "@/hooks/use-stores";
+import { FileUpload } from "@/components/ui/file-upload";
 import { z } from "zod";
 
 // Component for Job Logs
@@ -77,9 +78,6 @@ function JobLogsSection() {
     },
   });
   
-  // State for managing images before they're added to the form
-  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
-
   async function onSubmit(values: any) {
     try {
       await createJobLog(values);
@@ -95,7 +93,6 @@ function JobLogsSection() {
         attachments: [],
         comments: null,
       });
-      setNewImagePreview(null);
     } catch (error) {
       console.error("Error submitting job log:", error);
     }
@@ -336,45 +333,15 @@ function JobLogsSection() {
                           <FormLabel>Attachments (Images)</FormLabel>
                           <FormControl>
                             <div className="space-y-4">
-                              <Input 
-                                type="file" 
-                                accept="image/*"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    // Convert the file to a base64 string for storage
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      setNewImagePreview(event.target?.result as string);
-                                    };
-                                    reader.readAsDataURL(file);
-                                  } else {
-                                    setNewImagePreview(null);
-                                  }
+                              <FileUpload
+                                onUploadComplete={(imageUrl) => {
+                                  // Add the new image URL to the attachments array
+                                  const updatedAttachments = [...field.value, imageUrl];
+                                  field.onChange(updatedAttachments);
                                 }}
+                                placeholder="Click to upload maintenance issue images"
+                                buttonText="Upload Image"
                               />
-                              
-                              {newImagePreview && (
-                                <div className="mt-2 flex items-center space-x-4">
-                                  <img 
-                                    src={newImagePreview} 
-                                    alt="New attachment preview"
-                                    className="h-32 w-32 object-cover rounded-md border" 
-                                  />
-                                  <Button
-                                    type="button"
-                                    onClick={() => {
-                                      // Add the new image to the attachments array
-                                      const updatedAttachments = [...field.value, newImagePreview];
-                                      field.onChange(updatedAttachments);
-                                      // Reset the new image preview
-                                      setNewImagePreview(null);
-                                    }}
-                                  >
-                                    <PlusIcon className="h-4 w-4 mr-2" /> Add Image
-                                  </Button>
-                                </div>
-                              )}
                               
                               <div className="mt-4">
                                 {field.value.length > 0 ? (
