@@ -1,0 +1,8 @@
+manager_name,email_address,phone_number,assigned_shop,access_level,date_of_joining,last_login_date
+TC Manager,TC@chaiiwala.com,123-456-7890,Trafford Centre,Shop Limited Access,19/3/2025,6/4/2025
+OT Manager,OT@chaiiwala.com,987-654-3210,Old Trafford,Shop Limited Access,9/3/2025,6/4/2025
+RD Manager,RD@chaiiwala.com,555-123-4567,Rochdale,Shop Limited Access,6/3/2025,6/4/2025
+Jubayed Chowdhury,jubayed.chaiiwala@gmail.com,444-555-6666,Stockport,Senior Manager Access,24/3/2025,6/4/2025
+CH Manager,CH@chaiiwala.com,333-222-1111,Cheetham Hill,Shop Limited Access,21/3/2025,6/4/2025
+OL Manager,OL@chaiiwala.com,333-222-1111,Oldham,Shop Limited Access,21/3/2025,6/4/2025
+OX Manager,OX@chaiiwala.com,333-222-1111,Oxford Road,Shop Limited Access,21/3/2025,6/4/2025
