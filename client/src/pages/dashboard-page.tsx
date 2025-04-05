@@ -377,7 +377,22 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <JobLogsWidget />
+                {/* Ensure widget gets rendered with proper data */}
+                <div className="mb-4">
+                  <JobLogsWidget />
+                </div>
+                <Separator className="my-4" />
+                {/* Quick actions */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-semibold">Maintenance Tools</h3>
+                    <p className="text-sm text-muted-foreground">Quick access to maintenance resources</p>
+                  </div>
+                  <Button variant="outline" className="gap-2" onClick={() => window.location.href = "/maintenance"}>
+                    <Wrench className="h-4 w-4" />
+                    View Full Maintenance Page
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
