@@ -1,53 +1,615 @@
-import React from "react";
+import React, { useState } from "react";
+import { useEventOrders } from "@/hooks/use-event-orders";
+import { useStores } from "@/hooks/use-stores";
+import { useAuth } from "@/hooks/use-auth";
+import { EventOrder, InsertEventOrder, eventStatusEnum } from "@shared/schema";
+import { format } from "date-fns";
+import { enUS } from "date-fns/locale";
+import { Loader2, CalendarIcon, PlusCircle, Calendar, AlertCircle, Filter } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CalendarIcon, ClockIcon, CheckCircleIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { insertEventOrderSchema } from "@shared/schema";
 
+// Extended schema for the form with client-side validation
+const eventOrderFormSchema = insertEventOrderSchema
+  .extend({
+    // Additional zod validations for the form
+    eventDate: z.string().min(1, "Event date is required"),
+    eventTime: z.string().min(1, "Event time is required"),
+    venue: z.string().min(3, "Venue must be at least 3 characters"),
+    product: z.string().min(3, "Product description required"),
+    quantity: z.number().min(1, "Quantity must be at least 1"),
+    customerName: z.string().min(3, "Customer name is required"),
+    customerPhone: z.string().min(8, "Valid phone number is required"),
+    customerEmail: z.string().email().optional().or(z.literal("")),
+    notes: z.string().optional(),
+  });
+
+// Status badge component
+const StatusBadge = ({ status }: { status: string }) => {
+  const statusStyles = {
+    pending: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+    confirmed: "bg-green-100 text-green-800 hover:bg-green-200",
+    completed: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    cancelled: "bg-red-100 text-red-800 hover:bg-red-200",
+  };
+
+  const style = statusStyles[status as keyof typeof statusStyles] || statusStyles.pending;
+
+  return (
+    <Badge className={style} variant="outline">
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+};
+
+// Date picker component
+const DatePickerField = ({ form, name, label }: { form: any; name: string; label: string }) => {
+  const [date, setDate] = useState<Date | undefined>(undefined);
+
+  return (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem className="flex flex-col">
+          <FormLabel>{label}</FormLabel>
+          <Popover>
+            <PopoverTrigger asChild>
+              <FormControl>
+                <Button
+                  variant={"outline"}
+                  className={`w-full pl-3 text-left font-normal ${
+                    !field.value ? "text-muted-foreground" : ""
+                  }`}
+                >
+                  {field.value ? (
+                    format(new Date(field.value), "PPP", { locale: enUS })
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </FormControl>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={field.value ? new Date(field.value) : undefined}
+                onSelect={(date) => {
+                  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
+                  field.onChange(formattedDate);
+                  setDate(date);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+};
+
+// Main component
 export default function EventOrdersPage() {
+  const { user } = useAuth();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [filterStoreId, setFilterStoreId] = useState<number | undefined>(
+    user?.role === "store" ? user?.storeId || undefined : undefined
+  );
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
+
+  // Get event orders using our hook
+  const { eventOrders, isLoading, error, createEventOrder, updateEventOrder, isCreating, isUpdating } = useEventOrders();
+  
+  // Get stores for the store selection dropdown
+  const { stores = [], isLoading: isLoadingStores } = useStores();
+  
+  // Create the form
+  const form = useForm<z.infer<typeof eventOrderFormSchema>>({
+    resolver: zodResolver(eventOrderFormSchema),
+    defaultValues: {
+      storeId: user?.role === "store" ? user?.storeId || 0 : 0,
+      eventDate: "",
+      eventTime: "",
+      venue: "",
+      product: "",
+      quantity: 0,
+      bookingDate: format(new Date(), "yyyy-MM-dd"),
+      bookingTime: format(new Date(), "HH:mm"),
+      customerName: "",
+      customerPhone: "",
+      customerEmail: "",
+      bookedBy: user?.name || "",
+      status: "pending",
+      notes: "",
+    },
+  });
+
+  // Filter event orders based on selected filters
+  const filteredEventOrders = eventOrders.filter((order) => {
+    let include = true;
+    
+    if (filterStoreId !== undefined) {
+      include = include && order.storeId === filterStoreId;
+    }
+    
+    if (filterStatus) {
+      include = include && order.status === filterStatus;
+    }
+    
+    return include;
+  });
+
+  // Handle form submission
+  async function onSubmit(values: z.infer<typeof eventOrderFormSchema>) {
+    try {
+      await createEventOrder(values);
+      setIsFormOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error("Failed to create event order:", error);
+    }
+  }
+
+  // Handle status change
+  async function handleStatusChange(orderId: number, newStatus: string) {
+    try {
+      await updateEventOrder({ 
+        id: orderId, 
+        data: { 
+          status: newStatus as "pending" | "confirmed" | "completed" | "cancelled" 
+        } 
+      });
+    } catch (error) {
+      console.error("Failed to update event order status:", error);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Event Orders">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Event Orders">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center text-center p-6">
+              <AlertCircle className="h-10 w-10 text-destructive mb-4" />
+              <h3 className="text-lg font-semibold">Failed to load event orders</h3>
+              <p className="text-muted-foreground mt-2">
+                Please try refreshing the page or contact support if the problem persists.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="Event Orders">
-      <div className="grid gap-4">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            {/* Store Filter */}
+            {(user?.role === "admin" || user?.role === "regional") && (
+              <Select
+                value={filterStoreId?.toString() || "all"}
+                onValueChange={(value) => {
+                  setFilterStoreId(value === "all" ? undefined : parseInt(value));
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by Store" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stores</SelectItem>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id.toString()}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Status Filter */}
+            <Select
+              value={filterStatus || "all"}
+              onValueChange={(value) => {
+                setFilterStatus(value === "all" ? undefined : value);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <div className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <span>Status</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Create New Event Order Button */}
+          {(user?.role === "admin" || user?.role === "regional" || user?.role === "store") && (
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  New Event Order
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Event Order</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details to create a new event order. Fields marked with * are required.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Store Selection - for admin and regional managers only */}
+                      {(user?.role === "admin" || user?.role === "regional") && (
+                        <FormField
+                          control={form.control}
+                          name="storeId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Store*</FormLabel>
+                              <Select
+                                onValueChange={(value) => field.onChange(parseInt(value))}
+                                value={field.value.toString()}
+                                defaultValue={field.value.toString()}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select Store" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {stores.map((store) => (
+                                    <SelectItem key={store.id} value={store.id.toString()}>
+                                      {store.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {/* Event Date */}
+                      <DatePickerField form={form} name="eventDate" label="Event Date*" />
+
+                      {/* Event Time */}
+                      <FormField
+                        control={form.control}
+                        name="eventTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Event Time*</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Venue */}
+                      <FormField
+                        control={form.control}
+                        name="venue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Venue*</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Venue address/location" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Product */}
+                      <FormField
+                        control={form.control}
+                        name="product"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Product/Service*</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Food/beverage service description" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Quantity */}
+                      <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity*</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                {...field} 
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Customer Name */}
+                      <FormField
+                        control={form.control}
+                        name="customerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer Name*</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Customer Phone */}
+                      <FormField
+                        control={form.control}
+                        name="customerPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer Phone*</FormLabel>
+                            <FormControl>
+                              <Input type="tel" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Customer Email */}
+                      <FormField
+                        control={form.control}
+                        name="customerEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} />
+                            </FormControl>
+                            <FormDescription>Optional</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Status */}
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status*</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Any special requirements or additional information"
+                              className="resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>Optional - Include any special requirements</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Hidden fields */}
+                    <input type="hidden" {...form.register("bookingDate")} />
+                    <input type="hidden" {...form.register("bookingTime")} />
+                    <input type="hidden" {...form.register("bookedBy")} />
+
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={isCreating}>
+                        {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Create Event Order
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        {/* Event Orders Table */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>Event Orders Management</CardTitle>
+          <CardHeader>
+            <CardTitle>Event Orders</CardTitle>
             <CardDescription>
-              Manage and track catering orders for events and special occasions
+              Manage upcoming and past events for Chaiiwala catering services
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="upcoming">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="inProgress">In Progress</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-              <TabsContent value="upcoming" className="p-4">
-                <Alert>
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No upcoming event orders. You will see future event orders here.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-              <TabsContent value="inProgress" className="p-4">
-                <Alert>
-                  <ClockIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No event orders in progress. Orders currently being prepared will appear here.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-              <TabsContent value="completed" className="p-4">
-                <Alert>
-                  <CheckCircleIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No completed event orders. Your history of fulfilled orders will be displayed here.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-            </Tabs>
+            {filteredEventOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                <h3 className="text-lg font-medium">No event orders found</h3>
+                <p className="text-muted-foreground mt-2">
+                  {filterStoreId || filterStatus
+                    ? "Try adjusting your filters to see more results."
+                    : "Create a new event order to get started."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event Date</TableHead>
+                      <TableHead>Venue</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Store</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEventOrders.map((order) => {
+                      const store = stores.find((s) => s.id === order.storeId);
+                      
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{order.eventDate}</div>
+                              <div className="text-xs text-muted-foreground">{order.eventTime}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{order.venue}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{order.customerName}</div>
+                              <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{order.product}</TableCell>
+                          <TableCell>{order.quantity}</TableCell>
+                          <TableCell>
+                            <StatusBadge status={order.status} />
+                          </TableCell>
+                          <TableCell>{store?.name || `Store ${order.storeId}`}</TableCell>
+                          <TableCell className="text-right">
+                            {/* Status Update Dropdown */}
+                            {(user?.role === "admin" || user?.role === "regional" || 
+                             (user?.role === "store" && user.storeId === order.storeId)) && (
+                              <Select
+                                value={order.status}
+                                onValueChange={(value) => handleStatusChange(order.id, value)}
+                                disabled={isUpdating}
+                              >
+                                <SelectTrigger className="w-[130px]">
+                                  <SelectValue placeholder="Update Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
