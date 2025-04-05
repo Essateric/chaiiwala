@@ -34,19 +34,23 @@ export function useEventOrders(storeId?: number) {
       return await response.json();
     },
     onSuccess: (newOrder) => {
-      // Update specific query data with the new event order
+      // Log the returned data to help with debugging
+      console.log("New event order created:", newOrder);
+      
+      // Update specific query data with the new event order - immediate UI update
       queryClient.setQueryData(["/api/event-orders"], (oldData: EventOrder[] = []) => {
-        return [...oldData, newOrder];
+        console.log("Updating event orders list:", oldData ? [...oldData, newOrder] : [newOrder]);
+        return oldData ? [...oldData, newOrder] : [newOrder];
       });
       
       // Also update store-specific query if it exists
       if (storeId) {
         queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData: EventOrder[] = []) => {
-          return [...oldData, newOrder];
+          return oldData ? [...oldData, newOrder] : [newOrder];
         });
       }
       
-      // Additionally invalidate all queries to ensure consistency
+      // Force a refetch to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
       
       toast({
@@ -70,8 +74,14 @@ export function useEventOrders(storeId?: number) {
       return await response.json();
     },
     onSuccess: (updatedOrder) => {
+      // Log the returned data to help with debugging
+      console.log("Event order updated:", updatedOrder);
+      
       // Update specific query data with the updated event order
       queryClient.setQueryData(["/api/event-orders"], (oldData: EventOrder[] = []) => {
+        if (!oldData) return [updatedOrder];
+        
+        console.log("Updating event order in list:", updatedOrder);
         return oldData.map(order => 
           order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
         );
@@ -80,13 +90,15 @@ export function useEventOrders(storeId?: number) {
       // Also update store-specific query if it exists
       if (storeId) {
         queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData: EventOrder[] = []) => {
+          if (!oldData) return [updatedOrder];
+          
           return oldData.map(order => 
             order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
           );
         });
       }
       
-      // Additionally invalidate all queries to ensure consistency
+      // Force a refetch to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
       
       toast({

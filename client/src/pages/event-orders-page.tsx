@@ -3,6 +3,7 @@ import { useEventOrders } from "@/hooks/use-event-orders";
 import { useStores } from "@/hooks/use-stores";
 import { useAuth } from "@/hooks/use-auth";
 import { EventOrder, InsertEventOrder, eventStatusEnum } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Loader2, CalendarIcon, PlusCircle, Calendar, AlertCircle, Filter } from "lucide-react";
@@ -207,7 +208,27 @@ export default function EventOrdersPage() {
   // Handle form submission
   async function onSubmit(values: z.infer<typeof eventOrderFormSchema>) {
     try {
-      await createEventOrder(values);
+      console.log("Submitting event order form:", values);
+      
+      // Create the event order
+      const newOrder = await createEventOrder(values);
+      console.log("New order returned:", newOrder);
+      
+      // Update the UI immediately with the new order
+      queryClient.setQueryData<EventOrder[]>(["/api/event-orders"], (oldData = []) => {
+        console.log("Directly updating event orders list in page component:", [...oldData, newOrder]);
+        return [...oldData, newOrder];
+      });
+      
+      // If we're filtering by store, also update that query data
+      if (filterStoreId) {
+        queryClient.setQueryData<EventOrder[]>(
+          ["/api/event-orders", "store", filterStoreId], 
+          (oldData = []) => [...oldData, newOrder]
+        );
+      }
+      
+      // Close the form and reset
       setIsFormOpen(false);
       form.reset();
     } catch (error) {
