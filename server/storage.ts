@@ -400,6 +400,10 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date()
     };
+    // Ensure attachments is an array
+    if (!jobLog.attachments) {
+      jobLog.attachments = [];
+    }
     this.jobLogs.set(id, jobLog);
     return jobLog;
   }
@@ -412,6 +416,12 @@ export class MemStorage implements IStorage {
       ...jobLog,
       ...data
     };
+    
+    // Ensure attachments is an array
+    if (!updatedJobLog.attachments) {
+      updatedJobLog.attachments = [];
+    }
+    
     this.jobLogs.set(id, updatedJobLog);
     return updatedJobLog;
   }
