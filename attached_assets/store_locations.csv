@@ -1,0 +1,10 @@
+name,address,area,manager
+Cheetham Hill,"74 Bury Old Rd, Manchester M8 5BW",1,MGR_CH
+Oxford Road,"149 Oxford Rd, Manchester M1 7EE",1,MGR_OX
+Old Trafford,"89 Ayres Rd, Old Trafford, Stretford, M16 7GS",1,MGR_OT
+Trafford Centre,"Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford M17 8AA",2,MGR_TC
+Stockport,"884-886 Stockport Rd, Levenshulme, Manchester M19 3BN",1,MGR_SR
+Rochdale,"35 Milkstone Rd, Rochdale OL11 1EB",2,MGR_RD
+Oldham,"66 George St, Oldham OL1 1LS",2,MGR_OL
+Wilmslow Road,123 Wilmslow Rd Manchester M14 5TB,1,MGR_WR
+Deansgate,456 Deansgate Manchester M3 4LY,1,MGR_DG
