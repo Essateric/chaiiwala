@@ -441,7 +441,10 @@ export class MemStorage implements IStorage {
       { name: "Trafford Centre", address: "Kiosk K14, The Trafford Centre, Trafford Blvd", area: 2, manager: "MGR_TC" },
       { name: "Stockport", address: "884-886 Stockport Rd, Levenshulme, Manchester", area: 1, manager: "MGR_SR" },
       { name: "Rochdale", address: "35 Milkstone Rd, Rochdale OL11 1EB", area: 2, manager: "MGR_RD" },
-      { name: "Oldham", address: "66 George St, Oldham OL1 1LS", area: 2, manager: "MGR_OL" }
+      { name: "Oldham", address: "66 George St, Oldham OL1 1LS", area: 2, manager: "MGR_OL" },
+      // Add your new stores below
+      { name: "Wilmslow Road", address: "123 Wilmslow Rd, Manchester M14 5TB", area: 1, manager: "MGR_WR" },
+      { name: "Deansgate", address: "456 Deansgate, Manchester M3 4LY", area: 1, manager: "MGR_DG" }
     ];
     
     storeData.forEach(store => {
@@ -646,6 +649,31 @@ export class MemStorage implements IStorage {
         role: "staff", 
         storeId: 3, 
         permissions: ["basic_access"] 
+      },
+      // Store managers for the new locations
+      { 
+        username: "imran", 
+        password: hashPassword, 
+        firstName: "Imran", 
+        lastName: "Khan", 
+        name: "Imran Khan", 
+        email: "imran@chaiiwala.com",
+        title: "Store Manager",
+        role: "store", 
+        storeId: 8, // Wilmslow Road
+        permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
+      },
+      { 
+        username: "zahra", 
+        password: hashPassword, 
+        firstName: "Zahra", 
+        lastName: "Ali", 
+        name: "Zahra Ali", 
+        email: "zahra@chaiiwala.com",
+        title: "Store Manager",
+        role: "store", 
+        storeId: 9, // Deansgate
+        permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
       }
     ];
     
