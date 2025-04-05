@@ -13,6 +13,7 @@ import { JobLog } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 
 export default function JobLogsWidget() {
+  console.log("Rendering JobLogsWidget component");
   const { user } = useAuth();
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" ? user?.storeId ?? undefined : undefined
@@ -20,8 +21,15 @@ export default function JobLogsWidget() {
   const [flagFilter, setFlagFilter] = useState<string | undefined>(undefined);
   
   // Direct fetch to ensure it loads properly in the dashboard
-  const { data: allJobLogs = [], isLoading } = useQuery<JobLog[]>({
+  const { data: allJobLogs = [], isLoading, error } = useQuery<JobLog[]>({
     queryKey: ["/api/joblogs"],
+  });
+  
+  console.log("JobLogsWidget - data fetched", { 
+    count: allJobLogs.length, 
+    isLoading, 
+    error: error?.message,
+    hasError: !!error
   });
   
   // Filter job logs based on selected store and flag
