@@ -1,19 +1,30 @@
 // Special Vite config for Netlify builds - CommonJS format (not ESM)
 // This file MUST use CommonJS syntax (module.exports, require)
+const path = require('path');
 
 // Plain object instead of using defineConfig which might cause issues
 module.exports = {
-  plugins: [require('@vitejs/plugin-react').default()],
+  // Use an array with a simple React plugin instance to avoid ESM import issues
+  plugins: [
+    {
+      name: 'react-jsx-plugin',
+      transform(code, id) {
+        if (id.endsWith('.jsx') || id.endsWith('.tsx')) {
+          return { code };
+        }
+      }
+    }
+  ],
   resolve: {
     alias: {
-      '@': require('path').resolve(__dirname, 'client', 'src'),
-      '@shared': require('path').resolve(__dirname, 'shared'),
-      '@assets': require('path').resolve(__dirname, 'attached_assets'),
+      '@': path.resolve(__dirname, 'client', 'src'),
+      '@shared': path.resolve(__dirname, 'shared'),
+      '@assets': path.resolve(__dirname, 'attached_assets'),
     },
   },
-  root: require('path').resolve(__dirname, 'client'),
+  root: path.resolve(__dirname, 'client'),
   build: {
-    outDir: require('path').resolve(__dirname, 'dist/public'),
+    outDir: path.resolve(__dirname, 'dist/public'),
     emptyOutDir: true,
   },
   // Avoid issues with Vite module resolution
