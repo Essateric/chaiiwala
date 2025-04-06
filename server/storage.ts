@@ -12,6 +12,7 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { pool, db } from "./db";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -1259,4 +1260,15 @@ export class MemStorage implements IStorage {
 }
 
 import { DatabaseStorage } from "./db-storage";
-export const storage = new DatabaseStorage();
+// Determine which storage implementation to use based on database availability
+let storage: IStorage;
+
+if (process.env.DATABASE_URL && pool && db) {
+  console.log("Using DatabaseStorage for data persistence");
+  storage = new DatabaseStorage();
+} else {
+  console.log("Using MemStorage for data persistence (in-memory only)");
+  storage = new MemStorage();
+}
+
+export { storage };

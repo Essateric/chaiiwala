@@ -162,65 +162,29 @@ const app = express();
 
 // Configure middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-
-// We can't use the file-upload package in serverless functions
-// Instead we'll handle Base64 encoded images directly
-
-// Enhanced CORS setup for Netlify environment
 app.use(cors({
-  origin: true, // Allow any origin when deployed
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  origin: process.env.URL || true, // Allow any origin in development
+  credentials: true
 }));
 
-// Additional CORS headers for all browsers and environments
-app.use((req, res, next) => {
-  // Set to the specific origin in production, or * in development
-  const origin = req.headers.origin;
-  res.header('Access-Control-Allow-Origin', origin);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-
-  // Handle OPTIONS requests immediately
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-  next();
-});
-
-// Enhanced session configuration for Netlify
+// Session configuration
 const sessionSettings = {
-  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secure-session-key",
+  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secret",
   resave: false,
   saveUninitialized: false,
   store: storage.sessionStore,
   cookie: {
-    // Always use secure cookies when not in development
-    secure: process.env.NODE_ENV !== "development",
+    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'none', // Important for cross-site requests in Netlify
-    path: '/'
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 };
 
-// Trust the Netlify proxy
-app.set("trust proxy", 1);
-
-// Extra debugging to help diagnose session issues
-console.log("Session configuration:", {
-  secret: "***REDACTED***",
-  nodeEnv: process.env.NODE_ENV,
-  secureCookies: sessionSettings.cookie.secure,
-  sameSite: sessionSettings.cookie.sameSite
-});
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+  sessionSettings.cookie.secure = true;
+}
 
 app.use(session(sessionSettings));
 app.use(passport.initialize());
@@ -464,267 +428,10 @@ app.get("/api/announcements/recent", (req, res) => {
   ]);
 });
 
-// Job Logs routes
-app.get("/api/joblogs", (req, res) => {
-  // Filter by store if provided
-  const storeId = req.query.storeId ? parseInt(req.query.storeId) : null;
-  
-  const joblogs = [
-    { 
-      id: 1, 
-      title: "Broken refrigerator", 
-      description: "Main refrigerator not maintaining temperature", 
-      storeId: 1, 
-      status: "pending", 
-      priority: "high", 
-      reportedBy: "Shabnam Qureshi",
-      reportedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      comments: "Called maintenance, waiting for parts",
-      images: []
-    },
-    { 
-      id: 2, 
-      title: "Leaky tap in kitchen", 
-      description: "Water dripping from main kitchen tap", 
-      storeId: 2, 
-      status: "in_progress", 
-      priority: "medium", 
-      reportedBy: "Usman Aftab",
-      reportedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      comments: "Plumber coming tomorrow",
-      images: []
-    },
-    { 
-      id: 3, 
-      title: "Flickering lights in dining area", 
-      description: "Several lights are flickering in the main dining area", 
-      storeId: 3, 
-      status: "completed", 
-      priority: "low", 
-      reportedBy: "Manager",
-      reportedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      comments: "Electrician replaced ballasts",
-      images: []
-    },
-    { 
-      id: 4, 
-      title: "POS system errors", 
-      description: "Cashier terminals occasionally freezing", 
-      storeId: 5, 
-      status: "pending", 
-      priority: "high", 
-      reportedBy: "Jubayed Chowdhury",
-      reportedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      comments: "IT support contacted",
-      images: []
-    }
-  ];
-  
-  const result = storeId ? joblogs.filter(job => job.storeId === storeId) : joblogs;
-  res.json(result);
-});
-
-app.post("/api/joblogs", (req, res) => {
-  // Check authentication
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-  
-  const newJobLog = {
-    id: Math.floor(Math.random() * 10000) + 100, // Generate a random ID 
-    ...req.body,
-    reportedBy: req.user.name,
-    reportedDate: new Date().toISOString(),
-    images: req.body.images || []
-  };
-  
-  res.status(201).json(newJobLog);
-});
-
-app.put("/api/joblogs/:id", (req, res) => {
-  // Check authentication
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-  
-  const id = parseInt(req.params.id);
-  const updatedJobLog = {
-    id,
-    ...req.body,
-    // Preserve reported info
-    reportedBy: req.body.reportedBy,
-    reportedDate: req.body.reportedDate
-  };
-  
-  res.json(updatedJobLog);
-});
-
-// Event Orders routes
-app.get("/api/event-orders", (req, res) => {
-  // Filter by store if provided
-  const storeId = req.query.storeId ? parseInt(req.query.storeId) : null;
-  
-  const eventOrders = [
-    {
-      id: 1,
-      customerName: "Sarah Thompson",
-      customerEmail: "sarah.thompson@example.com",
-      customerPhone: "07700123456",
-      eventName: "Corporate Meeting",
-      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      eventLocation: "123 Business Center, Manchester",
-      products: [
-        { name: "Karak Chai", quantity: 50, notes: "Half with sugar, half without" },
-        { name: "Samosas", quantity: 100, notes: "Vegetarian only" }
-      ],
-      status: "confirmed",
-      totalAmount: 425.00,
-      deposit: 100.00,
-      storeId: 1,
-      bookedBy: "Shabnam Qureshi",
-      bookedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      notes: "Delivery by 10am"
-    },
-    {
-      id: 2,
-      customerName: "John Williams",
-      customerEmail: "john.williams@example.com",
-      customerPhone: "07700123457",
-      eventName: "Wedding Reception",
-      eventDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      eventLocation: "Grand Wedding Hall, Birmingham",
-      products: [
-        { name: "Masala Chai", quantity: 200, notes: "Full service with staff" },
-        { name: "Mixed Sweets", quantity: 250, notes: "Including Jalebi and Gulab Jamun" }
-      ],
-      status: "pending",
-      totalAmount: 1200.00,
-      deposit: 400.00,
-      storeId: 2,
-      bookedBy: "Usman Aftab",
-      bookedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      notes: "Requires 3 staff members"
-    },
-    {
-      id: 3,
-      customerName: "Lisa Johnson",
-      customerEmail: "lisa.johnson@example.com",
-      customerPhone: "07700123458",
-      eventName: "Birthday Party",
-      eventDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      eventLocation: "Johnson Residence, Stockport",
-      products: [
-        { name: "Chai Latte", quantity: 30, notes: "With almond milk option" },
-        { name: "Chaat Selection", quantity: 40, notes: "Assorted" }
-      ],
-      status: "confirmed",
-      totalAmount: 350.00,
-      deposit: 100.00,
-      storeId: 5,
-      bookedBy: "Jubayed Chowdhury",
-      bookedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      notes: "Residential address, call before delivery"
-    }
-  ];
-  
-  const result = storeId ? eventOrders.filter(order => order.storeId === storeId) : eventOrders;
-  res.json(result);
-});
-
-app.post("/api/event-orders", (req, res) => {
-  // Check authentication
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-  
-  const newEventOrder = {
-    id: Math.floor(Math.random() * 10000) + 100, // Generate a random ID
-    ...req.body,
-    bookedBy: req.user.name,
-    bookedDate: new Date().toISOString(),
-    // Set default status if not provided
-    status: req.body.status || "pending"
-  };
-  
-  res.status(201).json(newEventOrder);
-});
-
-app.put("/api/event-orders/:id", (req, res) => {
-  // Check authentication
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-  
-  const id = parseInt(req.params.id);
-  const updatedEventOrder = {
-    id,
-    ...req.body,
-    // Preserve booking info
-    bookedBy: req.body.bookedBy,
-    bookedDate: req.body.bookedDate
-  };
-  
-  res.json(updatedEventOrder);
-});
-
-// CORS headers are already set above
-
-// File upload endpoint for job logs
-app.post("/api/upload/joblog-image", (req, res) => {
-  // Check authentication
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-
-  try {
-    // For Netlify functions, we expect base64 encoded images in the request
-    const { imageData, fileName, fileType } = req.body;
-    
-    if (!imageData || !fileName || !fileType) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Missing required image data, filename or file type" 
-      });
-    }
-    
-    // Generate a unique filename to prevent collisions
-    const uniqueFileName = `${Date.now()}-${fileName}`;
-    
-    // In Netlify functions, we can't save files to disk
-    // Instead, we'll return the base64 data as a data URL which can be used directly in the frontend
-    const dataUrl = `data:${fileType};base64,${imageData}`;
-    
-    res.json({
-      success: true,
-      fileUrl: dataUrl,
-      fileName: uniqueFileName,
-      message: "Image processed successfully"
-    });
-  } catch (error) {
-    console.error("Error processing image:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to process image", 
-      error: error.message 
-    });
-  }
-});
-
-// Enhanced error handler with detailed logging
+// Simple error handler
 app.use((err, req, res, next) => {
-  console.error('API Error:', err.message);
-  console.error('Stack Trace:', err.stack);
-  console.error('Request URL:', req.originalUrl);
-  console.error('Request Method:', req.method);
-  console.error('Request Body:', JSON.stringify(req.body || {}));
-  
-  res.status(500).json({ 
-    error: err.message,
-    path: req.path,
-    method: req.method,
-    // Don't include stack trace in production response for security
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
-  });
+  console.error(err.stack);
+  res.status(500).json({ error: err.message });
 });
 
 // Export the handler for Netlify Functions
