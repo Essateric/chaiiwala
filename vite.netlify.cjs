@@ -1,30 +1,28 @@
-// Special Vite config for Netlify builds
-// Uses CommonJS format to avoid ESM import issues
-const { defineConfig } = require('vite');
-const react = require('@vitejs/plugin-react');
-const path = require('path');
+// Special Vite config for Netlify builds - CommonJS format (not ESM)
+// This file MUST use CommonJS syntax (module.exports, require)
 
-// Simple version of config for Netlify
-module.exports = defineConfig({
-  plugins: [react()],
+// Plain object instead of using defineConfig which might cause issues
+module.exports = {
+  plugins: [require('@vitejs/plugin-react').default()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'client', 'src'),
-      '@shared': path.resolve(__dirname, 'shared'),
-      '@assets': path.resolve(__dirname, 'attached_assets'),
+      '@': require('path').resolve(__dirname, 'client', 'src'),
+      '@shared': require('path').resolve(__dirname, 'shared'),
+      '@assets': require('path').resolve(__dirname, 'attached_assets'),
     },
   },
-  root: path.resolve(__dirname, 'client'),
+  root: require('path').resolve(__dirname, 'client'),
   build: {
-    outDir: path.resolve(__dirname, 'dist/public'),
+    outDir: require('path').resolve(__dirname, 'dist/public'),
     emptyOutDir: true,
   },
   // Avoid issues with Vite module resolution
   optimizeDeps: {
     exclude: ['vite'],
+    include: [],
   },
   // Make sure 'vite' is treated as external
   ssr: {
-    external: ['vite', '@vitejs/plugin-react']
+    external: ['vite', '@vitejs/plugin-react', 'react', 'react-dom']
   }
-});
+};

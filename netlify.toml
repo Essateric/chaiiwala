@@ -1,5 +1,5 @@
 [build]
-  command = "node build-netlify.js"
+  command = "node netlify-build-transform.js node build-netlify.js"
   publish = "dist/public"
   functions = "netlify/functions"
   

@@ -4,6 +4,9 @@
  * Custom build script for Netlify deployment
  * Handles timeouts better than the standard npm run build command
  * Enhanced with better error handling and debugging
+ * 
+ * IMPORTANT: This file uses ESM syntax, but we use the netlify-build-transform.js
+ * script to temporarily modify package.json during the Netlify build process
  */
 
 import { execSync } from 'child_process';
@@ -245,44 +248,35 @@ try {
       console.error('❌ Second Vite build attempt failed:', buildError2.message);
       
       console.log('\n🔍 Attempting final build approach (attempt 3)...');
-      // Create a minimal Vite build command as final fallback
-      // Use a different approach that avoids direct require of vite
-      // Create a temporary file with the config instead of using -e
-      const tempConfigPath = path.resolve(__dirname, '_temp_vite_config.cjs');
-      const configContent = `
-// Temporary vite config for fallback build
-const path = require('path');
-
-// Export a plain object instead of using defineConfig
-module.exports = {
-  root: './client',
-  logLevel: 'info',
-  plugins: [require('@vitejs/plugin-react').default()],
-  resolve: {
-    alias: {
-      '@': path.resolve(process.cwd(), 'client', 'src'),
-      '@shared': path.resolve(process.cwd(), 'shared'),
-      '@assets': path.resolve(process.cwd(), 'attached_assets')
-    }
-  },
-  build: {
-    outDir: path.resolve(process.cwd(), 'dist/public'),
-    emptyOutDir: true
-  },
-  optimizeDeps: {
-    exclude: ['vite']
-  }
-};
-      `;
       
-      // Write the temporary config file
-      fs.writeFileSync(tempConfigPath, configContent);
-      console.log(`✅ Created temporary Vite config at ${tempConfigPath}`);
-      
-      // Use the temporary file for the build
-      const buildCommand = `NODE_ENV=production npx vite build --config ${tempConfigPath}`;
-      
-      execCommand(buildCommand, 'Building frontend with Vite API (attempt 3)');
+      try {
+        // Use our dedicated fallback script that handles everything in CommonJS
+        console.log('⚙️ Using standalone Vite build fallback script...');
+        execCommand('node build-netlify-vite-fallback.js', 'Building frontend with standalone fallback script (attempt 3)');
+      } catch (fallbackError) {
+        console.error('❌ Fallback script failed:', fallbackError.message);
+        
+        // Ultra-fallback: direct shell command to manually install and run vite
+        console.log('\n🔍 Attempting EMERGENCY build approach (attempt 4)...');
+        try {
+          console.log('🚨 Using emergency direct Vite build approach...');
+          
+          // Last resort: create an extremely minimal config and run with globally installed vite
+          const emergencyConfigPath = path.resolve(__dirname, '_emergency_vite_config.js');
+          fs.writeFileSync(emergencyConfigPath, `
+            export default {
+              root: "./client",
+              build: { outDir: "./dist/public", emptyOutDir: true }
+            };
+          `);
+          
+          // Install vite globally as standalone before running
+          execCommand('npm install -g vite@5.4.17 @vitejs/plugin-react@4.3.4', 'Installing Vite globally for emergency build');
+          execCommand('vite build --config _emergency_vite_config.js', 'Emergency Vite build attempt');
+        } catch (emergencyError) {
+          console.error('❌ All Vite build attempts failed:', emergencyError.message);
+        }
+      }
     }
   }
 } catch (error) {
