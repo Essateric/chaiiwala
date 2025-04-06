@@ -1,5 +1,6 @@
+
 [build]
-  command = "node netlify-build-transform.js node build-netlify.js"
+  command = "npm install && npx vite build"
   publish = "dist/public"
   functions = "netlify/functions"
   
@@ -14,7 +15,6 @@
   publish = "dist/public"
   autoLaunch = false
 
-# Content Security Policy headers
 [[headers]]
   for = "/*"
   [headers.values]
