@@ -1,5 +1,5 @@
 [build]
-  command = "node netlify-build-transform.js 'NODE_ENV=production node build-netlify-vite-fallback.js && cp netlify/functions/api.cjs netlify/functions/api.js'"
+  command = "node netlify-build-transform.cjs 'NODE_ENV=production node build-netlify.cjs'"
   publish = "dist/public"
   functions = "netlify/functions"
   
@@ -7,6 +7,8 @@
   NODE_VERSION = "18.19.0"
   SESSION_SECRET = "chaiiwala-dashboard-secure-session-key"
   NODE_ENV = "production"
+  VITE_API_URL = "/.netlify/functions/api"
+  VITE_API_URL = "/.netlify/functions/api"
 
 [dev]
   framework = "#custom"

@@ -2,19 +2,21 @@
 // This file MUST use CommonJS syntax (module.exports, require)
 const path = require('path');
 
-// Plain object instead of using defineConfig which might cause issues
+// For CommonJS compatibility
+try {
+  // Check if React plugin exists in the right version
+  require.resolve('@vitejs/plugin-react');
+} catch (e) {
+  console.error('Error resolving @vitejs/plugin-react, installing directly...');
+  require('child_process').execSync('npm install @vitejs/plugin-react@4.3.4 --no-save');
+}
+
+// Simple React plugin without dynamic imports
+const reactPlugin = require('@vitejs/plugin-react');
+
+// Plain object without defineConfig to avoid ESM issues
 module.exports = {
-  // Use an array with a simple React plugin instance to avoid ESM import issues
-  plugins: [
-    {
-      name: 'react-jsx-plugin',
-      transform(code, id) {
-        if (id.endsWith('.jsx') || id.endsWith('.tsx')) {
-          return { code };
-        }
-      }
-    }
-  ],
+  plugins: [reactPlugin.default ? reactPlugin.default() : reactPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'client', 'src'),
@@ -27,12 +29,11 @@ module.exports = {
     outDir: path.resolve(__dirname, 'dist/public'),
     emptyOutDir: true,
   },
-  // Avoid issues with Vite module resolution
+  // Make sure these are excluded from optimization
   optimizeDeps: {
-    exclude: ['vite'],
-    include: [],
+    exclude: ['vite', '@vitejs/plugin-react'],
   },
-  // Make sure 'vite' is treated as external
+  // Make sure these are treated as external in SSR mode
   ssr: {
     external: ['vite', '@vitejs/plugin-react', 'react', 'react-dom']
   }

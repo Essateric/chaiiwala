@@ -1,0 +1,55 @@
+build.command from netlify.toml                               
+6:08:02 PM: ────────────────────────────────────────────────────────────────
+6:08:02 PM: ​
+6:08:02 PM: $ node netlify-build-transform.js 'NODE_ENV=production node build-netlify-vite-fallback.js && cp netlify/functions/api.cjs netlify/functions/api.js'
+6:08:02 PM: file:///opt/build/repo/netlify-build-transform.js:2
+6:08:02 PM: const fs = require('fs');
+6:08:02 PM:            ^
+6:08:02 PM: ReferenceError: require is not defined in ES module scope, you can use import instead
+6:08:02 PM: This file is being treated as an ES module because it has a '.js' file extension and '/opt/build/repo/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+6:08:02 PM:     at file:///opt/build/repo/netlify-build-transform.js:2:12
+6:08:02 PM:     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+6:08:02 PM:     at async ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+6:08:02 PM:     at async loadESM (node:internal/process/esm_loader:34:7)
+6:08:02 PM:     at async handleMainPromise (node:internal/modules/run_main:106:12)
+6:08:02 PM: Node.js v18.19.0
+6:08:02 PM: ​
+6:08:02 PM: "build.command" failed                                        
+6:08:02 PM: ────────────────────────────────────────────────────────────────
+6:08:02 PM: ​
+6:08:02 PM:   Error message
+6:08:02 PM:   Command failed with exit code 1: node netlify-build-transform.js 'NODE_ENV=production node build-netlify-vite-fallback.js && cp netlify/functions/api.cjs netlify/functions/api.js' (https://ntl.fyi/exit-code-1)
+6:08:02 PM: ​
+6:08:02 PM:   Error location
+6:08:02 PM:   In build.command from netlify.toml:
+6:08:02 PM:   node netlify-build-transform.js 'NODE_ENV=production node build-netlify-vite-fallback.js && cp netlify/functions/api.cjs netlify/functions/api.js'
+6:08:02 PM: ​
+6:08:02 PM:   Resolved config
+6:08:02 PM:   build:
+6:08:02 PM:     command: node netlify-build-transform.js 'NODE_ENV=production node build-netlify-vite-fallback.js && cp netlify/functions/api.cjs netlify/functions/api.js'
+6:08:02 PM:     commandOrigin: config
+6:08:02 PM:     environment:
+6:08:02 PM:       - NODE_VERSION
+6:08:02 PM:       - SESSION_SECRET
+6:08:02 PM:       - NODE_ENV
+6:08:02 PM:     publish: /opt/build/repo/dist/public
+6:08:02 PM:     publishOrigin: config
+6:08:02 PM:   functionsDirectory: /opt/build/repo/netlify/functions
+6:08:02 PM:   headers:
+6:08:03 PM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+6:08:03 PM:     - for: /*
+      values:
+        Content-Security-Policy: 'default-src * ''self''; font-src * ''self'' https://fonts.gstatic.com; style-src * ''self'' https://fonts.googleapis.com ''unsafe-inline''; script-src * ''self'' ''unsafe-eval'' ''unsafe-inline''; img-src * ''self'' data: blob:; connect-src * ''self'' https://fonts.googleapis.com https://*.netlify.app https://*.netlify.com https://*.chaiiwala.co.uk'
+  headersOrigin: config
+  redirects:
+    - force: true
+      from: /api/*
+      status: 200
+      to: /.netlify/functions/api/:splat
+    - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+6:08:03 PM: Build failed due to a user error: Build script returned non-zero exit code: 2
+6:08:03 PM: Failing build: Failed to build site
+6:08:03 PM: Finished processing build request in 26.171s
