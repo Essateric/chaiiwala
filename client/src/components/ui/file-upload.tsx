@@ -2,6 +2,12 @@ import React, { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UploadCloud, X, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+
+// Check if we're in Netlify environment
+const isNetlify = window.location.hostname.includes('netlify.app') || 
+                  window.location.hostname !== 'localhost' || 
+                  import.meta.env.PROD === true;
 
 interface FileUploadProps {
   onUploadComplete: (imageUrl: string) => void;
@@ -35,25 +41,54 @@ export function FileUpload({
         const objectUrl = URL.createObjectURL(file);
         setPreview(objectUrl);
 
-        // Create form data for upload
-        const formData = new FormData();
-        formData.append("image", file);
-
-        // Upload the file to the server
-        const response = await fetch("/api/upload/joblog-image", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to upload image");
+        let response;
+        
+        if (isNetlify) {
+          // For Netlify, convert the file to base64 and send as JSON
+          const reader = new FileReader();
+          
+          // Create a Promise to handle the FileReader asynchronously
+          const readAsDataURL = () => new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          
+          // Get the data URL and extract the base64 part
+          const dataUrl = await readAsDataURL();
+          const base64Data = dataUrl.split(',')[1]; // Remove the data:image/jpeg;base64, part
+          
+          // Make the API request with the base64 data
+          response = await apiRequest("POST", "/api/upload/joblog-image", {
+            imageData: base64Data,
+            fileName: file.name,
+            fileType: file.type
+          });
+        } else {
+          // For regular Express server, use FormData
+          const formData = new FormData();
+          formData.append("image", file);
+          
+          // Upload the file using normal fetch for FormData
+          response = await fetch("/api/upload/joblog-image", {
+            method: "POST",
+            body: formData,
+            credentials: "include"
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to upload image");
+          }
         }
-
+        
         const data = await response.json();
         // Call the callback with the uploaded file URL
         onUploadComplete(data.fileUrl);
+        
+        console.log("Upload successful:", data);
       } catch (err) {
+        console.error("Upload error:", err);
         setError((err as Error).message || "Failed to upload image");
         // Reset preview if upload failed
         setPreview(currentImage || null);
