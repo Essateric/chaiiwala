@@ -168,45 +168,59 @@ app.use(cookieParser());
 // We can't use the file-upload package in serverless functions
 // Instead we'll handle Base64 encoded images directly
 
-// Enhanced CORS setup
+// Enhanced CORS setup for Netlify environment
 app.use(cors({
-  origin: process.env.URL || true, // Allow any origin in development
+  origin: true, // Allow any origin when deployed
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
-// Additional CORS headers for browsers that need it
+// Additional CORS headers for all browsers and environments
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.URL || '*');
+  // Set to the specific origin in production, or * in development
+  const origin = req.headers.origin;
+  res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
 
-  // Handle OPTIONS requests
+  // Handle OPTIONS requests immediately
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    return res.sendStatus(204);
   }
   next();
 });
 
-// Session configuration
+// Enhanced session configuration for Netlify
 const sessionSettings = {
-  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secret",
+  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secure-session-key",
   resave: false,
   saveUninitialized: false,
   store: storage.sessionStore,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Always use secure cookies when not in development
+    secure: process.env.NODE_ENV !== "development",
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'none', // Important for cross-site requests in Netlify
+    path: '/'
   }
 };
 
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-  sessionSettings.cookie.secure = true;
-}
+// Trust the Netlify proxy
+app.set("trust proxy", 1);
+
+// Extra debugging to help diagnose session issues
+console.log("Session configuration:", {
+  secret: "***REDACTED***",
+  nodeEnv: process.env.NODE_ENV,
+  secureCookies: sessionSettings.cookie.secure,
+  sameSite: sessionSettings.cookie.sameSite
+});
 
 app.use(session(sessionSettings));
 app.use(passport.initialize());

@@ -24,14 +24,17 @@ export function setupAuth(app: Express) {
   // Use session store from storage
   const sessionStore = storage.sessionStore;
 
-  // Configure session middleware
+  // Configure session middleware (using same settings as Netlify version)
   const sessionSettings: session.SessionOptions = {
-    secret: "chaiiwala-dashboard-secret-key",
+    secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secure-session-key",
     resave: false,
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax'
     }
   };
 
