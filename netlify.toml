@@ -1,5 +1,5 @@
 [build]
-  command = "npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
+  command = "node build-netlify.js"
   publish = "dist/public"
   functions = "netlify/functions"
   
