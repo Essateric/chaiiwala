@@ -5,18 +5,11 @@ import session from "express-session";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
-// Import type from the schema
-import { insertUserSchema } from '@shared/schema';
-import { z } from 'zod';
-
-// Define type based on the schema
-type InsertUserType = z.infer<typeof insertUserSchema>;
-
 // Define test users with fixed passwords for debugging
-const TEST_USERS: InsertUserType[] = [
-  { username: "shabnam", password: "password123", name: "Shabnam Essa", firstName: "Shabnam", lastName: "Essa", email: "shabnam@chaiiwala.com", role: "admin" },
-  { username: "usman", password: "password123", name: "Usman Aftab", firstName: "Usman", lastName: "Aftab", email: "usman@chaiiwala.com", role: "regional" },
-  { username: "jubayed", password: "password123", name: "Jubayed Chowdhury", firstName: "Jubayed", lastName: "Chowdhury", email: "jubayed@chaiiwala.com", role: "store", storeId: 5 }
+const TEST_USERS = [
+  { username: "shabnam", password: "password123", name: "Shabnam Essa", role: "admin" },
+  { username: "usman", password: "password123", name: "Usman Aftab", role: "regional" },
+  { username: "jubayed", password: "password123", name: "Jubayed Chowdhury", role: "store", storeId: 5 }
 ];
 
 declare global {
@@ -56,7 +49,10 @@ export function setupAuth(app: Express) {
       const existingUser = await storage.getUserByUsername(testUser.username);
       if (!existingUser) {
         console.log(`Creating test user: ${testUser.username}`);
-        await storage.createUser(testUser);
+        await storage.createUser({
+          ...testUser,
+          email: null
+        });
       }
     }
     console.log("Test users ready");
@@ -152,7 +148,7 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     console.log(`Login attempt: ${req.body.username}`);
     
-    passport.authenticate('local', (err: any, user: any, info: any) => {
+    passport.authenticate('local', (err, user, info) => {
       if (err) {
         console.error('Login error:', err);
         return next(err);
