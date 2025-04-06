@@ -128,18 +128,21 @@ try {
 }
 
 // Verify Vite config exists with sophisticated fallback logic
-// For Netlify, prefer the CommonJS version first
-let viteConfigPath = path.resolve(__dirname, 'vite.netlify.js');
+// For Netlify, prefer the CommonJS version with .cjs extension (required for "type": "module" packages)
+let viteConfigPath = path.resolve(__dirname, 'vite.netlify.cjs');
 
 // Fallback paths to check if the main one doesn't exist
 const possibleConfigPaths = [
-  path.resolve(__dirname, 'vite.netlify.js'), // Netlify-specific CommonJS version (preferred for Netlify)
+  path.resolve(__dirname, 'vite.netlify.cjs'), // Netlify-specific CommonJS version (preferred for Netlify)
+  path.resolve(__dirname, 'vite.netlify.js'),  // Legacy format
   path.resolve(__dirname, 'vite.config.js'),
   path.resolve(__dirname, 'vite.config.ts'),
+  path.resolve(process.cwd(), 'vite.netlify.cjs'),
   path.resolve(process.cwd(), 'vite.netlify.js'),
   path.resolve(process.cwd(), 'vite.config.js'),
   path.resolve(process.cwd(), 'vite.config.ts'),
-  '/opt/build/repo/vite.netlify.js', // Netlify specific path with CommonJS format
+  '/opt/build/repo/vite.netlify.cjs', // Netlify specific path with CommonJS format
+  '/opt/build/repo/vite.netlify.js',
   '/opt/build/repo/vite.config.js',
   '/opt/build/repo/vite.config.ts'
 ];
@@ -156,15 +159,15 @@ function findValidConfigPath() {
 
 // First try the default path
 if (fs.existsSync(viteConfigPath)) {
-  console.log(`✅ Found vite.config.ts at ${viteConfigPath}`);
+  console.log(`✅ Found Vite config at ${viteConfigPath}`);
 } else {
   // If not found, search for alternatives
-  console.warn(`⚠️ Could not find vite.config.ts at ${viteConfigPath}`);
+  console.warn(`⚠️ Could not find Vite config at ${viteConfigPath}`);
   console.log('Searching for Vite config in alternative locations...');
   
   // Search the entire project
   console.log('Running global search for vite config files:');
-  execCommand('find . -name "vite.config.ts" -o -name "vite.config.js" -o -name "vite.netlify.js"', 'Looking for Vite config');
+  execCommand('find . -name "vite.config.ts" -o -name "vite.config.js" -o -name "vite.netlify.js" -o -name "vite.netlify.cjs"', 'Looking for Vite config');
   
   // Try known fallback paths
   const foundConfigPath = findValidConfigPath();
@@ -225,7 +228,7 @@ try {
     console.log('\n🔍 Attempting alternative build approach (attempt 2)...');
     try {
       // Try with direct node_modules path but using the Netlify-specific CommonJS config
-      execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.netlify.js', 'Building frontend with Vite (attempt 2)');
+      execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.netlify.cjs', 'Building frontend with Vite (attempt 2)');
     } catch (buildError2) {
       console.error('❌ Second Vite build attempt failed:', buildError2.message);
       
