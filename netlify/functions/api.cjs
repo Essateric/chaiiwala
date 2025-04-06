@@ -95,21 +95,67 @@ class MemStorage {
   
   // Seed data method
   seedInitialData() {
-    // Admin user
-    this.users.set(1, {
-      id: 1,
-      username: "admin",
-      password: "$2b$10$sKsibAGWF4pCtxXu1a5XzOw7TKI7ElDZNUvCmwh/ZUk1lP5ylS67y", // password123
-      name: "Admin User",
-      email: "admin@chaiiwala.com",
-      phone: "1234567890",
-      role: "admin",
-      storeId: null,
-      createdAt: new Date().toISOString()
-    });
-    this.userId = 2;
+    // Common function to hash password for seeding
+    const hashPassword = 'c8680ca3ea7be0ac4fef3954ccf3bb114ba12f8fab964e0a6f55ff9386c022a4f4a78e71343bd0e2213c11c86266a8c1a13d507752bdd80b492ae04a5ee9f2b6.b6e5be78c42ffc3595c7352fbd88fe9f'; // password123
     
-    // Add more seed data as needed
+    // Seed users
+    const userData = [
+      { 
+        username: "shabnam", 
+        password: hashPassword, 
+        firstName: "Shabnam", 
+        lastName: "Qureshi", 
+        name: "Shabnam Qureshi", 
+        email: "shabnam@chaiiwala.com", 
+        title: "Director of Operations", 
+        role: "admin", 
+        permissions: ["all_access", "user_management", "system_settings"]
+      },
+      
+      // Regional manager with access to all stores and highest permissions
+      { 
+        username: "usman", 
+        password: hashPassword, 
+        firstName: "Usman", 
+        lastName: "Aftab", 
+        name: "Usman Aftab", 
+        email: "usman.aftab@chaiiwala.co.uk", 
+        title: "Regional Director", 
+        role: "regional", 
+        permissions: ["view_all_stores", "inventory_management", "staff_scheduling", "reporting", "task_management", "all_features"]
+      },
+      
+      // Store manager with access limited to Stockport Road store
+      { 
+        username: "jubayed", 
+        password: hashPassword, 
+        firstName: "Jubayed", 
+        lastName: "Chowdhury", 
+        name: "Jubayed Chowdhury", 
+        email: "jubayed@chaiiwala.com", 
+        title: "Store Manager", 
+        role: "store", 
+        storeId: 5, 
+        permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
+      },
+      
+      // Original seed data with updated fields
+      { 
+        username: "admin", 
+        password: hashPassword, 
+        firstName: "Admin", 
+        lastName: "User", 
+        name: "Admin User", 
+        email: "admin@chaiiwala.com",
+        title: "System Administrator",
+        role: "admin", 
+        permissions: ["all_access"] 
+      }
+    ];
+    
+    userData.forEach(user => {
+      this.createUser(user);
+    });
   }
 }
 
@@ -123,8 +169,38 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(cors());
+
+// Enhanced CORS setup for Netlify environment
+app.use(cors({
+  origin: true, // Allow any origin when deployed
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
+
+// Additional CORS headers for all browsers and environments
+app.use((req, res, next) => {
+  // Set to the specific origin in production, or * in development
+  const origin = req.headers.origin;
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+
+  // Handle OPTIONS requests immediately
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// Trust the Netlify proxy
+app.set("trust proxy", 1);
 
 // Auth setup
 const sessionSettings = {
@@ -133,8 +209,12 @@ const sessionSettings = {
   saveUninitialized: false,
   store: storage.sessionStore,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    // Always use secure cookies when not in development
+    secure: process.env.NODE_ENV !== "development",
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'none', // Important for cross-site requests in Netlify
+    path: '/'
   }
 };
 
