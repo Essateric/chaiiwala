@@ -127,17 +127,21 @@ try {
   console.error('❌ Error checking Vite installation:', error.message);
 }
 
-// Verify vite.config.ts exists with sophisticated fallback
-let viteConfigPath = path.resolve(__dirname, 'vite.config.ts');
+// Verify Vite config exists with sophisticated fallback logic
+// For Netlify, prefer the CommonJS version first
+let viteConfigPath = path.resolve(__dirname, 'vite.netlify.js');
 
 // Fallback paths to check if the main one doesn't exist
 const possibleConfigPaths = [
-  path.resolve(__dirname, 'vite.config.ts'),
+  path.resolve(__dirname, 'vite.netlify.js'), // Netlify-specific CommonJS version (preferred for Netlify)
   path.resolve(__dirname, 'vite.config.js'),
-  path.resolve(process.cwd(), 'vite.config.ts'),
+  path.resolve(__dirname, 'vite.config.ts'),
+  path.resolve(process.cwd(), 'vite.netlify.js'),
   path.resolve(process.cwd(), 'vite.config.js'),
-  '/opt/build/repo/vite.config.ts', // Netlify specific path
-  path.resolve(__dirname, '..', 'vite.config.ts')
+  path.resolve(process.cwd(), 'vite.config.ts'),
+  '/opt/build/repo/vite.netlify.js', // Netlify specific path with CommonJS format
+  '/opt/build/repo/vite.config.js',
+  '/opt/build/repo/vite.config.ts'
 ];
 
 // Function to check for valid config path
@@ -160,7 +164,7 @@ if (fs.existsSync(viteConfigPath)) {
   
   // Search the entire project
   console.log('Running global search for vite config files:');
-  execCommand('find . -name "vite.config.ts" -o -name "vite.config.js"', 'Looking for Vite config');
+  execCommand('find . -name "vite.config.ts" -o -name "vite.config.js" -o -name "vite.netlify.js"', 'Looking for Vite config');
   
   // Try known fallback paths
   const foundConfigPath = findValidConfigPath();
@@ -220,27 +224,43 @@ try {
     
     console.log('\n🔍 Attempting alternative build approach (attempt 2)...');
     try {
-      // Try with direct node_modules path as fallback
-      execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.config.ts', 'Building frontend with Vite (attempt 2)');
+      // Try with direct node_modules path but using the Netlify-specific CommonJS config
+      execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.netlify.js', 'Building frontend with Vite (attempt 2)');
     } catch (buildError2) {
       console.error('❌ Second Vite build attempt failed:', buildError2.message);
       
       console.log('\n🔍 Attempting final build approach (attempt 3)...');
       // Create a minimal Vite build command as final fallback
+      // Use a plain CommonJS build approach as final fallback
       const buildCommand = `node -e "
-        const { build } = require('vite');
-        build({
-          configFile: '${viteConfigPath}',
-          root: './client',
-          logLevel: 'info',
-          build: {
-            outDir: '../dist/public',
-            emptyOutDir: true
-          }
-        }).catch(err => {
-          console.error(err);
+        try {
+          const vite = require('vite');
+          const path = require('path');
+          
+          // Using direct configuration object without loading a config file
+          vite.build({
+            root: './client',
+            logLevel: 'info',
+            plugins: [require('@vitejs/plugin-react').default()],
+            resolve: {
+              alias: {
+                '@': path.resolve(process.cwd(), 'client', 'src'),
+                '@shared': path.resolve(process.cwd(), 'shared'),
+                '@assets': path.resolve(process.cwd(), 'attached_assets')
+              }
+            },
+            build: {
+              outDir: path.resolve(process.cwd(), 'dist/public'),
+              emptyOutDir: true
+            }
+          }).catch(err => {
+            console.error('Build error:', err);
+            process.exit(1);
+          });
+        } catch (error) {
+          console.error('Fatal error:', error);
           process.exit(1);
-        })
+        }
       "`;
       
       execCommand(buildCommand, 'Building frontend with Vite API (attempt 3)');
