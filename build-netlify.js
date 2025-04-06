@@ -101,11 +101,23 @@ try {
 }
 
 // Add extra safety by ensuring critical dependencies are available
-console.log('Installing critical build dependencies globally and locally...');
-// Install without modifying package.json
+console.log('Installing critical build dependencies with multiple methods...');
+
+// First try with --no-save to avoid modifying package.json
+console.log('Step 1: Installing locally with --no-save...');
 execCommand('npm install vite@5.4.17 @vitejs/plugin-react@4.3.4 esbuild@0.25.2 --no-save', 'Installing build dependencies locally');
-// Also try globally for Netlify environment
+
+// Then try globally for Netlify environment
+console.log('Step 2: Installing Vite globally...');
 execCommand('npm install -g vite@5.4.17', 'Installing Vite globally');
+
+// Also install as exact dev dependencies to ensure they're available
+console.log('Step 3: Installing as exact dev dependencies...');
+execCommand('npm install -E -D vite@5.4.17 @vitejs/plugin-react@4.3.4', 'Installing Vite as exact dev dependency');
+
+// Force install with highest priority
+console.log('Step 4: Force installing with highest priority...');
+execCommand('npm install vite@5.4.17 --prefer-offline --no-fund --no-audit --force', 'Force installing Vite with highest priority');
 
 // Check for Vite installation without using npm list (which can return exit code 1)
 console.log('Verifying Vite installation...');
@@ -234,37 +246,41 @@ try {
       
       console.log('\n🔍 Attempting final build approach (attempt 3)...');
       // Create a minimal Vite build command as final fallback
-      // Use a plain CommonJS build approach as final fallback
-      const buildCommand = `node -e "
-        try {
-          const vite = require('vite');
-          const path = require('path');
-          
-          // Using direct configuration object without loading a config file
-          vite.build({
-            root: './client',
-            logLevel: 'info',
-            plugins: [require('@vitejs/plugin-react').default()],
-            resolve: {
-              alias: {
-                '@': path.resolve(process.cwd(), 'client', 'src'),
-                '@shared': path.resolve(process.cwd(), 'shared'),
-                '@assets': path.resolve(process.cwd(), 'attached_assets')
-              }
-            },
-            build: {
-              outDir: path.resolve(process.cwd(), 'dist/public'),
-              emptyOutDir: true
-            }
-          }).catch(err => {
-            console.error('Build error:', err);
-            process.exit(1);
-          });
-        } catch (error) {
-          console.error('Fatal error:', error);
-          process.exit(1);
-        }
-      "`;
+      // Use a different approach that avoids direct require of vite
+      // Create a temporary file with the config instead of using -e
+      const tempConfigPath = path.resolve(__dirname, '_temp_vite_config.cjs');
+      const configContent = `
+// Temporary vite config for fallback build
+const path = require('path');
+
+// Export a plain object instead of using defineConfig
+module.exports = {
+  root: './client',
+  logLevel: 'info',
+  plugins: [require('@vitejs/plugin-react').default()],
+  resolve: {
+    alias: {
+      '@': path.resolve(process.cwd(), 'client', 'src'),
+      '@shared': path.resolve(process.cwd(), 'shared'),
+      '@assets': path.resolve(process.cwd(), 'attached_assets')
+    }
+  },
+  build: {
+    outDir: path.resolve(process.cwd(), 'dist/public'),
+    emptyOutDir: true
+  },
+  optimizeDeps: {
+    exclude: ['vite']
+  }
+};
+      `;
+      
+      // Write the temporary config file
+      fs.writeFileSync(tempConfigPath, configContent);
+      console.log(`✅ Created temporary Vite config at ${tempConfigPath}`);
+      
+      // Use the temporary file for the build
+      const buildCommand = `NODE_ENV=production npx vite build --config ${tempConfigPath}`;
       
       execCommand(buildCommand, 'Building frontend with Vite API (attempt 3)');
     }

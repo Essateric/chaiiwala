@@ -19,4 +19,12 @@ module.exports = defineConfig({
     outDir: path.resolve(__dirname, 'dist/public'),
     emptyOutDir: true,
   },
+  // Avoid issues with Vite module resolution
+  optimizeDeps: {
+    exclude: ['vite'],
+  },
+  // Make sure 'vite' is treated as external
+  ssr: {
+    external: ['vite', '@vitejs/plugin-react']
+  }
 });
