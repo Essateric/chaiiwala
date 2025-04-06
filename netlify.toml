@@ -6,6 +6,7 @@
 [build.environment]
   NODE_VERSION = "18.19.0"
   SESSION_SECRET = "chaiiwala-dashboard-secure-session-key"
+  NODE_ENV = "production"
 
 [dev]
   framework = "#custom"
@@ -17,12 +18,13 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://fonts.googleapis.com"
+    Content-Security-Policy = "default-src * 'self'; font-src * 'self' https://fonts.gstatic.com; style-src * 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src * 'self' 'unsafe-eval' 'unsafe-inline'; img-src * 'self' data: blob:; connect-src * 'self' https://fonts.googleapis.com https://*.netlify.app https://*.netlify.com"
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/*"

@@ -3,17 +3,19 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Check if we're in Netlify production environment by checking for the Netlify environment
 // This is a more reliable way to detect Netlify environment than checking for the hostname
 // We'll also check for the production build which means the app is likely deployed
-const isNetlify = window.location.hostname.includes('netlify.app') || 
-                  window.location.hostname !== 'localhost' || 
-                  import.meta.env.PROD === true;
+// IMPORTANT: For Netlify deployments, always assume we're in Netlify environment when not in localhost
+const isNetlify = true; // Always route through Netlify functions when deployed
 
 console.log("Is Netlify environment:", isNetlify);
+console.log("Current hostname:", window.location.hostname);
+console.log("Production mode:", import.meta.env.PROD);
 
 // Helper to transform API URLs for Netlify deployment
 function transformApiUrl(url: string): string {
   // Only transform API URLs
   if (url.startsWith('/api/')) {
     if (isNetlify) {
+      // For Netlify, we need to redirect to the serverless function endpoint
       const transformedUrl = `/.netlify/functions/api${url.replace('/api', '')}`;
       console.log(`Transformed URL from ${url} to ${transformedUrl}`);
       return transformedUrl;
