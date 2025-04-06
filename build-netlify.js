@@ -355,6 +355,20 @@ try {
       console.log('✅ Created api.js in netlify/functions from netlify/api.js');
     }
   }
+  
+  // Copy Netlify _headers file for CSP configuration
+  if (fs.existsSync('netlify/_headers')) {
+    fs.copyFileSync('netlify/_headers', path.join(publicDir, '_headers'));
+    console.log('✅ Copied netlify/_headers to dist/public/_headers');
+  } else {
+    console.warn('⚠️ Warning: netlify/_headers file not found');
+    // Create a _headers file with CSP directives
+    const headersContent = `/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.netlify.app https://*.netlify.com *.chaiiwala.co.uk
+`;
+    fs.writeFileSync(path.join(publicDir, '_headers'), headersContent);
+    console.log('✅ Created dist/public/_headers with permissive CSP');
+  }
 } catch (error) {
   console.error('❌ Error during Netlify functions copy:', error);
 }
