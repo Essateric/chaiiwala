@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- CSP modified to allow all necessary connections for Netlify -->
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'self'; font-src * 'self' https://fonts.gstatic.com; style-src * 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src * 'self' 'unsafe-eval' 'unsafe-inline'; img-src * 'self' data: blob:; connect-src * 'self' https://fonts.googleapis.com https://*.netlify.app https://*.netlify.com">
+    <!-- Add CSP meta tag to allow JavaScript eval functionality -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data:; connect-src 'self' *;">
     <title>Chaiiwala Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

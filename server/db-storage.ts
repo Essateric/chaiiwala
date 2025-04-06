@@ -12,23 +12,44 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, desc, gte, sql, asc, gt, not, isNull } from "drizzle-orm";
-import { pool } from "./db";
+import createMemoryStore from "memorystore";
 
-const PostgresSessionStore = connectPg(session);
+let PostgresSessionStore;
+let sessionStore: session.Store;
+
+// Create the appropriate session store based on database availability
+if (process.env.DATABASE_URL && pool) {
+  PostgresSessionStore = connectPg(session);
+  sessionStore = new PostgresSessionStore({ 
+    pool,
+    createTableIfMissing: true, 
+    tableName: 'session'
+  });
+  console.log("Using PostgreSQL session store");
+} else {
+  const MemoryStore = createMemoryStore(session);
+  sessionStore = new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  });
+  console.log("Using memory session store");
+}
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      createTableIfMissing: true 
-    });
+    // Use the already configured session store
+    this.sessionStore = sessionStore;
     
-    // Initialize the database with seed data if needed
-    this.initializeData();
+    // Only try to initialize data if database is available
+    if (process.env.DATABASE_URL && pool && db) {
+      // Initialize the database with seed data if needed
+      this.initializeData();
+    } else {
+      console.log("Skipping database initialization - no database connection available");
+    }
   }
   
   private async initializeData() {
