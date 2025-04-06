@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   name: text("name").notNull(), // Keeping this for backward compatibility
-  email: text("email"),
+  email: text("email").notNull(),
   title: text("title"), // Job title
   role: roleEnum("role").notNull().default('staff'), // Role for permissions
   permissions: text("permissions").array(), // Array of specific permissions
@@ -110,7 +110,6 @@ export const jobLogs = pgTable("job_logs", {
   description: text("description").notNull(), // Description of the job
   completionDate: text("completion_date"), // Date by which the job should be completed
   attachments: text("attachments").array(), // URLs or paths to any uploaded attachments
-  attachment: text("attachment"), // For backward compatibility
   comments: text("comments"), // Additional comments
   flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
@@ -155,7 +154,7 @@ export const insertChecklistSchema = createInsertSchema(checklists).omit({ id: t
 export const insertChecklistTaskSchema = createInsertSchema(checklistTasks).omit({ id: true });
 export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
-export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true, attachment: true });
+export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 

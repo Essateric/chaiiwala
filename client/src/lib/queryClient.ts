@@ -3,8 +3,8 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Check if we're in Netlify production environment by checking for the Netlify environment
 // This is a more reliable way to detect Netlify environment than checking for the hostname
 // We'll also check for the production build which means the app is likely deployed
-// IMPORTANT: For Netlify deployments, use Netlify functions when in production environment
-const isNetlify = import.meta.env.PROD || window.location.hostname.includes('netlify.app');
+// IMPORTANT: For Netlify deployments, always assume we're in Netlify environment when not in localhost
+const isNetlify = true; // Always route through Netlify functions when deployed
 
 console.log("Is Netlify environment:", isNetlify);
 console.log("Current hostname:", window.location.hostname);
