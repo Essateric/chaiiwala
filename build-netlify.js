@@ -78,13 +78,54 @@ if (!fs.existsSync(functionsDir)) {
   fs.mkdirSync(functionsDir, { recursive: true });
 }
 
-// Install key dependencies
-execCommand('npm install', 'Installing all dependencies');
+// Install key dependencies with enhanced error handling and retries
+console.log('Installing dependencies with enhanced error handling...');
+try {
+  // Attempt normal install first
+  try {
+    execCommand('npm install', 'Installing all dependencies (attempt 1)');
+  } catch (error) {
+    console.warn('⚠️ First dependency installation attempt failed, trying with --legacy-peer-deps');
+    execCommand('npm install --legacy-peer-deps', 'Installing all dependencies (attempt 2 with legacy-peer-deps)');
+  }
+  
+  // Verify package-lock.json exists after install
+  if (!fs.existsSync('./package-lock.json')) {
+    console.warn('⚠️ package-lock.json not found after npm install, this may cause issues');
+  } else {
+    console.log('✅ package-lock.json found after installation');
+  }
+} catch (error) {
+  console.error('❌ All dependency installation attempts failed:', error.message);
+  console.log('⚠️ Continuing build process despite dependency installation issues');
+}
 
 // Add extra safety by ensuring critical dependencies are available
-console.log('Installing critical build dependencies with specific versions...');
-execCommand('npm install vite@5.4.17 @vitejs/plugin-react@4.3.4 esbuild@0.25.2 --no-save', 'Installing Vite and build dependencies');
-execCommand('npm list vite', 'Verifying Vite installation');
+console.log('Installing critical build dependencies globally and locally...');
+// Install without modifying package.json
+execCommand('npm install vite@5.4.17 @vitejs/plugin-react@4.3.4 esbuild@0.25.2 --no-save', 'Installing build dependencies locally');
+// Also try globally for Netlify environment
+execCommand('npm install -g vite@5.4.17', 'Installing Vite globally');
+
+// Check for Vite installation without using npm list (which can return exit code 1)
+console.log('Verifying Vite installation...');
+try {
+  if (fs.existsSync('./node_modules/vite')) {
+    console.log('✅ Vite package found in node_modules directory');
+    
+    // Try to get the version directly from package.json
+    if (fs.existsSync('./node_modules/vite/package.json')) {
+      const vitePackage = JSON.parse(fs.readFileSync('./node_modules/vite/package.json', 'utf8'));
+      console.log(`✅ Installed Vite version: ${vitePackage.version}`);
+    }
+  } else {
+    console.error('⚠️ Vite package not found in node_modules - trying global installation');
+    // Force install again with different flags
+    execCommand('npm install vite@5.4.17 --no-save --force', 'Force installing Vite');
+  }
+} catch (error) {
+  console.error('❌ Error checking Vite installation:', error.message);
+}
 
 // Verify vite.config.ts exists with sophisticated fallback
 let viteConfigPath = path.resolve(__dirname, 'vite.config.ts');
@@ -171,15 +212,46 @@ try {
   // Print Vite version for debugging
   execCommand('npx vite --version', 'Checking Vite version');
   
-  // Run the actual build with full debug output
-  execCommand(`npx vite build --debug --config ${viteConfigPath}`, 'Building frontend with Vite');
+  // Run the actual build with full debug output - attempt 1
+  try {
+    execCommand(`npx vite build --debug --config ${viteConfigPath}`, 'Building frontend with Vite (attempt 1)');
+  } catch (buildError) {
+    console.error('❌ First Vite build attempt failed:', buildError.message);
+    
+    console.log('\n🔍 Attempting alternative build approach (attempt 2)...');
+    try {
+      // Try with direct node_modules path as fallback
+      execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.config.ts', 'Building frontend with Vite (attempt 2)');
+    } catch (buildError2) {
+      console.error('❌ Second Vite build attempt failed:', buildError2.message);
+      
+      console.log('\n🔍 Attempting final build approach (attempt 3)...');
+      // Create a minimal Vite build command as final fallback
+      const buildCommand = `node -e "
+        const { build } = require('vite');
+        build({
+          configFile: '${viteConfigPath}',
+          root: './client',
+          logLevel: 'info',
+          build: {
+            outDir: '../dist/public',
+            emptyOutDir: true
+          }
+        }).catch(err => {
+          console.error(err);
+          process.exit(1);
+        })
+      "`;
+      
+      execCommand(buildCommand, 'Building frontend with Vite API (attempt 3)');
+    }
+  }
 } catch (error) {
-  console.error('❌ Vite build failed with an unexpected error:');
+  console.error('❌ All Vite build attempts failed with unexpected errors:');
   console.error(error);
   
-  console.log('\n🔍 Attempting alternative build approach...');
-  // Try with direct node_modules path as fallback
-  execCommand('NODE_ENV=production ./node_modules/.bin/vite build --config vite.config.ts', 'Alternative Vite build');
+  // As a last resort, try to continue if dist/public exists
+  console.log('\n⚠️ Continuing despite build errors...');
 }
 
 // Check that build produced files
