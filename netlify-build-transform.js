@@ -1,12 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
-// Paths
 const packageJsonPath = path.resolve(process.cwd(), 'package.json');
 
 console.log('🔧 Netlify build transformer script');
@@ -41,7 +37,6 @@ if (!command) {
 }
 
 console.log(`\n🚀 Running command: ${command}`);
-
 
 try {
   execSync(command, { stdio: 'inherit' });
