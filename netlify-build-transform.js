@@ -1,9 +1,8 @@
-// This script temporarily modifies package.json for Netlify build
-// and restores it afterwards
+
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-// Paths
 const packageJsonPath = path.resolve(process.cwd(), 'package.json');
 
 console.log('🔧 Netlify build transformer script');
@@ -38,7 +37,6 @@ if (!command) {
 }
 
 console.log(`\n🚀 Running command: ${command}`);
-const { execSync } = require('child_process');
 
 try {
   execSync(command, { stdio: 'inherit' });
@@ -50,7 +48,7 @@ try {
   // Restore original package.json
   fs.writeFileSync(packageJsonPath, originalPackageJson);
   console.log('✅ Restored original package.json');
-  
+
   // Remove backup
   fs.unlinkSync(backupPath);
   console.log(`✅ Removed backup at ${backupPath}`);
