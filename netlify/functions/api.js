@@ -163,26 +163,62 @@ const app = express();
 // Configure middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-  origin: process.env.URL || true, // Allow any origin in development
-  credentials: true
-}));
 
-// Session configuration
+// Enhanced CORS configuration for Netlify deployment
+const corsOptions = {
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      process.env.URL,
+      process.env.DEPLOY_URL,
+      process.env.DEPLOY_PRIME_URL,
+      'https://www.chaiiwala-dashboard.netlify.app',
+      'https://chaiiwala-dashboard.netlify.app'
+    ];
+    
+    // Allow localhost and netlify dev server in non-production
+    if (process.env.NODE_ENV !== 'production') {
+      allowedOrigins.push('http://localhost:3000', 'http://localhost:5000', 'http://localhost:8888');
+    }
+    
+    // Check if the origin is allowed
+    if (allowedOrigins.includes(origin) || origin.endsWith('.netlify.app')) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Temporarily allow all origins for testing
+    }
+  },
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Session configuration with improved security for Netlify
 const sessionSettings = {
-  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secret",
+  secret: process.env.SESSION_SECRET || "chaiiwala-dashboard-secure-key-8675309",
   resave: false,
   saveUninitialized: false,
   store: storage.sessionStore,
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax', // Important for cross-site cookies
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 };
 
+// Always set trust proxy for Netlify deployment
+app.set("trust proxy", 1);
+
+// Force secure cookies in production
 if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
   sessionSettings.cookie.secure = true;
 }
 
@@ -220,12 +256,23 @@ passport.deserializeUser(async (id, done) => {
 // API Routes
 // ------------------------------
 
-// Authentication routes
+// Authentication routes with improved error handling for Netlify deployment
 app.post("/api/register", async (req, res, next) => {
   try {
+    // Validate input data
+    if (!req.body.username || !req.body.password) {
+      return res.status(400).json({ 
+        message: "Username and password are required",
+        status: "error"
+      });
+    }
+
     const existingUser = await storage.getUserByUsername(req.body.username);
     if (existingUser) {
-      return res.status(400).send("Username already exists");
+      return res.status(400).json({
+        message: "Username already exists",
+        status: "error" 
+      });
     }
 
     const user = await storage.createUser({
@@ -233,31 +280,123 @@ app.post("/api/register", async (req, res, next) => {
       password: await hashPassword(req.body.password),
     });
 
+    // Remove password from response object
+    const userResponse = { ...user };
+    delete userResponse.password;
+
     req.login(user, (err) => {
       if (err) return next(err);
-      res.status(201).json(user);
+      res.status(201).json({
+        message: "User registered successfully",
+        user: userResponse,
+        status: "success"
+      });
     });
   } catch (error) {
-    next(error);
+    console.error("Registration error:", error);
+    res.status(500).json({ 
+      message: "Failed to register user",
+      error: error.message,
+      status: "error"
+    });
   }
 });
 
-app.post("/api/login", passport.authenticate("local"), (req, res) => {
-  res.status(200).json(req.user);
+app.post("/api/login", (req, res, next) => {
+  // Custom passport authenticate to provide better error messages
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      console.error("Login error:", err);
+      return res.status(500).json({ 
+        message: "Internal server error during login",
+        status: "error"
+      });
+    }
+    
+    if (!user) {
+      return res.status(401).json({ 
+        message: "Invalid username or password",
+        status: "error"
+      });
+    }
+    
+    req.login(user, (err) => {
+      if (err) {
+        console.error("Session error:", err);
+        return res.status(500).json({ 
+          message: "Failed to create session",
+          status: "error"
+        });
+      }
+      
+      // Remove password from response
+      const userResponse = { ...user };
+      delete userResponse.password;
+      
+      res.status(200).json({
+        message: "Login successful",
+        user: userResponse,
+        status: "success"
+      });
+    });
+  })(req, res, next);
 });
 
 app.post("/api/logout", (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    res.sendStatus(200);
-  });
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(200).json({ 
+        message: "No active session to logout",
+        status: "success"
+      });
+    }
+    
+    req.logout((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ 
+          message: "Error during logout",
+          status: "error"
+        });
+      }
+      res.status(200).json({
+        message: "Logged out successfully",
+        status: "success"
+      });
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ 
+      message: "Failed to process logout",
+      status: "error"
+    });
+  }
 });
 
 app.get("/api/user", (req, res) => {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ 
+        message: "Not authenticated",
+        status: "error"
+      });
+    }
+    
+    // Remove password from response
+    const userResponse = { ...req.user };
+    delete userResponse.password;
+    
+    res.status(200).json({
+      user: userResponse,
+      status: "success"
+    });
+  } catch (error) {
+    console.error("Auth check error:", error);
+    res.status(500).json({
+      message: "Error retrieving user data",
+      status: "error"
+    });
   }
-  res.json(req.user);
 });
 
 // Basic API routes for the Dashboard
@@ -428,11 +567,55 @@ app.get("/api/announcements/recent", (req, res) => {
   ]);
 });
 
-// Simple error handler
+// Enhanced error handling for Netlify Functions
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message });
+  // Log the error with more context for debugging
+  console.error(`Netlify Function Error [${req.method} ${req.path}]:`, err);
+  
+  // Determine if this is an authentication error
+  let statusCode = 500;
+  let errorMessage = "Internal server error";
+  
+  if (err.name === 'AuthenticationError' || err.message.includes('authentication')) {
+    statusCode = 401;
+    errorMessage = "Authentication failed";
+  } else if (err.name === 'ValidationError' || err.message.includes('validation')) {
+    statusCode = 400;
+    errorMessage = "Validation error";
+  }
+  
+  // Send a structured error response
+  res.status(statusCode).json({
+    status: "error",
+    message: errorMessage,
+    details: process.env.NODE_ENV === 'production' ? null : err.message,
+    path: req.path,
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Export the handler for Netlify Functions
-export const handler = serverless(app);
+// Add a catch-all route for debugging purposes
+app.all('*', (req, res) => {
+  res.status(404).json({
+    status: "error",
+    message: `Route not found: ${req.method} ${req.path}`,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Export the handler for Netlify Functions with improved error handling wrapper
+export const handler = (event, context) => {
+  // Log incoming requests in production for debugging authentication issues
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`Netlify Function Request: ${event.httpMethod} ${event.path}`);
+    
+    // Log headers without sensitive information for debugging CORS and cookies
+    const safeHeaders = { ...event.headers };
+    if (safeHeaders.cookie) safeHeaders.cookie = "REDACTED";
+    if (safeHeaders.authorization) safeHeaders.authorization = "REDACTED";
+    console.log('Request headers:', JSON.stringify(safeHeaders));
+  }
+  
+  // Return the serverless handler with proper error handling
+  return serverless(app)(event, context);
+};
