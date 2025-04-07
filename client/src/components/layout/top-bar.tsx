@@ -39,8 +39,8 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
         </div>
         
         <div className="flex items-center space-x-4">
-          {/* Search */}
-          <h1 className="hidden sm:block mr-4 text-xl font-semibold text-chai-gold">
+          {/* Title - positioned to left */}
+          <h1 className="hidden sm:block mr-8 text-xl font-semibold text-chai-gold order-first">
             {title}
           </h1>
           <div className="relative hidden md:block">
