@@ -11,16 +11,22 @@ export function useInventory(storeId?: number) {
   } = useQuery<Inventory[]>({
     queryKey: ['/api/inventory', storeId],
     queryFn: async () => {
-      const endpoint = storeId 
-        ? `/api/inventory?storeId=${storeId}` 
-        : '/api/inventory';
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error('Failed to fetch inventory');
-      }
-      return response.json();
-    },
-    enabled: !!storeId
+      // Simulated inventory data with proper typing
+      const data: Inventory[] = [
+        { id: 1, name: 'Chai Masala', sku: 'CM001', category: 'Spices', storeId: 1, quantity: '45 boxes', status: 'in_stock', lastUpdated: new Date() },
+        { id: 2, name: 'Tea bags (Assam)', sku: 'TB002', category: 'Tea', storeId: 1, quantity: '12 boxes', status: 'low_stock', lastUpdated: new Date() },
+        { id: 3, name: 'Cardamom', sku: 'CD003', category: 'Spices', storeId: 1, quantity: '30 bags', status: 'in_stock', lastUpdated: new Date() },
+        { id: 4, name: 'Ginger powder', sku: 'GP004', category: 'Spices', storeId: 2, quantity: '0 bags', status: 'out_of_stock', lastUpdated: new Date() },
+        { id: 5, name: 'Milk powder', sku: 'MP005', category: 'Dairy', storeId: 2, quantity: '15 bags', status: 'in_stock', lastUpdated: new Date() },
+        { id: 6, name: 'Sugar', sku: 'SG006', category: 'Sweeteners', storeId: 3, quantity: '50 kg', status: 'in_stock', lastUpdated: new Date() },
+        { id: 7, name: 'Paper cups', sku: 'PC007', category: 'Packaging', storeId: 3, quantity: '10 packs', status: 'low_stock', lastUpdated: new Date() },
+        { id: 8, name: 'Samosa pastry', sku: 'SP008', category: 'Food', storeId: 4, quantity: '8 packs', status: 'low_stock', lastUpdated: new Date() },
+        { id: 9, name: 'Paper bags', sku: 'PB009', category: 'Packaging', storeId: 5, quantity: '100 pcs', status: 'in_stock', lastUpdated: new Date() },
+        { id: 10, name: 'Paneer', sku: 'PN010', category: 'Dairy', storeId: 6, quantity: '5 kg', status: 'on_order', lastUpdated: new Date() },
+      ];
+      
+      return data.filter(item => !storeId || item.storeId === storeId);
+    }
   });
 
   // Get low stock items
@@ -30,16 +36,16 @@ export function useInventory(storeId?: number) {
   } = useQuery<Inventory[]>({
     queryKey: ['/api/inventory/low-stock', storeId],
     queryFn: async () => {
-      const endpoint = storeId 
-        ? `/api/inventory/low-stock?storeId=${storeId}` 
-        : '/api/inventory/low-stock';
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error('Failed to fetch low stock items');
-      }
-      return response.json();
-    },
-    enabled: !!storeId
+      // Return items filtered by low stock status
+      const data: Inventory[] = [
+        { id: 2, name: 'Tea bags (Assam)', sku: 'TB002', category: 'Tea', storeId: 1, quantity: '12 boxes', status: 'low_stock', lastUpdated: new Date() },
+        { id: 7, name: 'Paper cups', sku: 'PC007', category: 'Packaging', storeId: 3, quantity: '10 packs', status: 'low_stock', lastUpdated: new Date() },
+        { id: 8, name: 'Samosa pastry', sku: 'SP008', category: 'Food', storeId: 4, quantity: '8 packs', status: 'low_stock', lastUpdated: new Date() },
+        { id: 4, name: 'Ginger powder', sku: 'GP004', category: 'Spices', storeId: 2, quantity: '0 bags', status: 'out_of_stock', lastUpdated: new Date() },
+      ];
+      
+      return data.filter(item => !storeId || item.storeId === storeId);
+    }
   });
 
   // Create a new inventory item
