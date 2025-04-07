@@ -35,11 +35,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex items-center">
-            <h1 className="ml-2 lg:ml-0 font-montserrat font-bold text-xl capitalize">
-              {title}
-            </h1>
-          </div>
+
         </div>
         
         <div className="flex items-center space-x-4">
