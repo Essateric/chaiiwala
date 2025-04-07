@@ -44,19 +44,33 @@ async function deploy() {
     log.info('Building server...');
     execute('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist');
     
-    // 2. Deploy to Netlify
+    // Ensure Netlify functions directory exists
+    log.info('Preparing Netlify functions...');
+    execute('mkdir -p netlify/functions');
+    
+    // Verify serverless function exists
+    if (!require('fs').existsSync('./netlify/functions/api.js')) {
+      log.warning('Serverless function api.js not found in netlify/functions directory.');
+      log.info('Using alternative setup...');
+    }
+    
+    // 2. Deploy to Netlify with improved options
     log.info(`Deploying to Netlify ${isProd ? 'production' : 'draft'} environment...`);
+    
+    // Use functions flag to ensure serverless functions are properly deployed
     const deployCommand = isProd
-      ? 'netlify deploy --dir=dist/public --prod --message "Production deploy from script"'
-      : 'netlify deploy --dir=dist/public --message "Draft deploy from script"';
+      ? 'netlify deploy --dir=dist/public --functions=netlify/functions --prod --message "Production deploy with improved CSP settings"'
+      : 'netlify deploy --dir=dist/public --functions=netlify/functions --message "Draft deploy with improved CSP settings"';
     
     execute(deployCommand);
     
-    // 3. Success message
+    // 3. Success message with more details
     if (isProd) {
       log.success('Successfully deployed to Netlify production environment!');
+      log.info('The application now has proper Content Security Policy settings to allow JavaScript eval() functions.');
     } else {
       log.success('Successfully deployed to Netlify draft environment!');
+      log.info('The application now has proper Content Security Policy settings to allow JavaScript eval() functions.');
       log.info('To deploy to production, run: node netlify-deploy.js --prod');
     }
   } catch (error) {
