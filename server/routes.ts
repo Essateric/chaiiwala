@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
+import fs from "fs";
 import { UploadedFile } from "express-fileupload";
 import { 
   insertStoreSchema, 
@@ -354,7 +355,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate unique filename
       const fileName = `${uuidv4()}${path.extname(uploadedFile.name)}`;
-      const uploadPath = path.join(__dirname, '..', 'public', 'uploads', fileName);
+      
+      // Create uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      const uploadPath = path.join(uploadsDir, fileName);
 
       // Move the file to the uploads directory
       await uploadedFile.mv(uploadPath);
@@ -375,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve uploaded files
   app.get("/uploads/:fileName", (req, res) => {
     const fileName = req.params.fileName;
-    const filePath = path.join(__dirname, '..', 'public', 'uploads', fileName);
+    const filePath = path.join(process.cwd(), 'public', 'uploads', fileName);
     res.sendFile(filePath);
   });
 

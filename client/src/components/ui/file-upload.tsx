@@ -75,7 +75,7 @@ export function FileUpload({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <Input
           type="file"
           id="file-upload"
@@ -89,11 +89,11 @@ export function FileUpload({
           className="flex-1 cursor-pointer flex items-center gap-2 border border-dashed rounded-md p-4 hover:bg-gray-50 transition-colors"
         >
           {isUploading ? (
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary animate-spin flex-shrink-0" />
           ) : (
-            <UploadCloud className="h-6 w-6 text-gray-400" />
+            <UploadCloud className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400 flex-shrink-0" />
           )}
-          <span className="text-sm text-gray-500">
+          <span className="text-xs sm:text-sm text-gray-500 truncate">
             {isUploading ? "Uploading..." : placeholder}
           </span>
         </label>
@@ -103,6 +103,7 @@ export function FileUpload({
           size="sm"
           onClick={() => document.getElementById("file-upload")?.click()}
           disabled={isUploading}
+          className="whitespace-nowrap mt-1 sm:mt-0"
         >
           {buttonText}
         </Button>
@@ -115,7 +116,7 @@ export function FileUpload({
           <img
             src={preview}
             alt="Preview"
-            className="max-w-full max-h-[200px] rounded-md object-contain"
+            className="max-w-full max-h-[150px] sm:max-h-[200px] rounded-md object-contain"
           />
           <button
             type="button"
