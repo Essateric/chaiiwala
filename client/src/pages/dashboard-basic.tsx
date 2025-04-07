@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+import { StockWidget } from "@/components/dashboard/stock-widget";
 import { 
   BarChart, 
   Bar, 
@@ -223,6 +224,11 @@ export default function DashboardBasic() {
               </button>
             </div>
           </div>
+        </div>
+        
+        {/* Stock Widget */}
+        <div className="mt-8">
+          <StockWidget stores={stores} />
         </div>
         
         {/* Notifications */}
