@@ -21,8 +21,10 @@ export function StockWidget({ stores }: StockWidgetProps) {
   // Group inventory items by store
   const inventoryByStore: Record<string, InventoryType[]> = {};
 
-  if (inventory && inventory.length > 0) {
-    inventory.forEach(item => {
+  // Safely process inventory data with appropriate type checking
+  const safeInventory = inventory || [];
+  if (safeInventory.length > 0) {
+    safeInventory.forEach((item: InventoryType) => {
       const storeName = stores.find(s => s.id === item.storeId)?.name || 'Unknown Store';
       if (!inventoryByStore[storeName]) {
         inventoryByStore[storeName] = [];
@@ -82,12 +84,12 @@ export function StockWidget({ stores }: StockWidgetProps) {
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-full" />
           </div>
-        ) : inventory && inventory.length > 0 ? (
+        ) : safeInventory.length > 0 ? (
           <div className="h-[300px] pr-4 overflow-y-auto">
             <div className="space-y-4">
               {selectedStoreId ? (
                 <div className="space-y-2">
-                  {inventory.map((item) => (
+                  {safeInventory.map((item: InventoryType) => (
                     <div key={item.id} className="flex justify-between p-2 rounded-md bg-gray-50">
                       <div>
                         <div className="font-medium text-sm">{item.name}</div>
@@ -106,7 +108,7 @@ export function StockWidget({ stores }: StockWidgetProps) {
                 Object.entries(inventoryByStore).map(([storeName, items]) => (
                   <div key={storeName} className="space-y-2">
                     <h4 className="font-medium text-sm text-gray-700 bg-gray-100 p-2 rounded">{storeName}</h4>
-                    {items.map((item) => (
+                    {items.map((item: InventoryType) => (
                       <div key={item.id} className="flex justify-between p-2 rounded-md bg-gray-50 ml-2">
                         <div>
                           <div className="font-medium text-sm">{item.name}</div>
@@ -124,7 +126,7 @@ export function StockWidget({ stores }: StockWidgetProps) {
                 ))
               )}
             </div>
-            {inventory.length === 0 && (
+            {safeInventory.length === 0 && (
               <div className="text-center py-6 text-gray-500">No stock data available</div>
             )}
           </div>

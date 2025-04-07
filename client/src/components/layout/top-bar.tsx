@@ -38,11 +38,12 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
 
         </div>
         
+        {/* Title displayed separately to ensure proper alignment */}
+        <h1 className="hidden sm:block text-xl font-semibold text-chai-gold text-left pl-4 mt-2">
+          {title}
+        </h1>
+          
         <div className="flex items-center space-x-4">
-          {/* Title - positioned to left */}
-          <h1 className="hidden sm:block mr-8 text-xl font-semibold text-chai-gold order-first">
-            {title}
-          </h1>
           <div className="relative hidden md:block">
             <Input
               type="text"
