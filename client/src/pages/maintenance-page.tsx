@@ -203,7 +203,7 @@ function JobLogsSection() {
                         )}
                       />
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="logDate"
@@ -280,7 +280,7 @@ function JobLogsSection() {
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="loggedBy"
@@ -336,7 +336,7 @@ function JobLogsSection() {
                               <FileUpload
                                 onUploadComplete={(imageUrl) => {
                                   // Add the new image URL to the attachments array
-                                  const updatedAttachments = [...field.value, imageUrl];
+                                  const updatedAttachments = [...(field.value || []), imageUrl];
                                   field.onChange(updatedAttachments);
                                 }}
                                 placeholder="Click to upload maintenance issue images"
@@ -344,24 +344,24 @@ function JobLogsSection() {
                               />
                               
                               <div className="mt-4">
-                                {field.value.length > 0 ? (
+                                {(field.value || []).length > 0 ? (
                                   <div>
-                                    <h4 className="mb-2 text-sm font-medium">Attached Images ({field.value.length})</h4>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {field.value.map((img, index) => (
+                                    <h4 className="mb-2 text-sm font-medium">Attached Images ({(field.value || []).length})</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                      {(field.value || []).map((img, index) => (
                                         <div key={index} className="relative group">
                                           <img 
                                             src={img} 
                                             alt={`Attachment ${index + 1}`}
-                                            className="h-24 w-24 object-cover rounded-md border" 
+                                            className="h-20 w-20 sm:h-24 sm:w-24 object-cover rounded-md border" 
                                           />
                                           <Button
                                             type="button"
                                             variant="destructive"
                                             size="icon"
-                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="absolute top-1 right-1 h-6 w-6 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                             onClick={() => {
-                                              const updatedAttachments = [...field.value];
+                                              const updatedAttachments = [...(field.value || [])];
                                               updatedAttachments.splice(index, 1);
                                               field.onChange(updatedAttachments);
                                             }}
@@ -432,9 +432,9 @@ function JobLogsSection() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Logged By</TableHead>
+                  <TableHead className="hidden md:table-cell">Logged By</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Store</TableHead>
+                  <TableHead className="hidden sm:table-cell w-[100px]">Store</TableHead>
                   <TableHead className="w-[80px] text-center">Image</TableHead>
                 </TableRow>
               </TableHeader>
@@ -442,20 +442,25 @@ function JobLogsSection() {
                 {jobLogs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell>
-                      {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
+                      <span className="hidden sm:inline">
+                        {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
+                      </span>
+                      <span className="sm:hidden">
+                        {format(new Date(`${job.logDate}T${job.logTime}`), "dd/MM/yy HH:mm", { locale: enUS })}
+                      </span>
                     </TableCell>
-                    <TableCell className="font-medium max-w-[220px] truncate">
+                    <TableCell className="font-medium max-w-[120px] sm:max-w-[220px] truncate">
                       {job.description}
                     </TableCell>
-                    <TableCell>{job.loggedBy}</TableCell>
+                    <TableCell className="hidden md:table-cell">{job.loggedBy}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getFlagBadgeClass(job.flag)}`}>
+                      <span className={`inline-flex items-center rounded-full px-2 sm:px-2.5 py-1 text-xs font-medium ${getFlagBadgeClass(job.flag)}`}>
                         {job.flag === "normal" && "Normal"}
-                        {job.flag === "long_standing" && "Long-standing"}
+                        {job.flag === "long_standing" && <span><span className="hidden sm:inline">Long-standing</span><span className="sm:hidden">Long</span></span>}
                         {job.flag === "urgent" && "Urgent"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {stores.find(store => store.id === job.storeId)?.name || `Store ID: ${job.storeId}`}
                     </TableCell>
                     <TableCell className="w-[80px]">
