@@ -142,7 +142,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     >
       {/* Logo & Brand */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
           <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
             <img 
               src={chaiiwalaLogo} 
@@ -150,7 +150,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               className="h-7 sm:h-7 w-auto"
             />
           </div>
-          <span className="font-montserrat font-bold text-chai-gold text-xl hidden sm:inline">Chaiiwala</span>
         </div>
         <button 
           onClick={onClose} 
