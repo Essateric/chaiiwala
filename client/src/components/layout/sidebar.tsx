@@ -147,10 +147,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <img 
               src={chaiiwalaLogo} 
               alt="Chaiiwala Logo" 
-              className="h-7 w-auto"
+              className="h-7 sm:h-7 w-auto"
             />
           </div>
-          <span className="font-montserrat font-bold text-chai-gold text-xl">Chaiiwala</span>
+          <span className="font-montserrat font-bold text-chai-gold text-xl hidden sm:inline">Chaiiwala</span>
         </div>
         <button 
           onClick={onClose} 

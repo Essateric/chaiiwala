@@ -81,13 +81,13 @@ export default function DashboardBasic() {
       <div className="py-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-xl sm:text-2xl font-semibold text-white dark:text-white">Dashboard</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-400">
               An overview of your Chaiiwala stores performance
             </p>
           </div>
           <div className="mt-4 md:mt-0 flex items-center">
-            <span className="mr-4 text-sm text-gray-700">Welcome, {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'User'}</span>
+            <span className="mr-4 text-xs sm:text-sm text-gray-300">Welcome, {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'User'}</span>
           </div>
         </div>
 
