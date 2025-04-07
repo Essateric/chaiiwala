@@ -40,6 +40,9 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
         
         <div className="flex items-center space-x-4">
           {/* Search */}
+          <h1 className="hidden sm:block mr-4 text-xl font-semibold text-chai-gold">
+            {title}
+          </h1>
           <div className="relative hidden md:block">
             <Input
               type="text"
