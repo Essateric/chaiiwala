@@ -55,7 +55,7 @@ export function StockWidget({ stores }: StockWidgetProps) {
   };
 
   return (
-    <Card className="shadow-lg">
+    <Card id="full-stock-widget" className="shadow-lg">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg font-medium flex items-center">
@@ -63,6 +63,7 @@ export function StockWidget({ stores }: StockWidgetProps) {
             Stock Overview
           </CardTitle>
           <select 
+            id="stock-store-dropdown"
             className="border rounded-md p-2 text-sm w-40 bg-white"
             value={selectedStoreId?.toString() || "all"}
             onChange={handleStoreChange}
