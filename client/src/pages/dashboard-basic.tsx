@@ -18,7 +18,8 @@ import {
   Store, 
   Users, 
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Package
 } from 'lucide-react';
 
 // Store data from the user's input
@@ -147,19 +148,52 @@ export default function DashboardBasic() {
             </div>
           </div>
           
+          {/* Compact Stock Widget */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                      <Package className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div className="ml-2">
+                      <span className="text-sm font-medium text-gray-500">Stock</span>
+                    </div>
+                  </div>
+                  <select 
+                    className="border rounded-md py-1 px-2 text-xs bg-white"
+                    onChange={(e) => {
+                      const storeDropdown = document.getElementById('stock-store-dropdown');
+                      if (storeDropdown) {
+                        (storeDropdown as HTMLSelectElement).value = e.target.value;
+                        const event = new Event('change', { bubbles: true });
+                        storeDropdown.dispatchEvent(event);
+                      }
+                    }}
+                  >
+                    <option value="all">All Stores</option>
+                    {stores.map((store) => (
+                      <option key={store.id} value={store.id.toString()}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
-                    <dd>
-                      <div className="text-lg font-semibold text-gray-900">{tasks.filter(task => !task.completed).length}</div>
-                    </dd>
-                  </dl>
+                
+                <div className="mt-1 text-xs text-gray-600">
+                  <div 
+                    onClick={() => {
+                      // Scroll to the full stock widget
+                      const stockWidget = document.getElementById('full-stock-widget');
+                      if (stockWidget) {
+                        stockWidget.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="cursor-pointer hover:underline text-chai-gold"
+                  >
+                    View details
+                  </div>
                 </div>
               </div>
             </div>
