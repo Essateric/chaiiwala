@@ -547,14 +547,14 @@ export default function EventOrdersPage() {
                       <h3 className="text-sm font-semibold mb-2">Order Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="creator-info">Created By</Label>
-                          <div id="creator-info" className="text-sm font-medium mt-1">
+                          <span className="text-sm font-medium mb-1 block">Created By</span>
+                          <div className="text-sm mt-1">
                             {user?.name || "Unknown User"}
                           </div>
                         </div>
                         <div>
-                          <Label htmlFor="creation-time">Date & Time</Label>
-                          <div id="creation-time" className="text-sm font-medium mt-1">
+                          <span className="text-sm font-medium mb-1 block">Date & Time</span>
+                          <div className="text-sm mt-1">
                             {format(new Date(), "PPP", { locale: enUS })} at {format(new Date(), "h:mm a")}
                           </div>
                         </div>
