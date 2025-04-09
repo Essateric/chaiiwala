@@ -611,7 +611,7 @@ export default function EventOrdersPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Store</TableHead>
                       <TableHead>Booked By</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Update Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -657,7 +657,7 @@ export default function EventOrdersPage() {
                                 disabled={isUpdating}
                               >
                                 <SelectTrigger className="w-[130px]">
-                                  <SelectValue placeholder="Update Status" />
+                                  <SelectValue placeholder="Change Status" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="pending">Pending</SelectItem>
