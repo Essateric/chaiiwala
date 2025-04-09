@@ -170,7 +170,17 @@ export default function EventOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
 
   // Get event orders using our hook, passing the filterStoreId so it can properly update the cache
-  const { eventOrders, isLoading, error, createEventOrder, updateEventOrder, isCreating, isUpdating } = useEventOrders(filterStoreId);
+  const { eventOrders: fetchedEventOrders, isLoading, error, createEventOrder, updateEventOrder, isCreating, isUpdating } = useEventOrders(filterStoreId);
+  
+  // Create a state variable to track orders with locally updated status for immediate UI feedback
+  const [eventOrders, setEventOrders] = useState<EventOrder[]>([]);
+  
+  // Sync eventOrders state with fetched data whenever it changes
+  useEffect(() => {
+    if (fetchedEventOrders) {
+      setEventOrders(fetchedEventOrders);
+    }
+  }, [fetchedEventOrders]);
   
   // Get stores for the store selection dropdown
   const { stores = [], isLoading: isLoadingStores } = useStores();
@@ -236,7 +246,10 @@ export default function EventOrdersPage() {
       const newOrder = await createEventOrder(values);
       console.log("New order returned:", newOrder);
       
-      // Update the UI immediately with the new order
+      // Update our local state immediately
+      setEventOrders(currentOrders => [...currentOrders, newOrder]);
+      
+      // Also update the query cache for consistency
       queryClient.setQueryData<EventOrder[]>(["/api/event-orders"], (oldData = []) => {
         console.log("Directly updating event orders list in page component:", [...oldData, newOrder]);
         return [...oldData, newOrder];
@@ -264,21 +277,35 @@ export default function EventOrdersPage() {
       // Optimistically update the UI immediately
       const statusType = newStatus as "pending" | "confirmed" | "completed" | "cancelled";
       
-      // Create a copy of the current orders with the updated status
-      const updatedOrders = eventOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: statusType } 
-          : order
+      // Update our local state immediately for a responsive UI
+      setEventOrders(currentOrders => 
+        currentOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: statusType } 
+            : order
+        )
       );
       
-      // Update the query cache immediately for a responsive UI
-      queryClient.setQueryData(["/api/event-orders"], updatedOrders);
+      // Also update the query cache for consistency
+      queryClient.setQueryData(["/api/event-orders"], (oldData: EventOrder[] = []) => {
+        return oldData.map(order => 
+          order.id === orderId 
+            ? { ...order, status: statusType } 
+            : order
+        );
+      });
       
       // If we're filtering by store, also update that query data
       if (filterStoreId) {
         queryClient.setQueryData(
           ["/api/event-orders", "store", filterStoreId], 
-          updatedOrders.filter(order => order.storeId === filterStoreId)
+          (oldData: EventOrder[] = []) => {
+            return oldData.map(order => 
+              order.id === orderId 
+                ? { ...order, status: statusType } 
+                : order
+            );
+          }
         );
       }
       
@@ -289,7 +316,7 @@ export default function EventOrdersPage() {
       });
     } catch (error) {
       console.error("Failed to update event order status:", error);
-      // On error, invalidate queries to refresh from server
+      // Revert to original data on error
       queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
     }
   }
