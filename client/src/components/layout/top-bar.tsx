@@ -39,7 +39,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
         </div>
         
         {/* Title displayed separately to ensure proper alignment */}
-        <h1 className="hidden sm:block text-xl font-semibold text-chai-gold text-left pl-4 mt-2">
+        <h1 className="hidden sm:block text-xl font-semibold text-chai-gold text-left pl-0 mt-2">
           {title}
         </h1>
           
