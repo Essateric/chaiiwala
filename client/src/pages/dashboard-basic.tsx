@@ -5,6 +5,14 @@ import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockWidget } from "@/components/dashboard/stock-widget";
+import { useInventory } from "@/hooks/use-inventory";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   BarChart, 
   Bar, 
@@ -19,7 +27,8 @@ import {
   Users, 
   AlertTriangle,
   Sparkles,
-  Package
+  Package,
+  X
 } from 'lucide-react';
 
 // Store data from the user's input
@@ -61,6 +70,12 @@ const notifications = [
 
 export default function DashboardBasic() {
   const { toast } = useToast();
+  const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(undefined);
+  const [selectedStoreName, setSelectedStoreName] = useState<string>("All Stores");
+  
+  // Fetch inventory data for the selected store
+  const { inventory, isLoading: isLoadingInventory } = useInventory(selectedStoreId);
   
   // Fetch user data directly - matches approach in ProtectedComponent
   const { data: user } = useQuery<SelectUser | undefined, Error>({
@@ -77,6 +92,36 @@ export default function DashboardBasic() {
     },
     enabled: false // Disable actual fetching since we're using sample data
   });
+  
+  // Get status color for inventory items
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'in_stock':
+        return 'bg-green-100 text-green-800';
+      case 'low_stock':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'out_of_stock':
+        return 'bg-red-100 text-red-800';
+      case 'on_order':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const storeId = value === "all" ? undefined : Number(value);
+    setSelectedStoreId(storeId);
+    
+    // Update the selected store name
+    if (storeId) {
+      const store = stores.find(s => s.id === storeId);
+      setSelectedStoreName(store?.name || "Unknown Store");
+    } else {
+      setSelectedStoreName("All Stores");
+    }
+  };
 
   return (
     <DashboardLayout title="Dashboard">
@@ -163,14 +208,8 @@ export default function DashboardBasic() {
                   </div>
                   <select 
                     className="border rounded-md py-1 px-2 text-xs bg-white"
-                    onChange={(e) => {
-                      const storeDropdown = document.getElementById('stock-store-dropdown');
-                      if (storeDropdown) {
-                        (storeDropdown as HTMLSelectElement).value = e.target.value;
-                        const event = new Event('change', { bubbles: true });
-                        storeDropdown.dispatchEvent(event);
-                      }
-                    }}
+                    value={selectedStoreId?.toString() || "all"}
+                    onChange={handleStoreChange}
                   >
                     <option value="all">All Stores</option>
                     {stores.map((store) => (
@@ -184,11 +223,8 @@ export default function DashboardBasic() {
                 <div className="mt-1 text-xs text-gray-600">
                   <div 
                     onClick={() => {
-                      // Scroll to the full stock widget
-                      const stockWidget = document.getElementById('full-stock-widget');
-                      if (stockWidget) {
-                        stockWidget.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } } as React.ChangeEvent<HTMLSelectElement>);
+                      setIsStockDialogOpen(true);
                     }}
                     className="cursor-pointer hover:underline text-chai-gold"
                   >
@@ -303,6 +339,59 @@ export default function DashboardBasic() {
           </div>
         </div>
       </div>
+      
+      {/* Stock Dialog */}
+      <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader className="flex justify-between items-center">
+            <DialogTitle className="flex items-center">
+              <Package className="h-5 w-5 mr-2 text-chai-gold" />
+              Stock Inventory - {selectedStoreName}
+            </DialogTitle>
+            <button 
+              onClick={() => setIsStockDialogOpen(false)}
+              className="rounded-full p-1 hover:bg-gray-100"
+            >
+              <X className="h-4 w-4 text-gray-500" />
+            </button>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4 p-1">
+              {isLoadingInventory ? (
+                <div className="space-y-2">
+                  {[1,2,3,4].map((i) => (
+                    <div key={i} className="bg-gray-100 h-14 animate-pulse rounded"></div>
+                  ))}
+                </div>
+              ) : inventory && inventory.length > 0 ? (
+                <div className="space-y-2">
+                  {inventory.map((item) => (
+                    <div key={item.id} className="flex justify-between p-3 rounded-md bg-gray-50 border border-gray-100">
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-xs text-gray-500">
+                          SKU: {item.sku} • Category: {item.category}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm font-medium">{item.quantity}</div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                          {item.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  No stock data available for {selectedStoreName}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
