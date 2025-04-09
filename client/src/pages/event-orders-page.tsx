@@ -261,14 +261,36 @@ export default function EventOrdersPage() {
   // Handle status change
   async function handleStatusChange(orderId: number, newStatus: string) {
     try {
+      // Optimistically update the UI immediately
+      const statusType = newStatus as "pending" | "confirmed" | "completed" | "cancelled";
+      
+      // Create a copy of the current orders with the updated status
+      const updatedOrders = eventOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: statusType } 
+          : order
+      );
+      
+      // Update the query cache immediately for a responsive UI
+      queryClient.setQueryData(["/api/event-orders"], updatedOrders);
+      
+      // If we're filtering by store, also update that query data
+      if (filterStoreId) {
+        queryClient.setQueryData(
+          ["/api/event-orders", "store", filterStoreId], 
+          updatedOrders.filter(order => order.storeId === filterStoreId)
+        );
+      }
+      
+      // Make the actual API call to persist the change
       await updateEventOrder({ 
         id: orderId, 
-        data: { 
-          status: newStatus as "pending" | "confirmed" | "completed" | "cancelled" 
-        } 
+        data: { status: statusType } 
       });
     } catch (error) {
       console.error("Failed to update event order status:", error);
+      // On error, invalidate queries to refresh from server
+      queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
     }
   }
 
