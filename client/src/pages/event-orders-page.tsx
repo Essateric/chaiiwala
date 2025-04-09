@@ -85,8 +85,8 @@ const formatDateTime = (dateStr: string, timeStr: string) => {
       return `${dateStr} ${timeStr || ""}`;
     }
     
-    // Format: ddd Do MMM YYYY HH:mm:ss (e.g., "Sun 20th Apr 2025 17:30:00")
-    return format(date, "EEE do MMM yyyy HH:mm:ss", { locale: enUS });
+    // Format: ddd Do MMM YYYY HH:mm (e.g., "Sun 20th Apr 2025 17:30")
+    return format(date, "EEE do MMM yyyy HH:mm", { locale: enUS });
   } catch (error) {
     console.error("Error formatting date:", error);
     return `${dateStr} ${timeStr || ""}`;
