@@ -1,14 +1,38 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Inventory, InsertInventory } from "@shared/schema";
+import { Inventory, InsertInventory, Store } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Extended inventory type with store breakdown for combined view
+export type InventoryWithBreakdown = Inventory & {
+  storeBreakdown?: { storeId: number; name: string; quantity: string }[];
+};
 
 export function useInventory(storeId?: number) {
   // Fetch inventory for the store
+  // Fetch stores data
+  const {
+    data: stores = []
+  } = useQuery<Store[]>({
+    queryKey: ['/api/stores'],
+    queryFn: async () => {
+      // Simulated stores data with proper typing
+      return [
+        { id: 1, name: 'Cheetham Hill', address: '74 Bury Old Rd, Manchester M8 5BW', area: 1, manager: 'MGR_CH' },
+        { id: 2, name: 'Oxford Road', address: '149 Oxford Rd, Manchester M1 7EE', area: 1, manager: 'MGR_OX' },
+        { id: 3, name: 'Old Trafford', address: 'Ayres Rd, Old Trafford, Stretford, 89 M16 7GS', area: 1, manager: 'MGR_OT' },
+        { id: 4, name: 'Trafford Centre', address: 'Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford', area: 2, manager: 'MGR_TC' },
+        { id: 5, name: 'Stockport', address: '884-886 Stockport Rd, Levenshulme, Manchester', area: 1, manager: 'MGR_SR' },
+        { id: 6, name: 'Rochdale', address: '35 Milkstone Rd, Rochdale OL11 1EB', area: 2, manager: 'MGR_RD' },
+        { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
+      ];
+    }
+  });
+
   const {
     data: inventory,
     isLoading,
     error
-  } = useQuery<Inventory[]>({
+  } = useQuery<InventoryWithBreakdown[]>({
     queryKey: ['/api/inventory', storeId],
     queryFn: async () => {
       // Simulated inventory data with proper typing
@@ -25,7 +49,46 @@ export function useInventory(storeId?: number) {
         { id: 10, name: 'Paneer', sku: 'PN010', category: 'Dairy', storeId: 6, quantity: '5 kg', status: 'on_order', lastUpdated: new Date() },
       ];
       
-      return data.filter(item => !storeId || item.storeId === storeId);
+      if (storeId) {
+        return data.filter(item => item.storeId === storeId) as InventoryWithBreakdown[];
+      } else {
+        // For "All Stores" view, combine items by SKU and add store breakdown
+        const skuGroups: { [key: string]: Inventory[] } = {};
+        
+        // Group inventory items by SKU
+        data.forEach(item => {
+          if (!skuGroups[item.sku]) {
+            skuGroups[item.sku] = [];
+          }
+          skuGroups[item.sku].push(item);
+        });
+        
+        // Create combined inventory items with store breakdown
+        const combinedInventory: InventoryWithBreakdown[] = Object.values(skuGroups).map(group => {
+          // Use the first item as the base
+          const baseItem = { ...group[0] };
+          
+          // Create store breakdown info
+          const storeBreakdown = group.map(item => ({
+            storeId: item.storeId,
+            name: stores.find(s => s.id === item.storeId)?.name || `Store ${item.storeId}`,
+            quantity: item.quantity
+          }));
+          
+          // Add combined suffix if multiple stores have this item
+          if (group.length > 1) {
+            // Just use the base item's quantity for now, ideally we would sum these up
+            // but since quantities have units (e.g., "45 boxes"), simple summing is not possible
+          }
+          
+          return {
+            ...baseItem,
+            storeBreakdown
+          };
+        });
+        
+        return combinedInventory;
+      }
     }
   });
 
