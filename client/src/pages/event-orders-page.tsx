@@ -591,6 +591,7 @@ export default function EventOrdersPage() {
                       <TableHead>Quantity</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Store</TableHead>
+                      <TableHead>Booked By</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -619,6 +620,14 @@ export default function EventOrdersPage() {
                             <StatusBadge status={order.status} />
                           </TableCell>
                           <TableCell>{store?.name || `Store ${order.storeId}`}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{order.bookedBy}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {order.bookingDate} at {order.bookingTime}
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right">
                             {/* Status Update Dropdown */}
                             {(user?.role === "admin" || user?.role === "regional" || 
