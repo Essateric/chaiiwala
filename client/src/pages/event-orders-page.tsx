@@ -71,6 +71,28 @@ const eventOrderFormSchema = insertEventOrderSchema
     notes: z.string().optional(),
   });
 
+// Date formatter helper
+const formatDateTime = (dateStr: string, timeStr: string) => {
+  if (!dateStr) return "";
+  
+  try {
+    // Combine date and time strings (e.g., "2025-04-20" and "17:30")
+    const combinedDateTimeStr = `${dateStr}T${timeStr || "00:00"}`;
+    const date = new Date(combinedDateTimeStr);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return `${dateStr} ${timeStr || ""}`;
+    }
+    
+    // Format: ddd Do MMM YYYY HH:mm:ss (e.g., "Sun 20th Apr 2025 17:30:00")
+    return format(date, "EEE do MMM yyyy HH:mm:ss", { locale: enUS });
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return `${dateStr} ${timeStr || ""}`;
+  }
+};
+
 // Status badge component
 const StatusBadge = ({ status }: { status: string }) => {
   const statusStyles = {
@@ -622,8 +644,9 @@ export default function EventOrdersPage() {
                         <TableRow key={order.id}>
                           <TableCell>
                             <div>
-                              <div className="font-medium">{order.eventDate}</div>
-                              <div className="text-xs text-muted-foreground">{order.eventTime}</div>
+                              <div className="font-medium">
+                                {formatDateTime(order.eventDate, order.eventTime)}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>{order.venue}</TableCell>
@@ -643,7 +666,7 @@ export default function EventOrdersPage() {
                             <div>
                               <div className="font-medium">{order.bookedBy}</div>
                               <div className="text-xs text-muted-foreground">
-                                {order.bookingDate} at {order.bookingTime}
+                                {formatDateTime(order.bookingDate, order.bookingTime)}
                               </div>
                             </div>
                           </TableCell>
