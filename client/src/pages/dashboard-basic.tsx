@@ -5,7 +5,7 @@ import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockWidget } from "@/components/dashboard/stock-widget";
-import { useInventory } from "@/hooks/use-inventory";
+import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
 import { 
   Dialog,
   DialogContent,
@@ -198,12 +198,34 @@ export default function DashboardBasic() {
             <div className="p-5">
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                      <Package className="h-6 w-6 text-purple-600" />
+                  <div className="flex flex-col">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                        <Package className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div className="ml-2">
+                        <span className="text-sm font-medium text-gray-500">Stock</span>
+                      </div>
                     </div>
-                    <div className="ml-2">
-                      <span className="text-sm font-medium text-gray-500">Stock</span>
+                    <div className="ml-12 mt-1">
+                      {!selectedStoreId && inventory ? (
+                        <span className="text-lg font-semibold text-gray-900">{inventory.length} items</span>
+                      ) : selectedStoreId && inventory ? (
+                        <div>
+                          <span className="text-lg font-semibold text-gray-900">{inventory.length} items</span>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {inventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock').length > 0 ? (
+                              <span className="text-yellow-600">
+                                {inventory.filter(item => item.status === 'low_stock').length} low stock
+                              </span>
+                            ) : (
+                              <span className="text-green-600">Stock levels good</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-lg font-semibold text-gray-900">Loading...</span>
+                      )}
                     </div>
                   </div>
                   <select 
@@ -366,16 +388,38 @@ export default function DashboardBasic() {
                 </div>
               ) : inventory && inventory.length > 0 ? (
                 <div className="space-y-2">
-                  {inventory.map((item) => (
+                  {(inventory as InventoryWithBreakdown[]).map((item: InventoryWithBreakdown) => (
                     <div key={item.id} className="flex justify-between p-3 rounded-md bg-gray-50 border border-gray-100">
                       <div>
                         <div className="font-medium">{item.name}</div>
                         <div className="text-xs text-gray-500">
                           SKU: {item.sku} • Category: {item.category}
                         </div>
+                        {!selectedStoreId && item.storeBreakdown && (
+                          <div className="mt-1 text-xs text-gray-500">
+                            <details className="cursor-pointer">
+                              <summary className="text-chai-gold hover:underline">View breakdown</summary>
+                              <div className="mt-1 pl-3 border-l-2 border-gray-200">
+                                {item.storeBreakdown.map((store, idx) => (
+                                  <div key={idx} className="flex justify-between">
+                                    <span>{store.name}:</span>
+                                    <span className="font-medium">{store.quantity}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
-                        <div className="text-sm font-medium">{item.quantity}</div>
+                        <div className="text-sm font-medium">
+                          {item.quantity}
+                          {!selectedStoreId && item.storeBreakdown && (
+                            <span className="ml-1 text-xs text-gray-500">
+                              (Combined)
+                            </span>
+                          )}
+                        </div>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
                           {item.status.replace('_', ' ')}
                         </span>
