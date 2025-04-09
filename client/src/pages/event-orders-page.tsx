@@ -542,7 +542,26 @@ export default function EventOrdersPage() {
                       )}
                     />
 
-                    {/* Hidden fields */}
+                    {/* Order Creator Information */}
+                    <div className="bg-secondary/30 p-4 rounded-md mb-4">
+                      <h3 className="text-sm font-semibold mb-2">Order Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="creator-info">Created By</Label>
+                          <div id="creator-info" className="text-sm font-medium mt-1">
+                            {user?.name || "Unknown User"}
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="creation-time">Date & Time</Label>
+                          <div id="creation-time" className="text-sm font-medium mt-1">
+                            {format(new Date(), "PPP", { locale: enUS })} at {format(new Date(), "h:mm a")}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Hidden fields for form submission */}
                     <input type="hidden" {...form.register("bookingDate")} />
                     <input type="hidden" {...form.register("bookingTime")} />
                     <input type="hidden" {...form.register("bookedBy")} />
