@@ -233,7 +233,7 @@ export default function InventoryView() {
               </a>
               <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                 <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
-                Inventory
+                Stock Check
               </a>
               <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                 <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
@@ -276,7 +276,7 @@ export default function InventoryView() {
             </a>
             <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
               <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
-              Inventory
+              Stock Check
             </a>
             <a href="#" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
               <Coffee className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
@@ -292,13 +292,13 @@ export default function InventoryView() {
           <div className="py-6 px-4 sm:px-6 lg:px-8 mt-12 md:mt-0">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Inventory Management</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Stock Management</h1>
                 <p className="mt-1 text-sm text-gray-500">
                   Manage your Chaiiwala product inventory
                 </p>
               </div>
               <div className="mt-4 md:mt-0 flex flex-col items-end">
-                <div className="mb-2 bg-gray-100 px-3 py-1 rounded-md flex items-center">
+                <div className="bg-gray-100 px-3 py-1 rounded-md flex items-center">
                   <span className="text-sm font-medium mr-2">Logged in as:</span>
                   <span className="text-sm text-chai-gold font-semibold">{currentUser.name}</span>
                   <span className="mx-2 text-gray-400">|</span>
@@ -306,12 +306,6 @@ export default function InventoryView() {
                     {currentUser.role}
                   </span>
                 </div>
-                <Button 
-                  className="bg-chai-gold text-white hover:bg-yellow-600"
-                  onClick={() => toast({ title: "Coming soon", description: "Order functionality will be available in the next version" })}
-                >
-                  Order Inventory
-                </Button>
               </div>
             </div>
 
@@ -435,11 +429,11 @@ export default function InventoryView() {
               </div>
             </div>
 
-            {/* Inventory Table */}
+            {/* Stock Table */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableCaption>Inventory of Chaiiwala products as of {new Date().toLocaleDateString()}</TableCaption>
+                  <TableCaption>Stock of Chaiiwala products as of {new Date().toLocaleDateString()}</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[100px]">
