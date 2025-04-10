@@ -103,6 +103,7 @@ export class MemStorage implements IStorage {
   private jobLogs: Map<number, JobLog>;
   private eventOrders: Map<number, EventOrder>;
   private stockConfigs: Map<number, StockConfig>;
+  private permissions: Map<number, Permission>;
   
   private userId: number;
   private storeId: number;
@@ -115,6 +116,7 @@ export class MemStorage implements IStorage {
   private jobLogId: number;
   private eventOrderId: number;
   private stockConfigId: number;
+  private permissionId: number;
 
   constructor() {
     // Initialize session store
@@ -133,6 +135,8 @@ export class MemStorage implements IStorage {
     this.announcements = new Map();
     this.jobLogs = new Map();
     this.eventOrders = new Map();
+    this.stockConfigs = new Map();
+    this.permissions = new Map();
 
     // Initialize IDs
     this.userId = 1;

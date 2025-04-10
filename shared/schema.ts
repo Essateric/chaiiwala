@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, pgEnum, json, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, pgEnum, json, varchar, unique, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -162,11 +162,6 @@ export const permissions = pgTable("permissions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   description: text("description"),
-}, (table) => {
-  return {
-    nameUnique: unique("permissions_name_unique").on(table.name),
-    idPrimary: primaryKey(table.id)
-  }
 });
 
 // Session table (used by connect-pg-simple)
