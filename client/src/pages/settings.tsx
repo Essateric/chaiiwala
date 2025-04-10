@@ -172,7 +172,7 @@ export default function SettingsPage() {
   
   return (
     <DashboardLayout title="Settings">
-      <div className="container mx-auto py-6">
+      <div className="container max-w-7xl mx-auto py-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Settings</h1>
           <p className="text-gray-500">Configure system settings and preferences</p>
@@ -264,11 +264,11 @@ export default function SettingsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Item Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-center">Low Stock Threshold</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="w-1/6">Item Code</TableHead>
+                        <TableHead className="w-2/6">Name</TableHead>
+                        <TableHead className="w-1/6">Category</TableHead>
+                        <TableHead className="w-1/6 text-center">Low Stock Threshold</TableHead>
+                        <TableHead className="w-1/6 text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
