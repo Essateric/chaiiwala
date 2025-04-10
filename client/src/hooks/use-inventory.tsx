@@ -69,11 +69,14 @@ export function useInventory(storeId?: number) {
           const baseItem = { ...group[0] };
           
           // Create store breakdown info
-          const storeBreakdown = group.map(item => ({
-            storeId: item.storeId,
-            name: stores.find(s => s.id === item.storeId)?.name || `Store ${item.storeId}`,
-            quantity: item.quantity
-          }));
+          const storeBreakdown = group.map(item => {
+            const store = stores.find(s => s.id === item.storeId);
+            return {
+              storeId: item.storeId,
+              name: store ? store.name : `Store ${item.storeId}`,
+              quantity: item.quantity
+            };
+          });
           
           // Add combined suffix if multiple stores have this item
           if (group.length > 1) {
