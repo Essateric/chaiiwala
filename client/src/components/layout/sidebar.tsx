@@ -87,13 +87,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ['admin', 'regional', 'store', 'staff'] 
     },
     { 
-      name: 'Tasks', 
-      icon: ClipboardListIcon, 
-      href: '/tasks', 
-      active: currentPage === 'tasks',
-      roles: ['admin', 'regional', 'store', 'staff'] 
-    },
-    { 
       name: 'Announcements', 
       icon: BellIcon, 
       href: '/announcements', 

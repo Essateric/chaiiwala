@@ -26,7 +26,8 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; }[]>;
+  getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]>;
+  getStaffByStore(storeId: number): Promise<{ id: number; name: string; role: string; }[]>;
 
   // Store methods
   getAllStores(): Promise<Store[]>;
