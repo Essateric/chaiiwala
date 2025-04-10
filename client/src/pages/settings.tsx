@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { User as SelectUser, Permission as SelectPermission } from "@shared/schema";
+import { User as SelectUser, Permission as SelectPermission, Store as SelectStore } from "@shared/schema";
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,6 +73,12 @@ export default function SettingsPage() {
     name: "",
     lowStockThreshold: 5,
     category: "Food"
+  });
+  
+  // Fetch all stores for the store dropdown
+  const { data: allStores = [] } = useQuery<SelectStore[]>({
+    queryKey: ['/api/stores'],
+    queryFn: getQueryFn(),
   });
   
   // Function to generate item code based on category and name
@@ -491,15 +497,16 @@ export default function SettingsPage() {
                             </div>
                             <div>
                               <Label htmlFor="store-select">Assign to Store</Label>
-                              <Select defaultValue="store-1">
+                              <Select defaultValue="">
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select store" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="store-1">Stockport Road</SelectItem>
-                                  <SelectItem value="store-2">Wilmslow Road</SelectItem>
-                                  <SelectItem value="store-3">Deansgate</SelectItem>
-                                  <SelectItem value="store-4">Oxford Road</SelectItem>
+                                  {allStores.map((store) => (
+                                    <SelectItem key={store.id} value={String(store.id)}>
+                                      {store.name}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
