@@ -1376,6 +1376,32 @@ export class MemStorage implements IStorage {
     eventOrderData.forEach(eventOrder => {
       this.createEventOrder(eventOrder);
     });
+
+    // Seed permissions
+    const permissionsData: InsertPermission[] = [
+      { name: "all_access", description: "Grants access to all system features", accessLevel: "Admin Access" },
+      { name: "view_all_stores", description: "Allows viewing data from all store locations", accessLevel: "Senior Manager Access" },
+      { name: "manage_store", description: "Allows managing a specific store", accessLevel: "Shop Limited Access" },
+      { name: "inventory_management", description: "Allows creating and updating inventory items", accessLevel: "Senior Manager Access" },
+      { name: "staff_scheduling", description: "Allows creating and managing staff schedules", accessLevel: "Shop Limited Access" },
+      { name: "reporting", description: "Access to reporting and analytics features", accessLevel: "Senior Manager Access" },
+      { name: "task_management", description: "Ability to create and assign tasks", accessLevel: "Senior Manager Access" },
+      { name: "view_inventory", description: "View-only access to inventory data", accessLevel: "Shop Limited Access" },
+      { name: "manage_job_logs", description: "Create and update maintenance job logs", accessLevel: "Shop Limited Access" },
+      { name: "order_management", description: "Create and manage orders", accessLevel: "Shop Limited Access" },
+      { name: "admin_panel", description: "Access to administrative settings", accessLevel: "Admin Access" },
+      { name: "user_management", description: "Ability to create and manage user accounts", accessLevel: "Admin Access" },
+      { name: "announcement_create", description: "Create company-wide announcements", accessLevel: "Senior Manager Access" },
+      { name: "checklist_management", description: "Create and manage checklists", accessLevel: "Shop Limited Access" },
+      { name: "event_booking", description: "Create and manage event bookings", accessLevel: "Shop Limited Access" },
+      { name: "deep_cleaning", description: "Access to deep cleaning management", accessLevel: "Shop Limited Access" },
+      { name: "stock_config", description: "Configure stock thresholds and parameters", accessLevel: "Senior Manager Access" },
+      { name: "view_reports", description: "View operational reports", accessLevel: "Shop Limited Access" }
+    ];
+
+    permissionsData.forEach(permission => {
+      this.createPermission(permission);
+    });
   }
 }
 
