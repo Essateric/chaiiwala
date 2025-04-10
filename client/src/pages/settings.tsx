@@ -78,7 +78,7 @@ export default function SettingsPage() {
   // Fetch all stores for the store dropdown
   const { data: allStores = [] } = useQuery<SelectStore[]>({
     queryKey: ['/api/stores'],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
   
   // Function to generate item code based on category and name
@@ -502,7 +502,7 @@ export default function SettingsPage() {
                                   <SelectValue placeholder="Select store" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {allStores.map((store) => (
+                                  {allStores.map((store: SelectStore) => (
                                     <SelectItem key={store.id} value={String(store.id)}>
                                       {store.name}
                                     </SelectItem>
