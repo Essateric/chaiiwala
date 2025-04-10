@@ -29,7 +29,11 @@ import {
   StoreIcon,
   BuildingIcon,
   ShoppingBagIcon,
-  MoreVerticalIcon
+  MoreVerticalIcon,
+  X as XIcon,
+  Check as CheckIcon,
+  CalendarIcon,
+  UserIcon
 } from "lucide-react";
 
 export default function StockOrdersPage() {
@@ -59,6 +63,12 @@ export default function StockOrdersPage() {
   const [openLocalDialog, setOpenLocalDialog] = useState(false);
   const [openFreshwaysDialog, setOpenFreshwaysDialog] = useState(false);
   const [openAmazonDialog, setOpenAmazonDialog] = useState(false);
+  
+  // State for order receipt dialog
+  const [openReceiptDialog, setOpenReceiptDialog] = useState(false);
+  const [receiptDate, setReceiptDate] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
+  const [receiptLocation, setReceiptLocation] = useState('');
   
   return (
     <DashboardLayout title="Stock Orders">
@@ -552,9 +562,37 @@ export default function StockOrdersPage() {
                           <Badge>Awaiting Confirmation</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
-                            <MoreVerticalIcon className="h-4 w-4" />
-                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVerticalIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56" align="end">
+                              <div className="grid gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  className="flex items-center justify-start px-2 h-9 gap-2 text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (confirm("Are you sure you want to cancel this order?")) {
+                                      alert("Order cancelled successfully");
+                                    }
+                                  }}
+                                >
+                                  <XIcon className="h-4 w-4" />
+                                  <span>Cancel Order</span>
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  className="flex items-center justify-start px-2 h-9 gap-2 text-green-600 hover:text-green-600"
+                                  onClick={() => setOpenReceiptDialog(true)}
+                                >
+                                  <CheckIcon className="h-4 w-4" />
+                                  <span>Order Received</span>
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
                       </TableRow>
                     </TableBody>
