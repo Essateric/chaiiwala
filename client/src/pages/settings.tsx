@@ -14,7 +14,16 @@ import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package } from 'lucide
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 // Mock stock configuration data
-const initialStockConfig = [
+// Type declaration for stock items
+interface StockConfigItem {
+  id: number;
+  itemCode: string;
+  name: string;
+  lowStockThreshold: number;
+  category: string;
+}
+
+const initialStockConfig: StockConfigItem[] = [
   { 
     id: 1, 
     itemCode: "BP401", 
@@ -55,14 +64,25 @@ const initialStockConfig = [
 export default function SettingsPage() {
   const [stockConfig, setStockConfig] = useState(initialStockConfig);
   const [activeTab, setActiveTab] = useState("general");
-  const [editItem, setEditItem] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<StockConfigItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({
-    itemCode: "",
     name: "",
     lowStockThreshold: 5,
     category: "Food"
   });
+  
+  // Function to generate item code based on category and name
+  const generateItemCode = (category: string, name: string) => {
+    const prefix = category === 'Food' ? 'BP' : 
+                  category === 'Drinks' ? 'DP' : 
+                  category === 'Packaging' ? 'FPFC' : 'IT';
+                  
+    // Generate a random 3-digit number
+    const suffix = Math.floor(100 + Math.random() * 900).toString();
+    
+    return `${prefix}${suffix}`;
+  };
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
   const { toast } = useToast();
@@ -74,7 +94,7 @@ export default function SettingsPage() {
   });
   
   // Handle edit item
-  const handleEditItem = (item: any) => {
+  const handleEditItem = (item: StockConfigItem) => {
     setEditItem(item);
     setDialogOpen(true);
   };
@@ -102,19 +122,23 @@ export default function SettingsPage() {
   // Handle add new item
   const handleAddItem = () => {
     // Validate input
-    if (!newItem.itemCode || !newItem.name) {
+    if (!newItem.name) {
       toast({
         title: "Validation Error",
-        description: "Item code and name are required.",
+        description: "Product name is required.",
         variant: "destructive"
       });
       return;
     }
     
+    // Generate item code based on category and name
+    const itemCode = generateItemCode(newItem.category, newItem.name);
+    
     // Create new item with a unique ID
     const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
     const itemToAdd = {
       ...newItem,
+      itemCode,
       id: newId
     };
     
@@ -123,7 +147,6 @@ export default function SettingsPage() {
     
     // Reset form and close dialog
     setNewItem({
-      itemCode: "",
       name: "",
       lowStockThreshold: 5,
       category: "Food"
@@ -440,13 +463,15 @@ export default function SettingsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right" htmlFor="new-item-code">Item Code</Label>
-              <Input 
-                id="new-item-code"
-                value={newItem.itemCode} 
-                className="col-span-3"
-                onChange={(e) => setNewItem({...newItem, itemCode: e.target.value})}
-                placeholder="e.g. BP401"
-              />
+              <div className="col-span-3 flex items-center">
+                <Input 
+                  id="new-item-code"
+                  value={generateItemCode(newItem.category, newItem.name)}
+                  className="text-gray-500"
+                  readOnly
+                />
+                <div className="ml-2 text-xs text-gray-500">Auto-generated</div>
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
