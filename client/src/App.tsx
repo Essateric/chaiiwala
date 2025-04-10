@@ -127,7 +127,7 @@ function App() {
         </ProtectedComponent>
       </Route>
       <Route path="/schedule">
-        <ProtectedComponent roles={["admin", "regional", "store"]}>
+        <ProtectedComponent roles={["admin", "regional", "store", "staff"]}>
           <SchedulePage />
         </ProtectedComponent>
       </Route>

@@ -100,7 +100,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: BellIcon, 
       href: '/announcements', 
       active: currentPage === 'announcements',
-      roles: ['admin', 'regional', 'store', 'staff'] 
+      roles: ['admin', 'regional', 'store'] 
     },
 
     { 
