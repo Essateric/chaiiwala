@@ -200,3 +200,5 @@ export type InsertManagerDetails = z.infer<typeof insertManagerDetailsSchema>;
 
 export type EventOrder = typeof eventOrders.$inferSelect;
 export type InsertEventOrder = z.infer<typeof insertEventOrderSchema>;
+
+export type Session = typeof session.$inferSelect;
