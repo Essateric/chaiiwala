@@ -217,7 +217,7 @@ export default function StockOrdersPage() {
                       const accountNumber = formData.get('account-number');
                       const deliveryDate = formData.get('delivery-date');
                       
-                      // Send order to webhook
+                      // Send order to webhook with hardcoded store information
                       fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
                         method: 'POST',
                         headers: {
@@ -228,7 +228,9 @@ export default function StockOrdersPage() {
                           deliveryDate,
                           items: selectedItems,
                           orderType: 'Freshways',
-                          store: formData.get('store-name'),
+                          store: 'Chaiiwala Stockport Road',
+                          storeAddress: '165 Stockport Road, Manchester M12 4WH, United Kingdom',
+                          storePhone: '+44-161-273-7890',
                           notes: formData.get('notes')
                         }),
                       })
@@ -247,17 +249,20 @@ export default function StockOrdersPage() {
                     }}
                   >
                     <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="store-name" className="text-right">
+                      <div className="grid grid-cols-4 items-start gap-4">
+                        <Label htmlFor="store-info" className="text-right pt-2">
                           Store
                         </Label>
-                        <Input
-                          id="store-name"
-                          name="store-name"
-                          placeholder="Your store name"
-                          className="col-span-3"
-                          required
-                        />
+                        <div className="col-span-3 border rounded-md p-3 bg-muted/50">
+                          <input type="hidden" name="store-name" value="Chaiiwala Stockport Road" />
+                          <div className="space-y-1">
+                            <p className="font-medium">Chaiiwala Stockport Road</p>
+                            <p className="text-sm text-muted-foreground">165 Stockport Road</p>
+                            <p className="text-sm text-muted-foreground">Manchester M12 4WH</p>
+                            <p className="text-sm text-muted-foreground">United Kingdom</p>
+                            <p className="text-sm text-muted-foreground">Tel: +44-161-273-7890</p>
+                          </div>
+                        </div>
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="account-number" className="text-right">
