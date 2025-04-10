@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { 
   HomeIcon, 
@@ -26,13 +27,13 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, navigate] = useLocation();
   const { user, logoutMutation } = useAuth();
+  const { canAccess } = usePermissions();
 
   if (!user) return null;
 
   const currentPage = location === "/" ? "dashboard" : location.substring(1);
 
-  // Navigation items with role-based access
-  // Force console log to debug items and roles
+  // Console log to debug permissions and current page
   console.log("Current user role:", user.role);
   console.log("Current page:", currentPage);
   
@@ -42,7 +43,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: HomeIcon, 
       href: '/', 
       active: currentPage === 'dashboard',
-      roles: ['admin', 'regional', 'store', 'staff'] 
+      feature: 'dashboard'
     },
     // New items placed immediately after dashboard
     {
@@ -50,72 +51,70 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: WrenchIcon,
       href: '/maintenance',
       active: currentPage === 'maintenance',
-      roles: ['admin', 'regional', 'store']
+      feature: 'maintenance'
     },
     {
       name: 'Event Orders',
       icon: CalendarDaysIcon,
       href: '/event-orders',
       active: currentPage === 'event-orders',
-      roles: ['admin', 'regional', 'store']
+      feature: 'event_orders'
     },
     {
       name: 'Stock Orders',
       icon: PackageIcon,
       href: '/stock-orders',
       active: currentPage === 'stock-orders',
-      roles: ['admin', 'regional', 'store']
+      feature: 'stock_orders'
     },
     { 
       name: 'Stock Management', 
       icon: ArchiveIcon, 
       href: '/stock-management', 
       active: currentPage === 'stock-management',
-      roles: ['admin', 'regional'] 
+      feature: 'stock_management'
     },
     { 
       name: 'Deep Cleaning', 
       icon: ClipboardCheckIcon, 
       href: '/deep-cleaning', 
       active: currentPage === 'deep-cleaning',
-      roles: ['admin', 'regional', 'store'] 
+      feature: 'deep_cleaning'
     },
     { 
       name: 'Staff Schedule', 
       icon: CalendarIcon, 
       href: '/schedule', 
       active: currentPage === 'schedule',
-      roles: ['admin', 'regional', 'store', 'staff'] 
+      feature: 'staff_schedule'
     },
-
     { 
       name: 'Tasks', 
       icon: ClipboardListIcon, 
       href: '/tasks', 
       active: currentPage === 'tasks',
-      roles: ['admin', 'regional', 'store', 'staff'] 
+      feature: 'tasks'
     },
     { 
       name: 'Announcements', 
       icon: BellIcon, 
       href: '/announcements', 
       active: currentPage === 'announcements',
-      roles: ['admin', 'regional', 'store'] 
+      feature: 'announcements'
     },
-
     { 
       name: 'User Management', 
       icon: UsersIcon, 
       href: '/users', 
       active: currentPage === 'users',
-      roles: ['admin'] 
+      feature: 'user_management'
     },
     { 
       name: 'Settings', 
       icon: SettingsIcon, 
       href: '/settings', 
       active: currentPage === 'settings',
-      roles: ['admin', 'regional', 'store'] 
+      feature: 'settings'
     }
   ];
 
@@ -170,18 +169,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Navigation - with scrollable area */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
         {navItems.map((item, index) => {
-          // Special handling for Stock Orders - restrict to admin, regional, and only 7 store managers with specific IDs
-          if (item.name === 'Stock Orders') {
-            const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations
-            const canAccessStockOrders = 
-              user.role === 'admin' || 
-              user.role === 'regional' || 
-              (user.role === 'store' && user.storeId && allowedStoreIds.includes(user.storeId));
-            
-            if (!canAccessStockOrders) return null;
-          } 
-          // For all other items, use the standard role check
-          else if (!item.roles.includes(user.role)) {
+          // Check if user can access this feature using the permission hook
+          if (!canAccess(item.feature)) {
             return null;
           }
           
