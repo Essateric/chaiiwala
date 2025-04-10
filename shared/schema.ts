@@ -126,6 +126,17 @@ export const managerDetails = pgTable("manager_details", {
   lastLoginDate: text("last_login_date").notNull(),
 });
 
+// Stock Configuration Table
+export const stockConfig = pgTable("stock_config", {
+  id: serial("id").primaryKey(),
+  itemCode: text("item_code").notNull().unique(), // Unique code for the item
+  name: text("name").notNull(), // Item name
+  category: text("category").notNull(), // Category (Food, Drinks, Packaging, Other)
+  lowStockThreshold: integer("low_stock_threshold").notNull(), // Threshold for low stock alert
+  createdAt: timestamp("created_at").notNull().defaultNow(), // When the item was added
+  updatedAt: timestamp("updated_at").notNull().defaultNow(), // When the item was last updated
+});
+
 // Event Orders Table
 export const eventOrders = pgTable("event_orders", {
   id: serial("id").primaryKey(),
@@ -166,6 +177,7 @@ export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
 export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
+export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -200,5 +212,8 @@ export type InsertManagerDetails = z.infer<typeof insertManagerDetailsSchema>;
 
 export type EventOrder = typeof eventOrders.$inferSelect;
 export type InsertEventOrder = z.infer<typeof insertEventOrderSchema>;
+
+export type StockConfig = typeof stockConfig.$inferSelect;
+export type InsertStockConfig = z.infer<typeof insertStockConfigSchema>;
 
 export type Session = typeof session.$inferSelect;
