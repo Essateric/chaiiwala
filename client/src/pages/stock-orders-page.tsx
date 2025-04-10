@@ -18,6 +18,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   ShoppingCartIcon, 
   TruckIcon, 
@@ -25,7 +28,8 @@ import {
   CoffeeIcon, 
   StoreIcon,
   BuildingIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  MoreVerticalIcon
 } from "lucide-react";
 
 export default function StockOrdersPage() {
@@ -442,12 +446,87 @@ export default function StockOrdersPage() {
                 <TabsTrigger value="received">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="p-4">
-                <Alert>
-                  <ShoppingCartIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No pending stock orders. Orders that have been placed but not yet shipped will appear here.
-                  </AlertDescription>
-                </Alert>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order Date</TableHead>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Items</TableHead>
+                        <TableHead>Expected Delivery</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>Apr 10, 2025</TableCell>
+                        <TableCell className="font-medium">FW-2504-001</TableCell>
+                        <TableCell>Freshways</TableCell>
+                        <TableCell>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">View Items</Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="grid gap-2">
+                                <div className="rounded-md bg-muted p-2">
+                                  <ul className="text-sm list-disc list-inside space-y-1">
+                                    <li>Milk (Pack of 6)</li>
+                                    <li>Bread (Item)</li>
+                                    <li>Eggs</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell>Apr 12, 2025</TableCell>
+                        <TableCell>
+                          <Badge>Awaiting Confirmation</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon">
+                            <MoreVerticalIcon className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Apr 8, 2025</TableCell>
+                        <TableCell className="font-medium">FW-2504-002</TableCell>
+                        <TableCell>Freshways</TableCell>
+                        <TableCell>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">View Items</Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="grid gap-2">
+                                <div className="rounded-md bg-muted p-2">
+                                  <ul className="text-sm list-disc list-inside space-y-1">
+                                    <li>Yoghurt (Tub)</li>
+                                    <li>Oat Milk (Carton)</li>
+                                    <li>Buns (Pack of 6)</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell>Apr 11, 2025</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-amber-100 text-amber-800 hover:bg-amber-100">Processing</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon">
+                            <MoreVerticalIcon className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </TabsContent>
               <TabsContent value="inTransit" className="p-4">
                 <Alert>
