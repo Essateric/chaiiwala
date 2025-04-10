@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from '@tanstack/react-query';
-import { getQueryFn } from "@/lib/queryClient";
-import { User as SelectUser } from "@shared/schema";
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { User as SelectUser, Permission as SelectPermission } from "@shared/schema";
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package } from 'lucide-react';
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Mock stock configuration data
 // Type declaration for stock items
@@ -180,6 +183,12 @@ export default function SettingsPage() {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="stock">Stock Configuration</TabsTrigger>
             <TabsTrigger value="users">User Preferences</TabsTrigger>
+            {user?.role === 'admin' && (
+              <TabsTrigger value="permissions">
+                <Shield className="mr-2 h-4 w-4" />
+                Permissions
+              </TabsTrigger>
+            )}
           </TabsList>
           
           {/* General Settings Tab */}
@@ -368,6 +377,216 @@ export default function SettingsPage() {
               </CardFooter>
             </Card>
           </TabsContent>
+
+          {/* Permissions Tab */}
+          {user?.role === 'admin' && (
+            <TabsContent value="permissions">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Shield className="mr-2 h-5 w-5" />
+                    Permissions Management
+                  </CardTitle>
+                  <CardDescription>
+                    Configure user roles and feature access
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium">System Access Levels</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Define which user roles can access specific features
+                      </p>
+                      
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[250px]">Feature</TableHead>
+                              <TableHead className="text-center">Admin</TableHead>
+                              <TableHead className="text-center">Regional Manager</TableHead>
+                              <TableHead className="text-center">Store Manager</TableHead>
+                              <TableHead className="text-center">Staff</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {[
+                              { id: 'dashboard', name: 'Dashboard', description: 'View main dashboard' },
+                              { id: 'inventory', name: 'Inventory Management', description: 'Access and modify inventory' },
+                              { id: 'stock_check', name: 'Stock Check', description: 'Access stock check page' },
+                              { id: 'stock', name: 'Stock Tab', description: 'Access stock configuration tab' },
+                              { id: 'event_orders', name: 'Event Orders', description: 'Manage event orders' },
+                              { id: 'deep_cleaning', name: 'Deep Cleaning', description: 'Access deep cleaning management' },
+                              { id: 'announcements', name: 'Announcements', description: 'Create and view announcements' },
+                              { id: 'reports', name: 'Reports', description: 'Generate and view reports' },
+                              { id: 'user_management', name: 'User Management', description: 'Manage user accounts' }
+                            ].map((feature) => (
+                              <TableRow key={feature.id}>
+                                <TableCell className="font-medium">
+                                  <div>
+                                    {feature.name}
+                                    <p className="text-xs text-muted-foreground">{feature.description}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox 
+                                    id={`admin-${feature.id}`} 
+                                    defaultChecked={true} 
+                                    disabled
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox 
+                                    id={`regional-${feature.id}`} 
+                                    defaultChecked={['dashboard', 'inventory', 'stock_check', 'stock', 'event_orders', 'deep_cleaning', 'announcements', 'reports'].includes(feature.id)}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox 
+                                    id={`store-${feature.id}`} 
+                                    defaultChecked={['dashboard', 'inventory', 'event_orders', 'deep_cleaning', 'announcements'].includes(feature.id)}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox 
+                                    id={`staff-${feature.id}`} 
+                                    defaultChecked={['dashboard'].includes(feature.id)} 
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium">Store-Specific Permissions</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Configure access to specific store locations
+                      </p>
+                      
+                      <div className="border rounded-lg p-4">
+                        <div className="mb-4 flex items-center space-x-2">
+                          <UserCog className="h-5 w-5" />
+                          <span className="font-medium">Assign Store Access to Managers</span>
+                        </div>
+                        
+                        <div className="grid gap-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="user-select">Select User</Label>
+                              <Select defaultValue="user-1">
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select user" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="user-1">Jubayed Alam (Store Manager)</SelectItem>
+                                  <SelectItem value="user-2">Imran Khan (Store Manager)</SelectItem>
+                                  <SelectItem value="user-3">Zahra Ahmed (Store Manager)</SelectItem>
+                                  <SelectItem value="user-4">Usman Ali (Regional Manager)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="store-select">Assign to Store</Label>
+                              <Select defaultValue="store-1">
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select store" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="store-1">Stockport Road</SelectItem>
+                                  <SelectItem value="store-2">Wilmslow Road</SelectItem>
+                                  <SelectItem value="store-3">Deansgate</SelectItem>
+                                  <SelectItem value="store-4">Oxford Road</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          
+                          <Button className="w-full bg-chai-gold hover:bg-amber-600">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Assign Store Access
+                          </Button>
+                        </div>
+                        
+                        <div className="mt-6">
+                          <h4 className="text-sm font-medium mb-2">Current Store Assignments</h4>
+                          <div className="border rounded-md overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>User</TableHead>
+                                  <TableHead>Role</TableHead>
+                                  <TableHead>Assigned Store</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell>Jubayed Alam</TableCell>
+                                  <TableCell>Store Manager</TableCell>
+                                  <TableCell>Stockport Road</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="outline" size="sm">
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Imran Khan</TableCell>
+                                  <TableCell>Store Manager</TableCell>
+                                  <TableCell>Wilmslow Road</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="outline" size="sm">
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Zahra Ahmed</TableCell>
+                                  <TableCell>Store Manager</TableCell>
+                                  <TableCell>Deansgate</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="outline" size="sm">
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Usman Ali</TableCell>
+                                  <TableCell>Regional Manager</TableCell>
+                                  <TableCell>All Stores</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="outline" size="sm" disabled>
+                                      <Lock className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Note: Regional managers have access to all stores by default.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline">
+                    Reset to Defaults
+                  </Button>
+                  <Button className="bg-chai-gold hover:bg-amber-600">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Permission Changes
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
       
