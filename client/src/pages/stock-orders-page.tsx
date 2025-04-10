@@ -799,11 +799,15 @@ export default function StockOrdersPage() {
                     onChange={(e) => setReceiptLocation(e.target.value)}
                     required
                   >
-                    {storeLocations.map((store) => (
-                      <option key={store.id} value={store.name}>
-                        {store.name}
-                      </option>
-                    ))}
+                    {storeLocations && storeLocations.length > 0 ? (
+                      storeLocations.map((store) => (
+                        <option key={store.id} value={store.name}>
+                          {store.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value={receiptLocation}>{receiptLocation}</option>
+                    )}
                   </select>
                 ) : (
                   <Input
