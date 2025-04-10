@@ -157,6 +157,18 @@ export const eventOrders = pgTable("event_orders", {
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the event was created
 });
 
+// Permissions Table
+export const permissions = pgTable("permissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+}, (table) => {
+  return {
+    nameUnique: unique("permissions_name_unique").on(table.name),
+    idPrimary: primaryKey(table.id)
+  }
+});
+
 // Session table (used by connect-pg-simple)
 // This must match the table structure expected by connect-pg-simple
 export const session = pgTable("session", {
@@ -178,6 +190,7 @@ export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, c
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -215,5 +228,8 @@ export type InsertEventOrder = z.infer<typeof insertEventOrderSchema>;
 
 export type StockConfig = typeof stockConfig.$inferSelect;
 export type InsertStockConfig = z.infer<typeof insertStockConfigSchema>;
+
+export type Permission = typeof permissions.$inferSelect;
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
 
 export type Session = typeof session.$inferSelect;

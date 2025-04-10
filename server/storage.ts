@@ -79,6 +79,14 @@ export interface IStorage {
   getEventOrder(id: number): Promise<EventOrder | undefined>;
   createEventOrder(eventOrder: InsertEventOrder): Promise<EventOrder>;
   updateEventOrder(id: number, data: Partial<EventOrder>): Promise<EventOrder | undefined>;
+  
+  // Permissions methods
+  getAllPermissions(): Promise<Permission[]>;
+  getPermissionsByRole(role: string): Promise<Permission[]>;
+  getPermission(id: number): Promise<Permission | undefined>;
+  createPermission(permission: InsertPermission): Promise<Permission>;
+  updatePermission(id: number, data: Partial<Permission>): Promise<Permission | undefined>;
+  deletePermission(id: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -94,6 +102,7 @@ export class MemStorage implements IStorage {
   private announcements: Map<number, Announcement>;
   private jobLogs: Map<number, JobLog>;
   private eventOrders: Map<number, EventOrder>;
+  private stockConfigs: Map<number, StockConfig>;
   
   private userId: number;
   private storeId: number;
@@ -105,6 +114,7 @@ export class MemStorage implements IStorage {
   private announcementId: number;
   private jobLogId: number;
   private eventOrderId: number;
+  private stockConfigId: number;
 
   constructor() {
     // Initialize session store
