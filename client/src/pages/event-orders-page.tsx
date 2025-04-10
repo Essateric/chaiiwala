@@ -564,7 +564,7 @@ export default function EventOrdersPage() {
                         )}
                       />
 
-                      {/* Status */}
+                      {/* Status - New orders always start as pending */}
                       <FormField
                         control={form.control}
                         name="status"
@@ -573,7 +573,8 @@ export default function EventOrdersPage() {
                             <FormLabel>Status*</FormLabel>
                             <Select
                               onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              defaultValue="pending"
+                              disabled
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -582,11 +583,9 @@ export default function EventOrdersPage() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="confirmed">Confirmed</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
                               </SelectContent>
                             </Select>
+                            <FormDescription>New orders always start as Pending</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -726,16 +725,26 @@ export default function EventOrdersPage() {
                               <Select
                                 value={order.status}
                                 onValueChange={(value) => handleStatusChange(order.id, value)}
-                                disabled={isUpdating}
+                                disabled={isUpdating || order.status === "completed" || order.status === "cancelled"}
                               >
                                 <SelectTrigger className="w-[130px]">
                                   <SelectValue placeholder="Change Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                  {order.status === "pending" && (
+                                    <>
+                                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    </>
+                                  )}
+                                  {order.status === "confirmed" && (
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                  )}
+                                  {(order.status === "completed" || order.status === "cancelled") && (
+                                    <SelectItem value={order.status} disabled>
+                                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)} (Final)
+                                    </SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                             )}
