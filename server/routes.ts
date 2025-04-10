@@ -17,11 +17,13 @@ import {
   insertAnnouncementSchema,
   insertJobLogSchema,
   insertEventOrderSchema,
+  insertPermissionSchema,
   taskStatusEnum,
   priorityEnum,
   inventoryStatusEnum,
   jobFlagEnum,
-  eventStatusEnum
+  eventStatusEnum,
+  accessLevelEnum
 } from "@shared/schema";
 
 // Helper middleware to check if user is authenticated
@@ -448,6 +450,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to update event order" });
+    }
+  });
+
+  // Permissions
+  app.get("/api/permissions", isAuthenticated, async (req, res) => {
+    const permissions = await storage.getAllPermissions();
+    res.json(permissions);
+  });
+
+  app.get("/api/permissions/role/:role", isAuthenticated, async (req, res) => {
+    const role = req.params.role;
+    const permissions = await storage.getPermissionsByRole(role);
+    res.json(permissions);
+  });
+
+  app.get("/api/permissions/:id", isAuthenticated, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const permission = await storage.getPermission(id);
+    if (permission) {
+      res.json(permission);
+    } else {
+      res.status(404).json({ message: "Permission not found" });
+    }
+  });
+
+  app.post("/api/permissions", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const permissionData = insertPermissionSchema.parse(req.body);
+      const permission = await storage.createPermission(permissionData);
+      res.status(201).json(permission);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create permission" });
+      }
+    }
+  });
+
+  app.patch("/api/permissions/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedPermission = await storage.updatePermission(id, req.body);
+      if (updatedPermission) {
+        res.json(updatedPermission);
+      } else {
+        res.status(404).json({ message: "Permission not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update permission" });
+    }
+  });
+
+  app.delete("/api/permissions/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePermission(id);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete permission" });
+    }
+  });
+
+  // Enhance the current user API to include related permissions
+  app.get("/api/user/permissions", isAuthenticated, async (req, res) => {
+    try {
+      // Get the current user's role
+      const userRole = req.user.role;
+      // Get all permissions for this role
+      const permissions = await storage.getPermissionsByRole(userRole);
+      // Return both the user and their permissions
+      res.json({
+        user: req.user,
+        permissions: permissions
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to retrieve user permissions" });
     }
   });
 

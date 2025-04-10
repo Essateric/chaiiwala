@@ -1,8 +1,37 @@
 import { useAuth } from "./use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
+import { Permission } from "@shared/schema";
+
+// Types for the permission system
+interface UserPermissions {
+  user: {
+    id: number;
+    username: string;
+    name: string;
+    role: 'admin' | 'regional' | 'store' | 'staff';
+    [key: string]: any;
+  };
+  permissions: Permission[];
+}
 
 // Permission utility hook for role-based access control
 export function usePermissions() {
   const { user } = useAuth();
+  
+  // Fetch user's permissions from API
+  const { 
+    data: permissionsData,
+    isLoading,
+    error
+  } = useQuery<UserPermissions>({
+    queryKey: ["/api/user/permissions"],
+    queryFn: getQueryFn(),
+    // Only fetch if user is authenticated
+    enabled: !!user,
+    // Keep the data fresh, but don't refetch too often
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   // Function to check if user has a specific permission
   const hasPermission = (permissionName: string): boolean => {
@@ -11,7 +40,12 @@ export function usePermissions() {
     // Admin role has all permissions
     if (user.role === 'admin') return true;
     
-    // Check permissions array if it exists
+    // Check permissions from the API
+    if (permissionsData?.permissions) {
+      return permissionsData.permissions.some(p => p.name === permissionName);
+    }
+    
+    // Fallback to user's permission array if API data isn't available
     if (user.permissions && Array.isArray(user.permissions)) {
       return user.permissions.includes(permissionName);
     }
@@ -66,14 +100,22 @@ export function usePermissions() {
       'event_orders': ['admin', 'regional', 'store'],
       'stock_orders': ['admin', 'regional'],
     };
-
+    
     // Special handling for stock orders
     if (feature === 'stock_orders' && user.role === 'store') {
       const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the allowed store locations 
       return user.storeId ? allowedStoreIds.includes(user.storeId) : false;
     }
     
-    // Check if user's role is in the allowed roles for this feature
+    // First check if there's a direct permission match from the API
+    if (permissionsData?.permissions) {
+      const matchingPermission = permissionsData.permissions.find(p => 
+        p.name === feature || p.name === `${feature}_access` || p.name === `all_access`
+      );
+      if (matchingPermission) return true;
+    }
+    
+    // Fallback to role-based check if no matching permission found
     const allowedRoles = featureAccess[feature] || [];
     return allowedRoles.includes(user.role);
   };
@@ -84,6 +126,9 @@ export function usePermissions() {
     isAssignedToStore,
     canAccess,
     isAuthenticated: !!user,
-    userRole: user?.role || null
+    userRole: user?.role || null,
+    isLoading,
+    error,
+    permissions: permissionsData?.permissions || []
   };
 }
