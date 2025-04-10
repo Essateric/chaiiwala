@@ -46,9 +46,9 @@
     [headers.values]
       Content-Security-Policy = "default-src 'self' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; connect-src 'self' *; img-src 'self' data: blob: *; frame-src *; style-src 'self' 'unsafe-inline' *"
 
-# Production secure CSP
+# Production CSP with 'unsafe-eval' allowed for JavaScript frameworks
 [context.production]
   [[headers]]
     for = "/*"
     [headers.values]
-      Content-Security-Policy = "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-src 'self'; style-src 'self';"
+      Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data: blob:; frame-src 'self'; style-src 'self' 'unsafe-inline';"

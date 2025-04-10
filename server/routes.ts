@@ -46,6 +46,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
+  // Auth test endpoint for debugging Netlify deployments
+  app.get("/api/auth-test", (req, res) => {
+    res.json({
+      isAuthenticated: req.isAuthenticated(),
+      user: req.user || null,
+      sessionID: req.sessionID,
+      cookies: req.headers.cookie,
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        isNetlify: !!process.env.NETLIFY
+      }
+    });
+  });
+
   // Redirect root to auth page for easier access
   app.get("/", (req, res) => {
     if (!req.isAuthenticated()) {
