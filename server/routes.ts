@@ -516,10 +516,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhance the current user API to include related permissions
   app.get("/api/user/permissions", isAuthenticated, async (req, res) => {
     try {
+      // Make sure req.user exists before accessing its properties
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
       // Get the current user's role
       const userRole = req.user.role;
+      
       // Get all permissions for this role
       const permissions = await storage.getPermissionsByRole(userRole);
+      
       // Return both the user and their permissions
       res.json({
         user: req.user,

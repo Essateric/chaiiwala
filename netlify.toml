@@ -58,4 +58,4 @@
   [[headers]]
     for = "/*"
     [headers.values]
-      Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data: blob:; frame-src 'self'; style-src 'self' 'unsafe-inline';"
+      Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data: blob:; frame-src 'self'; style-src 'self' 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
