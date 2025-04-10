@@ -71,7 +71,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { 
       name: 'Stock Management', 
       icon: ArchiveIcon, 
-      href: '/inventory', 
+      href: '/stock-management', 
       active: currentPage === 'inventory',
       roles: ['admin', 'regional'] 
     },

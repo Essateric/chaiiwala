@@ -1,7 +1,7 @@
 import { Route, Switch } from "wouter";
 import AuthPageNew from "@/pages/auth-page-new";
 import DashboardBasic from "@/pages/dashboard-basic";
-import InventoryView from "@/pages/inventory-view";
+import StockManagementView from "@/pages/stock-management";
 import DeepCleaningPage from "@/pages/deep-cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
 import EventOrdersPage from "@/pages/event-orders-page";
@@ -95,9 +95,9 @@ function App() {
       <Route path="/auth">
         <AuthPageNew />
       </Route>
-      <Route path="/inventory">
+      <Route path="/stock-management">
         <ProtectedComponent roles={["admin", "regional"]}>
-          <InventoryView />
+          <StockManagementView />
         </ProtectedComponent>
       </Route>
       <Route path="/deep-cleaning">
