@@ -109,7 +109,8 @@ export const jobLogs = pgTable("job_logs", {
   storeId: integer("store_id").notNull(), // Store where the job is logged
   description: text("description").notNull(), // Description of the job
   completionDate: text("completion_date"), // Date by which the job should be completed
-  attachments: text("attachments").array(), // URLs or paths to any uploaded attachments
+  attachment: text("attachment"), // Legacy field - single attachment URL or path
+  attachments: text("attachments").array(), // URLs or paths to any uploaded attachments (new format)
   comments: text("comments"), // Additional comments
   flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
@@ -143,6 +144,14 @@ export const eventOrders = pgTable("event_orders", {
   status: eventStatusEnum("status").notNull().default('pending'), // Status of the event order
   notes: text("notes"), // Additional notes
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the event was created
+});
+
+// Session table (used by connect-pg-simple)
+// This must match the table structure expected by connect-pg-simple
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey().notNull(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
 });
 
 // Schema Validation
