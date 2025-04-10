@@ -6,9 +6,7 @@ import {
   ClipboardListIcon, 
   CalendarIcon, 
   ArchiveIcon, 
-  CheckSquareIcon, 
   BellIcon, 
-  ShoppingBagIcon, 
   UsersIcon, 
   SettingsIcon, 
   XIcon,
@@ -89,13 +87,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       active: currentPage === 'schedule',
       roles: ['admin', 'regional', 'store', 'staff'] 
     },
-    { 
-      name: 'Checklists', 
-      icon: CheckSquareIcon, 
-      href: '/checklists', 
-      active: currentPage === 'checklists',
-      roles: ['admin', 'regional', 'store', 'staff'] 
-    },
+
     { 
       name: 'Tasks', 
       icon: ClipboardListIcon, 
@@ -110,13 +102,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       active: currentPage === 'announcements',
       roles: ['admin', 'regional', 'store', 'staff'] 
     },
-    { 
-      name: 'Stores', 
-      icon: ShoppingBagIcon, 
-      href: '/stores', 
-      active: currentPage === 'stores',
-      roles: ['admin', 'regional'] 
-    },
+
     { 
       name: 'User Management', 
       icon: UsersIcon, 
