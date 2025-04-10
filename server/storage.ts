@@ -8,7 +8,8 @@ import {
   Schedule, InsertSchedule,
   Announcement, InsertAnnouncement,
   JobLog, InsertJobLog,
-  EventOrder, InsertEventOrder
+  EventOrder, InsertEventOrder,
+  StockConfig, InsertStockConfig
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -65,6 +66,12 @@ export interface IStorage {
   getJobLog(id: number): Promise<JobLog | undefined>;
   createJobLog(jobLog: InsertJobLog): Promise<JobLog>;
   updateJobLog(id: number, data: Partial<JobLog>): Promise<JobLog | undefined>;
+  
+  // Stock Configuration methods
+  getAllStockConfig(): Promise<StockConfig[]>;
+  getStockConfigByItemCode(itemCode: string): Promise<StockConfig | undefined>;
+  createStockConfig(stockConfig: InsertStockConfig): Promise<StockConfig>;
+  updateStockConfig(id: number, data: Partial<StockConfig>): Promise<StockConfig | undefined>;
   
   // Event Orders methods
   getAllEventOrders(): Promise<EventOrder[]>;
