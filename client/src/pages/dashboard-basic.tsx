@@ -331,48 +331,8 @@ export default function DashboardBasic() {
           </div>
         </div>
         
-        {/* Store Summary Stats - Compact Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 mb-6">
-          <div className="bg-white p-3 rounded-lg shadow flex items-center">
-            <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 mr-3">
-              <Store className="h-4 w-4 text-yellow-600" />
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Stores</div>
-              <div className="text-sm font-semibold">{stores.length}</div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-3 rounded-lg shadow flex items-center">
-            <div className="flex-shrink-0 bg-green-100 rounded-md p-2 mr-3">
-              <Sparkles className="h-4 w-4 text-green-600" />
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Weekly Sales</div>
-              <div className="text-sm font-semibold">£{(salesData.reduce((sum, item) => sum + item.sales, 0)/1000).toFixed(1)}k</div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-3 rounded-lg shadow flex items-center">
-            <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 mr-3">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Staff</div>
-              <div className="text-sm font-semibold">28</div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-3 rounded-lg shadow flex items-center">
-            <div className="flex-shrink-0 bg-purple-100 rounded-md p-2 mr-3">
-              <Package className="h-4 w-4 text-purple-600" />
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Inventory</div>
-              <div className="text-sm font-semibold">{inventory ? inventory.length : '...'} items</div>
-            </div>
-          </div>
-        </div>
+        {/* Additional bottom margin */}
+        <div className="mb-6"></div>
       </div>
       
       {/* Stock Dialog */}
