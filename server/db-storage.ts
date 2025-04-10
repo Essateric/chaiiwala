@@ -13,7 +13,7 @@ import {
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { db, pool } from "./db";
-import { eq, and, desc, gte, sql, asc, gt, not, isNull } from "drizzle-orm";
+import { eq, and, desc, gte, sql, asc, gt, not, isNull, or } from "drizzle-orm";
 import createMemoryStore from "memorystore";
 
 let PostgresSessionStore;
