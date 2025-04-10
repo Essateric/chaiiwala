@@ -26,7 +26,7 @@ export function usePermissions() {
     error
   } = useQuery<UserPermissions>({
     queryKey: ["/api/user/permissions"],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({ on401: "returnNull" }),
     // Only fetch if user is authenticated
     enabled: !!user,
     // Keep the data fresh, but don't refetch too often
