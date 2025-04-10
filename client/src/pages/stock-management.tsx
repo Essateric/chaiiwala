@@ -758,23 +758,23 @@ export default function StockManagementView() {
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="status" className="text-right text-sm font-medium col-span-1">
-                  Status:
-                </label>
-                <Select 
-                  defaultValue={editItem.status}
-                  onValueChange={(value) => setEditItem({...editItem, status: value})}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_stock">In Stock</SelectItem>
-                    <SelectItem value="low_stock">Low Stock</SelectItem>
-                    <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                    <SelectItem value="on_order">On Order</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="text-right text-sm font-medium col-span-1">Status:</div>
+                <div className="col-span-3">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    editItem.status === 'out_of_stock' 
+                      ? 'bg-red-100 text-red-800' 
+                      : editItem.status === 'low_stock' 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : editItem.status === 'on_order'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-green-100 text-green-800'
+                  }`}>
+                    {getStatusText(editItem.status)}
+                  </span>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Status is automatically updated based on stock quantity and configured thresholds
+                  </div>
+                </div>
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
