@@ -162,6 +162,7 @@ export const permissions = pgTable("permissions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   description: text("description"),
+  accessLevel: accessLevelEnum("access_level").notNull().default('Shop Limited Access'),
 });
 
 // Session table (used by connect-pg-simple)
