@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useStores } from "@/hooks/use-stores";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -79,14 +80,8 @@ export default function StockOrdersPage() {
     return 'Chaiiwala Stockport Road';
   });
   
-  // Add state for store locations to be used in dropdown
-  const [storeLocations, setStoreLocations] = useState<{id: number, name: string}[]>([
-    { id: 1, name: 'Chaiiwala Stockport Road' },
-    { id: 2, name: 'Chaiiwala Wilmslow Road' },
-    { id: 3, name: 'Chaiiwala Deansgate' },
-    { id: 4, name: 'Chaiiwala Manchester Airport' },
-    { id: 5, name: 'Chaiiwala Leeds' }
-  ]);
+  // Get real store locations from the database
+  const { stores: storeLocations } = useStores();
   
   // State for Freshways order form with dynamic total calculation
   const [selectedItems, setSelectedItems] = useState<{[key: string]: boolean}>({
