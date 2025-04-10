@@ -5,8 +5,10 @@ import {
   CardContent, 
   CardDescription, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter 
 } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
@@ -36,6 +38,9 @@ const registerSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
   role: z.enum(["admin", "regional", "store", "staff"]).default("staff"),
 });
 
@@ -123,6 +128,9 @@ export default function AuthPage() {
       name: "",
       username: "",
       password: "",
+      firstName: "",
+      lastName: "",
+      email: "",
       role: "staff"
     }
   });
@@ -263,6 +271,56 @@ export default function AuthPage() {
                     />
                     <FormField
                       control={registerForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your first name" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your last name" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your email address" 
+                              type="email"
+                              {...field} 
+                              autoComplete="email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
                       name="role"
                       render={({ field }) => (
                         <FormItem>
@@ -295,6 +353,65 @@ export default function AuthPage() {
               </TabsContent>
             </Tabs>
           </CardContent>
+          
+          {/* Debug Section for Netlify */}
+          {window.location.hostname.includes('netlify.app') && (
+            <CardFooter className="flex flex-col items-start border-t pt-4 mt-4">
+              <div className="flex items-center space-x-2 text-amber-600 mb-2">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Netlify Deployment Debug</span>
+              </div>
+              <div className="text-xs text-gray-500 space-y-1 w-full">
+                <p>Hostname: {window.location.hostname}</p>
+                <p>Path: {window.location.pathname}</p>
+                <p>API URLs will be rewritten to use Netlify functions</p>
+                <div className="mt-2 flex flex-col gap-1">
+                  <a 
+                    href="/.netlify/functions/api/auth-test" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Test Authentication Status
+                  </a>
+                  <button
+                    onClick={() => {
+                      // Direct login attempt using fetch
+                      fetch('/.netlify/functions/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: 'usman', password: 'password123' }),
+                        credentials: 'include'
+                      })
+                      .then(res => {
+                        if (!res.ok) return res.text().then(text => { throw new Error(text) });
+                        return res.json();
+                      })
+                      .then(data => {
+                        console.log('Direct login success:', data);
+                        toast({
+                          title: "Direct login successful",
+                          description: "Login successful using direct Netlify function path",
+                        });
+                        window.location.href = '/';
+                      })
+                      .catch(err => {
+                        console.error('Direct login failed:', err);
+                        toast({
+                          title: "Direct login failed",
+                          description: err.toString(),
+                          variant: "destructive",
+                        });
+                      });
+                    }}
+                    className="text-blue-600 hover:underline text-left"
+                  >
+                    Try Direct Login (usman/password123)
+                  </button>
+                </div>
+              </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
 
