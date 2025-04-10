@@ -23,11 +23,32 @@
   to = "/index.html"
   status = 200
 
-# Add security headers including CSP with 'unsafe-eval' to allow JavaScript eval functionality
+# Common secure headers for ALL builds
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+# Development (deploy-preview and branch-deploy) relaxed CSP
+[context.deploy-preview]
+  [[headers]]
+    for = "/*"
+    [headers.values]
+      Content-Security-Policy = "default-src 'self' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; connect-src 'self' *; img-src 'self' data: blob: *; frame-src *; style-src 'self' 'unsafe-inline' *"
+
+[context.branch-deploy]
+  [[headers]]
+    for = "/*"
+    [headers.values]
+      Content-Security-Policy = "default-src 'self' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; connect-src 'self' *; img-src 'self' data: blob: *; frame-src *; style-src 'self' 'unsafe-inline' *"
+
+# Production secure CSP
+[context.production]
+  [[headers]]
+    for = "/*"
+    [headers.values]
+      Content-Security-Policy = "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-src 'self'; style-src 'self';"
