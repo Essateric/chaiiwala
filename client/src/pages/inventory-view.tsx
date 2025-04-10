@@ -87,7 +87,7 @@ const inventoryData = [
   { itemCode: "FPG359", secondaryCode: "FPG359", product: "Chaiiwala Honey", price: 17.99, stock: 7, category: "Food", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
 ];
 
-export default function InventoryView() {
+export default function StockManagementView() {
   const [search, setSearch] = useState('');
   const [filteredData, setFilteredData] = useState(inventoryData);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -294,17 +294,13 @@ export default function InventoryView() {
               <div>
                 <h1 className="text-2xl font-semibold text-gray-900">Stock Management</h1>
                 <p className="mt-1 text-sm text-gray-500">
-                  Manage your Chaiiwala product inventory
+                  Manage your Chaiiwala product stock
                 </p>
               </div>
               <div className="mt-4 md:mt-0 flex flex-col items-end">
                 <div className="bg-gray-100 px-3 py-1 rounded-md flex items-center">
                   <span className="text-sm font-medium mr-2">Logged in as:</span>
                   <span className="text-sm text-chai-gold font-semibold">{currentUser.name}</span>
-                  <span className="mx-2 text-gray-400">|</span>
-                  <span className="text-xs bg-chai-gold text-white px-2 py-0.5 rounded-full capitalize">
-                    {currentUser.role}
-                  </span>
                 </div>
               </div>
             </div>
@@ -316,7 +312,7 @@ export default function InventoryView() {
                 <div className="flex items-center">
                   <Store className="h-5 w-5 text-chai-gold mr-2" />
                   <span className="font-medium text-gray-800">
-                    Viewing inventory for: <span className="text-chai-gold font-semibold">{currentStoreName}</span>
+                    Viewing stock for: <span className="text-chai-gold font-semibold">{currentStoreName}</span>
                   </span>
                 </div>
               </div>
@@ -331,7 +327,7 @@ export default function InventoryView() {
                 <CardContent>
                   <div className="text-2xl font-bold">{inventoryData.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    items in inventory
+                    items in stock
                   </p>
                 </CardContent>
               </Card>
