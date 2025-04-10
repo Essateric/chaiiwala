@@ -183,8 +183,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Navigation - with scrollable area */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {navItems.map((item, index) => (
-          item.roles.includes(user.role) && (
+        {navItems.map((item, index) => {
+          // Special handling for Stock Orders - restrict to admin, regional, and only 7 store managers with specific IDs
+          if (item.name === 'Stock Orders') {
+            const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations
+            const canAccessStockOrders = 
+              user.role === 'admin' || 
+              user.role === 'regional' || 
+              (user.role === 'store' && user.storeId && allowedStoreIds.includes(user.storeId));
+            
+            if (!canAccessStockOrders) return null;
+          } 
+          // For all other items, use the standard role check
+          else if (!item.roles.includes(user.role)) {
+            return null;
+          }
+          
+          return (
             <a
               key={index}
               href={item.href}
@@ -203,8 +218,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <item.icon className="mr-3 h-5 w-5" />
               <span>{item.name}</span>
             </a>
-          )
-        ))}
+          );
+        })}
       </nav>
 
       {/* Logout Button */}

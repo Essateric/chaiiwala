@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,6 +29,27 @@ import {
 } from "lucide-react";
 
 export default function StockOrdersPage() {
+  // Fetch user data for access control
+  const { user } = useAuth();
+  const [_, navigate] = useLocation();
+  
+  // Access control check
+  useEffect(() => {
+    if (!user) return;
+    
+    const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations
+    const canAccessStockOrders = 
+      user.role === 'admin' || 
+      user.role === 'regional' || 
+      (user.role === 'store' && user.storeId && allowedStoreIds.includes(user.storeId));
+    
+    if (!canAccessStockOrders) {
+      // Redirect unauthorized users to dashboard
+      console.log("Unauthorized access to Stock Orders page, redirecting to dashboard");
+      navigate("/");
+    }
+  }, [user, navigate]);
+  
   // State variables for dialog visibility
   const [openChaiiwalaDialog, setOpenChaiiwalaDialog] = useState(false);
   const [openLocalDialog, setOpenLocalDialog] = useState(false);
