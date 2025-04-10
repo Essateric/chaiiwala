@@ -1,206 +1,136 @@
-import { useState } from "react";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import CalendarView from "@/components/schedule/calendar-view";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-
-// Types for schedule data
-interface ShiftData {
-  id: string;
-  staffId: number;
-  staffName: string;
-  role: string;
-  start: string;
-  end: string;
-  day: number; // 0-6 (Sunday-Saturday)
-}
-
-interface StaffMember {
-  id: number;
-  name: string;
-  role: string;
-  color: string;
-}
+import { useQuery } from '@tanstack/react-query';
+import { getQueryFn } from "@/lib/queryClient";
+import { User as SelectUser } from "@shared/schema";
+import DashboardLayout from "@/components/layout/dashboard-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CalendarIcon, UsersIcon } from 'lucide-react';
 
 export default function SchedulePage() {
-  const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
-  const [newShiftData, setNewShiftData] = useState({
-    staffId: 0,
-    day: 0,
-    start: "09:00",
-    end: "17:00"
-  });
   const { toast } = useToast();
-
-  // Fetch shifts and staff data
-  const { data: shifts = [] } = useQuery<ShiftData[]>({
-    queryKey: ["/api/schedule/shifts"],
+  
+  // Fetch user data directly
+  const { data: user } = useQuery<SelectUser | undefined, Error>({
+    queryKey: ["/api/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: staff = [] } = useQuery<StaffMember[]>({
-    queryKey: ["/api/staff"],
-  });
-
-  // Add shift mutation
-  const addShiftMutation = useMutation({
-    mutationFn: async (shiftData: Omit<ShiftData, "id" | "staffName" | "role">) => {
-      const res = await apiRequest("POST", "/api/schedule/shifts", shiftData);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedule/shifts"] });
-      setShowAddShiftDialog(false);
-      toast({
-        title: "Shift Added",
-        description: "New shift has been added to the schedule.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: `Failed to add shift: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Remove shift mutation
-  const removeShiftMutation = useMutation({
-    mutationFn: async (shiftId: string) => {
-      await apiRequest("DELETE", `/api/schedule/shifts/${shiftId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedule/shifts"] });
-      toast({
-        title: "Shift Removed",
-        description: "Shift has been removed from the schedule.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: `Failed to remove shift: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handleAddShift = (staffId: number, day: number) => {
-    setNewShiftData({
-      ...newShiftData,
-      staffId,
-      day
-    });
-    setShowAddShiftDialog(true);
-  };
-
-  const submitNewShift = () => {
-    const { staffId, day, start, end } = newShiftData;
-    if (staffId && start && end) {
-      addShiftMutation.mutate({
-        staffId,
-        day,
-        start,
-        end
-      });
-    }
-  };
-
-  const handleRemoveShift = (shiftId: string) => {
-    removeShiftMutation.mutate(shiftId);
-  };
+  // Sample schedule data (would be fetched from API in real implementation)
+  const scheduleData = [
+    { day: 'Monday', staff: [
+      { name: 'John Doe', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Jane Smith', role: 'Barista', shift: '10:00 AM - 6:00 PM' },
+    ]},
+    { day: 'Tuesday', staff: [
+      { name: 'Alice Johnson', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Bob Brown', role: 'Barista', shift: '2:00 PM - 10:00 PM' },
+    ]},
+    { day: 'Wednesday', staff: [
+      { name: 'John Doe', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Charlie Davis', role: 'Barista', shift: '10:00 AM - 6:00 PM' },
+    ]},
+    { day: 'Thursday', staff: [
+      { name: 'Alice Johnson', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Jane Smith', role: 'Barista', shift: '2:00 PM - 10:00 PM' },
+    ]},
+    { day: 'Friday', staff: [
+      { name: 'John Doe', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Bob Brown', role: 'Barista', shift: '10:00 AM - 6:00 PM' },
+      { name: 'Charlie Davis', role: 'Barista', shift: '2:00 PM - 10:00 PM' },
+    ]},
+    { day: 'Saturday', staff: [
+      { name: 'Alice Johnson', role: 'Manager', shift: '9:00 AM - 5:00 PM' },
+      { name: 'Jane Smith', role: 'Barista', shift: '10:00 AM - 6:00 PM' },
+      { name: 'Bob Brown', role: 'Barista', shift: '2:00 PM - 10:00 PM' },
+    ]},
+    { day: 'Sunday', staff: [
+      { name: 'Charlie Davis', role: 'Manager', shift: '10:00 AM - 6:00 PM' },
+      { name: 'John Doe', role: 'Barista', shift: '11:00 AM - 7:00 PM' },
+    ]}
+  ];
 
   return (
     <DashboardLayout title="Staff Schedule">
-      <div className="mb-6">
-        <h2 className="text-2xl font-montserrat font-bold mb-1">Staff Scheduling</h2>
-        <p className="text-gray-600">Manage staff shifts and schedules across all locations</p>
-      </div>
-      
-      {/* Calendar View */}
-      <CalendarView 
-        shifts={shifts}
-        staff={staff}
-        onAddShift={handleAddShift}
-        onRemoveShift={handleRemoveShift}
-      />
-      
-      {/* Add Shift Dialog */}
-      <Dialog open={showAddShiftDialog} onOpenChange={setShowAddShiftDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Shift</DialogTitle>
-            <DialogDescription>
-              Enter the details for the new shift.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time</Label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={newShiftData.start}
-                  onChange={(e) => setNewShiftData({...newShiftData, start: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-time">End Time</Label>
-                <Input
-                  id="end-time"
-                  type="time"
-                  value={newShiftData.end}
-                  onChange={(e) => setNewShiftData({...newShiftData, end: e.target.value})}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-select">Staff Member</Label>
-              <Select 
-                value={newShiftData.staffId.toString()} 
-                onValueChange={(value) => setNewShiftData({...newShiftData, staffId: parseInt(value)})}
-              >
-                <SelectTrigger id="staff-select">
-                  <SelectValue placeholder="Select a staff member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {staff.map((member) => (
-                    <SelectItem key={member.id} value={member.id.toString()}>
-                      {member.name} ({member.role})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <div className="py-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <p className="text-xs sm:text-sm text-white">
+              Manage staff schedules and shift assignments
+            </p>
+          </div>
+          <div className="mt-2 md:mt-0 flex items-center">
+            <span className="text-xs sm:text-sm text-white">Welcome, {user?.name || 'User'}</span>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-2 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Staff Scheduled</CardTitle>
+              <UsersIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">7</div>
+              <p className="text-xs text-muted-foreground">
+                employees on rotation
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Schedule Period</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Weekly</div>
+              <p className="text-xs text-muted-foreground">
+                updated every Sunday
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Schedule Display */}
+        <div className="bg-white shadow rounded-lg overflow-hidden mb-8">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold mb-4">Weekly Staff Schedule</h2>
+            <p className="text-sm text-gray-500 mb-6">Click on a shift to manage details or request changes</p>
+            
+            <div className="space-y-6">
+              {scheduleData.map((day, index) => (
+                <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                  <h3 className="font-medium text-lg mb-2">{day.day}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {day.staff.map((person, staffIndex) => (
+                      <div 
+                        key={staffIndex} 
+                        className="bg-gray-50 p-4 rounded-md border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => toast({ title: "Schedule Feature Coming Soon", description: "Shift management will be available in the next update." })}
+                      >
+                        <div className="font-medium">{person.name}</div>
+                        <div className="text-sm text-gray-500">{person.role}</div>
+                        <div className="mt-2 text-chai-gold font-semibold">{person.shift}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddShiftDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              className="bg-chai-gold hover:bg-yellow-600" 
-              onClick={submitNewShift}
-              disabled={addShiftMutation.isPending}
-            >
-              {addShiftMutation.isPending ? "Adding..." : "Add Shift"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        <div className="flex justify-end">
+          <button 
+            className="px-4 py-2 bg-chai-gold text-white rounded-md hover:bg-opacity-90 transition-colors"
+            onClick={() => toast({ title: "Schedule Feature Coming Soon", description: "Full schedule management will be available in the next update." })}
+          >
+            Update Schedule
+          </button>
+        </div>
+      </div>
     </DashboardLayout>
   );
 }
