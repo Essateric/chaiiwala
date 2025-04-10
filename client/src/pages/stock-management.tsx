@@ -109,7 +109,9 @@ export default function StockManagementView() {
   const [sort, setSort] = useState({ field: '', direction: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState('all');
-
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
   const { toast } = useToast();
   
   // Fetch real authenticated user data
@@ -629,7 +631,7 @@ export default function StockManagementView() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => toast({ title: "Coming soon", description: "Edit functionality will be available in the next version" })}
+                              onClick={() => handleEditItem(item)}
                             >
                               Edit
                             </Button>
