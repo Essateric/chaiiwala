@@ -705,18 +705,58 @@ app.all('*', (req, res) => {
 });
 
 // Export the handler for Netlify Functions with improved error handling wrapper
-export const handler = (event, context) => {
+export const handler = async (event, context) => {
   // Log incoming requests in production for debugging authentication issues
-  if (process.env.NODE_ENV === 'production') {
-    console.log(`Netlify Function Request: ${event.httpMethod} ${event.path}`);
+  console.log(`Netlify Function Request: ${event.httpMethod} ${event.path}`);
+  
+  // Log headers without sensitive information for debugging CORS and cookies
+  const safeHeaders = { ...event.headers };
+  if (safeHeaders.cookie) safeHeaders.cookie = "REDACTED";
+  if (safeHeaders.authorization) safeHeaders.authorization = "REDACTED";
+  console.log('Request headers:', JSON.stringify(safeHeaders));
+  
+  // For improved debugging on Netlify
+  if (event.body) {
+    try {
+      // Only log non-sensitive information from the body
+      const bodyData = JSON.parse(event.body);
+      if (bodyData) {
+        const safeBody = { ...bodyData };
+        if (safeBody.password) safeBody.password = "REDACTED";
+        console.log('Request body (safe):', JSON.stringify(safeBody));
+      }
+    } catch (e) {
+      // If body is not JSON, don't log it
+      console.log('Request has non-JSON body');
+    }
+  }
+  
+  // Needed for proper path handling in Netlify Functions
+  // This handles the case where the request is coming to /.netlify/functions/api/login
+  // by modifying the path to be /api/login which Express can handle
+  if (event.path.startsWith('/.netlify/functions/api')) {
+    const originalPath = event.path;
+    event.path = event.path.replace('/.netlify/functions/api', '/api') || '/api';
+    console.log(`Rewriting path: ${originalPath} -> ${event.path}`);
     
-    // Log headers without sensitive information for debugging CORS and cookies
-    const safeHeaders = { ...event.headers };
-    if (safeHeaders.cookie) safeHeaders.cookie = "REDACTED";
-    if (safeHeaders.authorization) safeHeaders.authorization = "REDACTED";
-    console.log('Request headers:', JSON.stringify(safeHeaders));
+    // Also fix the rawPath if it exists (used in some Netlify environments)
+    if (event.rawPath) {
+      event.rawPath = event.rawPath.replace('/.netlify/functions/api', '/api') || '/api';
+    }
   }
   
   // Return the serverless handler with proper error handling
-  return serverless(app)(event, context);
+  try {
+    return await serverless(app)(event, context);
+  } catch (error) {
+    console.error('Serverless handler error:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        status: 'error',
+        message: 'Internal server error in Netlify function',
+        error: process.env.NODE_ENV === 'production' ? 'Server error' : error.message
+      })
+    };
+  }
 };

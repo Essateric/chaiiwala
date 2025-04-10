@@ -18,7 +18,10 @@ function transformApiUrl(url: string): string {
   if (url.startsWith('/api/')) {
     if (isNetlify) {
       // For Netlify, we need to route all API requests to the serverless function
-      return `/.netlify/functions/api${url.substring('/api'.length)}`;
+      // The path rewrite in the function handler will convert back to /api/...
+      const transformedUrl = `/.netlify/functions/api${url.substring('/api'.length)}`;
+      console.log(`Transforming API URL: ${url} -> ${transformedUrl}`);
+      return transformedUrl;
     }
     return url;
   }
