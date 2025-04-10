@@ -62,8 +62,40 @@ export default function AuthPage() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      try {
+        // Standard API request using our apiRequest helper
+        const res = await apiRequest("POST", "/api/login", credentials);
+        return await res.json();
+      } catch (error) {
+        // If we're failing with a 404 on Netlify, this could be the path rewriting issue
+        const isNetlify = window.location.hostname.includes('netlify.app');
+        if (isNetlify && 
+            error instanceof Error && 
+            error.message.includes('404')) {
+          
+          console.log('Auth error on Netlify, attempting with direct function path...');
+          
+          // Try with direct function path as fallback for Netlify
+          // This is a special case just for the login endpoint
+          const directRes = await fetch('/.netlify/functions/api/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials),
+            credentials: 'include'
+          });
+          
+          if (!directRes.ok) {
+            const errorText = await directRes.text();
+            console.error('Netlify direct path login error:', errorText);
+            throw new Error(`${directRes.status}: ${errorText || directRes.statusText}`);
+          }
+          
+          return await directRes.json();
+        }
+        
+        // Re-throw the original error if it's not the Netlify 404 case
+        throw error;
+      }
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -74,6 +106,7 @@ export default function AuthPage() {
       navigate("/");
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
