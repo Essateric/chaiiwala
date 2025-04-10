@@ -619,6 +619,75 @@ export default function StockOrdersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Order Received Dialog */}
+      <Dialog open={openReceiptDialog} onOpenChange={setOpenReceiptDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark Order as Received</DialogTitle>
+            <DialogDescription>
+              Enter details about who received the order and when it was received.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              alert("Order marked as received successfully!");
+              setOpenReceiptDialog(false);
+            }}
+          >
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="received-by" className="text-right">
+                  Received By
+                </Label>
+                <Input
+                  id="received-by"
+                  placeholder="Staff member's name"
+                  className="col-span-3"
+                  value={receivedBy}
+                  onChange={(e) => setReceivedBy(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="received-date" className="text-right">
+                  Date
+                </Label>
+                <div className="col-span-3 flex">
+                  <Input
+                    id="received-date"
+                    type="date"
+                    className="flex-1"
+                    value={receiptDate}
+                    onChange={(e) => setReceiptDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="receipt-location" className="text-right">
+                  Location
+                </Label>
+                <Input
+                  id="receipt-location"
+                  placeholder="Where the order was received"
+                  className="col-span-3"
+                  value={receiptLocation}
+                  onChange={(e) => setReceiptLocation(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenReceiptDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Confirm Receipt</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
