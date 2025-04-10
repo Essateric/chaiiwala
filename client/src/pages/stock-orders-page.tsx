@@ -462,7 +462,7 @@ export default function StockOrdersPage() {
                     <TableBody>
                       <TableRow>
                         <TableCell>Apr 10, 2025</TableCell>
-                        <TableCell className="font-medium">FW-2504-001</TableCell>
+                        <TableCell className="font-medium">FW-SR-25041001</TableCell>
                         <TableCell>Freshways</TableCell>
                         <TableCell>
                           <Popover>
@@ -476,6 +476,9 @@ export default function StockOrdersPage() {
                                     <li>Milk (Pack of 6)</li>
                                     <li>Bread (Item)</li>
                                     <li>Eggs</li>
+                                    <li>Buns (Pack of 6)</li>
+                                    <li>Yoghurt (Tub)</li>
+                                    <li>Oat Milk (Carton)</li>
                                   </ul>
                                 </div>
                               </div>
@@ -485,38 +488,6 @@ export default function StockOrdersPage() {
                         <TableCell>Apr 12, 2025</TableCell>
                         <TableCell>
                           <Badge>Awaiting Confirmation</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
-                            <MoreVerticalIcon className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Apr 8, 2025</TableCell>
-                        <TableCell className="font-medium">FW-2504-002</TableCell>
-                        <TableCell>Freshways</TableCell>
-                        <TableCell>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm">View Items</Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                              <div className="grid gap-2">
-                                <div className="rounded-md bg-muted p-2">
-                                  <ul className="text-sm list-disc list-inside space-y-1">
-                                    <li>Yoghurt (Tub)</li>
-                                    <li>Oat Milk (Carton)</li>
-                                    <li>Buns (Pack of 6)</li>
-                                  </ul>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </TableCell>
-                        <TableCell>Apr 11, 2025</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-amber-100 text-amber-800 hover:bg-amber-100">Processing</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon">
