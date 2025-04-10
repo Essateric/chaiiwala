@@ -285,67 +285,71 @@ export default function DeepCleaningPage() {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Deep Cleaning Schedule</h1>
-        <p className="text-gray-600">
-          Plan and schedule deep cleaning tasks for your store.
-          Click on a date to add a new cleaning task.
-        </p>
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
-          <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => {
-            const today = new Date();
-            handleSelectSlot({ start: today });
-          }}>
-            <Plus className="mr-2 h-4 w-4" /> Add New Task
-          </Button>
-          
-          {/* Store Filter - Only visible for admin and regional managers */}
-          {(user?.role === 'admin' || user?.role === 'regional') && (
-            <div className="flex items-center">
-              <Select 
-                value={selectedStore} 
-                onValueChange={setSelectedStore}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter by Store" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stores</SelectItem>
-                  {mockLocations.map(store => (
-                    <SelectItem key={store.id} value={String(store.id)}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <>
+      <DashboardLayout title="Deep Cleaning Schedule">
+        <div className="container mx-auto p-4">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-white">Deep Cleaning Schedule</h1>
+            <p className="text-gray-400">
+              Plan and schedule deep cleaning tasks for your store.
+              Click on a date to add a new cleaning task.
+            </p>
+            
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
+              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => {
+                const today = new Date();
+                handleSelectSlot({ start: today });
+              }}>
+                <Plus className="mr-2 h-4 w-4" /> Add New Task
+              </Button>
+              
+              {/* Store Filter - Only visible for admin and regional managers */}
+              {(user?.role === 'admin' || user?.role === 'regional') && (
+                <div className="flex items-center">
+                  <Select 
+                    value={selectedStore} 
+                    onValueChange={setSelectedStore}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <Filter className="mr-2 h-4 w-4" />
+                      <SelectValue placeholder="Filter by Store" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Stores</SelectItem>
+                      {mockLocations.map(store => (
+                        <SelectItem key={store.id} value={String(store.id)}>
+                          {store.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div style={{ height: 600 }}>
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            titleAccessor={getEventTitle}
-            selectable
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleEventSelect}
-            defaultView="week"
-            views={['month', 'week', 'day']}
-            step={60}
-            showMultiDayTimes
-            className="rounded-md border"
-          />
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div style={{ height: 600 }}>
+              <Calendar
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                titleAccessor={getEventTitle}
+                selectable
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={handleEventSelect}
+                defaultView="week"
+                views={['month', 'week', 'day']}
+                step={60}
+                showMultiDayTimes
+                className="rounded-md border"
+              />
+            </div>
+          </div>
         </div>
-      </div>
-
+      </DashboardLayout>
+      
       {/* New Task Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -473,6 +477,6 @@ export default function DeepCleaningPage() {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
