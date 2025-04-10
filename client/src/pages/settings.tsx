@@ -173,10 +173,7 @@ export default function SettingsPage() {
   return (
     <DashboardLayout title="Settings">
       <div className="container max-w-7xl mx-auto py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-gray-500">Configure system settings and preferences</p>
-        </div>
+        {/* Removed heading as it's already in the page title */}
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4">
@@ -385,8 +382,8 @@ export default function SettingsPage() {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid gap-4 py-4 place-items-center">
+              <div className="grid grid-cols-4 items-center gap-4 w-full">
                 <Label className="text-right" htmlFor="item-code">Item Code</Label>
                 <Input 
                   id="item-code"
@@ -396,7 +393,7 @@ export default function SettingsPage() {
                 />
               </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-4 items-center gap-4 w-full">
                 <Label className="text-right" htmlFor="item-name">Name</Label>
                 <Input 
                   id="item-name"
@@ -406,7 +403,7 @@ export default function SettingsPage() {
                 />
               </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-4 items-center gap-4 w-full">
                 <Label className="text-right" htmlFor="item-category">Category</Label>
                 <select 
                   id="item-category"
@@ -421,7 +418,7 @@ export default function SettingsPage() {
                 </select>
               </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-4 items-center gap-4 w-full">
                 <Label className="text-right" htmlFor="threshold">Low Stock Threshold</Label>
                 <Input 
                   id="threshold"
@@ -433,7 +430,7 @@ export default function SettingsPage() {
                 />
               </div>
               
-              <div className="col-span-3 text-xs text-muted-foreground ml-auto">
+              <div className="col-span-3 text-xs text-muted-foreground ml-auto text-center w-full">
                 Items with stock level at or below this threshold will be marked as "Low Stock"
               </div>
             </div>
@@ -460,8 +457,8 @@ export default function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid gap-4 py-4 place-items-center">
+            <div className="grid grid-cols-4 items-center gap-4 w-full">
               <Label className="text-right" htmlFor="new-item-code">Item Code</Label>
               <div className="col-span-3 flex items-center">
                 <Input 
@@ -474,7 +471,7 @@ export default function SettingsPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-4 items-center gap-4 w-full">
               <Label className="text-right" htmlFor="new-item-name">Name</Label>
               <Input 
                 id="new-item-name"
@@ -485,7 +482,7 @@ export default function SettingsPage() {
               />
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-4 items-center gap-4 w-full">
               <Label className="text-right" htmlFor="new-item-category">Category</Label>
               <select 
                 id="new-item-category"
@@ -500,7 +497,7 @@ export default function SettingsPage() {
               </select>
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-4 items-center gap-4 w-full">
               <Label className="text-right" htmlFor="new-threshold">Low Stock Threshold</Label>
               <Input 
                 id="new-threshold"

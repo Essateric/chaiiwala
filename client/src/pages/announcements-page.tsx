@@ -137,7 +137,7 @@ export default function AnnouncementsPage() {
     <DashboardLayout title="Announcements">
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-montserrat font-bold mb-1">Announcements & Communications</h2>
+          <h2 className="text-2xl font-montserrat font-bold mb-1">Announcements and Communications</h2>
           <p className="text-gray-600">Important updates and communications for all team members</p>
         </div>
         {(user?.role === 'admin' || user?.role === 'regional' || user?.role === 'store') && (
@@ -179,12 +179,6 @@ export default function AnnouncementsPage() {
         {filteredAnnouncements.length === 0 ? (
           <div className="col-span-full p-8 bg-white rounded-lg shadow text-center">
             <p className="text-gray-500 mb-4">No announcements found</p>
-            {(user?.role === 'admin' || user?.role === 'regional' || user?.role === 'store') && (
-              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={handleAddAnnouncement}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create Your First Announcement
-              </Button>
-            )}
           </div>
         ) : (
           filteredAnnouncements.map(announcement => (
