@@ -8,24 +8,11 @@ export type InventoryWithBreakdown = Inventory & {
 };
 
 export function useInventory(storeId?: number) {
-  // Fetch inventory for the store
   // Fetch stores data
   const {
     data: stores = []
   } = useQuery<Store[]>({
-    queryKey: ['/api/stores'],
-    queryFn: async () => {
-      // Simulated stores data with proper typing
-      return [
-        { id: 1, name: 'Cheetham Hill', address: '74 Bury Old Rd, Manchester M8 5BW', area: 1, manager: 'MGR_CH' },
-        { id: 2, name: 'Oxford Road', address: '149 Oxford Rd, Manchester M1 7EE', area: 1, manager: 'MGR_OX' },
-        { id: 3, name: 'Old Trafford', address: 'Ayres Rd, Old Trafford, Stretford, 89 M16 7GS', area: 1, manager: 'MGR_OT' },
-        { id: 4, name: 'Trafford Centre', address: 'Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford', area: 2, manager: 'MGR_TC' },
-        { id: 5, name: 'Stockport', address: '884-886 Stockport Rd, Levenshulme, Manchester', area: 1, manager: 'MGR_SR' },
-        { id: 6, name: 'Rochdale', address: '35 Milkstone Rd, Rochdale OL11 1EB', area: 2, manager: 'MGR_RD' },
-        { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
-      ];
-    }
+    queryKey: ['/api/stores']
   });
 
   const {
@@ -35,19 +22,12 @@ export function useInventory(storeId?: number) {
   } = useQuery<InventoryWithBreakdown[]>({
     queryKey: ['/api/inventory', storeId],
     queryFn: async () => {
-      // Simulated inventory data with proper typing
-      const data: Inventory[] = [
-        { id: 1, name: 'Chai Masala', sku: 'CM001', category: 'Spices', storeId: 1, quantity: '45 boxes', status: 'in_stock', lastUpdated: new Date() },
-        { id: 2, name: 'Tea bags (Assam)', sku: 'TB002', category: 'Tea', storeId: 1, quantity: '12 boxes', status: 'low_stock', lastUpdated: new Date() },
-        { id: 3, name: 'Cardamom', sku: 'CD003', category: 'Spices', storeId: 1, quantity: '30 bags', status: 'in_stock', lastUpdated: new Date() },
-        { id: 4, name: 'Ginger powder', sku: 'GP004', category: 'Spices', storeId: 2, quantity: '0 bags', status: 'out_of_stock', lastUpdated: new Date() },
-        { id: 5, name: 'Milk powder', sku: 'MP005', category: 'Dairy', storeId: 2, quantity: '15 bags', status: 'in_stock', lastUpdated: new Date() },
-        { id: 6, name: 'Sugar', sku: 'SG006', category: 'Sweeteners', storeId: 3, quantity: '50 kg', status: 'in_stock', lastUpdated: new Date() },
-        { id: 7, name: 'Paper cups', sku: 'PC007', category: 'Packaging', storeId: 3, quantity: '10 packs', status: 'low_stock', lastUpdated: new Date() },
-        { id: 8, name: 'Samosa pastry', sku: 'SP008', category: 'Food', storeId: 4, quantity: '8 packs', status: 'low_stock', lastUpdated: new Date() },
-        { id: 9, name: 'Paper bags', sku: 'PB009', category: 'Packaging', storeId: 5, quantity: '100 pcs', status: 'in_stock', lastUpdated: new Date() },
-        { id: 10, name: 'Paneer', sku: 'PN010', category: 'Dairy', storeId: 6, quantity: '5 kg', status: 'on_order', lastUpdated: new Date() },
-      ];
+      // Fetch real inventory data from API
+      const response = await fetch('/api/inventory');
+      if (!response.ok) {
+        throw new Error('Failed to fetch inventory data');
+      }
+      const data: Inventory[] = await response.json();
       
       if (storeId) {
         return data.filter(item => item.storeId === storeId) as InventoryWithBreakdown[];
@@ -70,9 +50,11 @@ export function useInventory(storeId?: number) {
           
           // Create store breakdown info
           const storeBreakdown = group.map(item => {
+            // Find the store by ID in the stores array
             const store = stores.find(s => s.id === item.storeId);
             return {
               storeId: item.storeId,
+              // Use store name if found, otherwise use a generic name
               name: store ? store.name : `Store ${item.storeId}`,
               quantity: item.quantity
             };
@@ -102,15 +84,21 @@ export function useInventory(storeId?: number) {
   } = useQuery<Inventory[]>({
     queryKey: ['/api/inventory/low-stock', storeId],
     queryFn: async () => {
-      // Return items filtered by low stock status
-      const data: Inventory[] = [
-        { id: 2, name: 'Tea bags (Assam)', sku: 'TB002', category: 'Tea', storeId: 1, quantity: '12 boxes', status: 'low_stock', lastUpdated: new Date() },
-        { id: 7, name: 'Paper cups', sku: 'PC007', category: 'Packaging', storeId: 3, quantity: '10 packs', status: 'low_stock', lastUpdated: new Date() },
-        { id: 8, name: 'Samosa pastry', sku: 'SP008', category: 'Food', storeId: 4, quantity: '8 packs', status: 'low_stock', lastUpdated: new Date() },
-        { id: 4, name: 'Ginger powder', sku: 'GP004', category: 'Spices', storeId: 2, quantity: '0 bags', status: 'out_of_stock', lastUpdated: new Date() },
-      ];
+      // Get all inventory and filter for low/out of stock items
+      const response = await fetch('/api/inventory');
+      if (!response.ok) {
+        throw new Error('Failed to fetch inventory data');
+      }
+      const data: Inventory[] = await response.json();
       
-      return data.filter(item => !storeId || item.storeId === storeId);
+      // Filter for low stock and out of stock items
+      const lowStockData = data.filter(
+        item => item.status === 'low_stock' || item.status === 'out_of_stock'
+      );
+      
+      return storeId 
+        ? lowStockData.filter(item => item.storeId === storeId)
+        : lowStockData;
     }
   });
 
