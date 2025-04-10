@@ -208,14 +208,36 @@ export default function StockOrdersPage() {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
                       
-                      // Collect all checked items
-                      const selectedItems = [];
-                      if (formData.get('milk')) selectedItems.push('Milk (Pack of 6)');
-                      if (formData.get('bread')) selectedItems.push('Bread (Item)');
-                      if (formData.get('buns')) selectedItems.push('Buns (Pack of 6)');
-                      if (formData.get('yoghurt')) selectedItems.push('Yoghurt (Tub)');
-                      if (formData.get('eggs')) selectedItems.push('Eggs');
-                      if (formData.get('oatMilk')) selectedItems.push('Oat Milk (Carton)');
+                      // Define the item structure type
+                      type OrderItem = {
+                        name: string;
+                        price: number;
+                        priceFormatted: string;
+                      };
+                      
+                      // Collect all checked items with prices
+                      const selectedItems: OrderItem[] = [];
+                      const itemPrices = {
+                        'milk': { name: 'Milk (Pack of 6)', price: 5.49 },
+                        'bread': { name: 'Bread (Item)', price: 1.99 },
+                        'buns': { name: 'Buns (Pack of 6)', price: 2.49 },
+                        'yoghurt': { name: 'Yoghurt (Tub)', price: 3.29 },
+                        'eggs': { name: 'Eggs', price: 2.79 },
+                        'oatMilk': { name: 'Oat Milk (Carton)', price: 1.89 }
+                      };
+                      
+                      let totalPrice = 0;
+                      
+                      Object.entries(itemPrices).forEach(([key, item]) => {
+                        if (formData.get(key)) {
+                          selectedItems.push({
+                            name: item.name,
+                            price: item.price,
+                            priceFormatted: `£${item.price.toFixed(2)}`
+                          });
+                          totalPrice += item.price;
+                        }
+                      });
                       
                       // Format account number and delivery date
                       const accountNumber = formData.get('account-number');
@@ -235,7 +257,9 @@ export default function StockOrdersPage() {
                           store: 'Chaiiwala Stockport Road',
                           storeAddress: '165 Stockport Road, Manchester M12 4WH, United Kingdom',
                           storePhone: '+44-161-273-7890',
-                          notes: formData.get('notes')
+                          notes: formData.get('notes'),
+                          totalPrice: totalPrice,
+                          totalPriceFormatted: `£${totalPrice.toFixed(2)}`
                         }),
                       })
                         .then((response) => {
@@ -472,14 +496,38 @@ export default function StockOrdersPage() {
                             <PopoverContent className="w-80">
                               <div className="grid gap-2">
                                 <div className="rounded-md bg-muted p-2">
-                                  <ul className="text-sm list-disc list-inside space-y-1">
-                                    <li>Milk (Pack of 6)</li>
-                                    <li>Bread (Item)</li>
-                                    <li>Eggs</li>
-                                    <li>Buns (Pack of 6)</li>
-                                    <li>Yoghurt (Tub)</li>
-                                    <li>Oat Milk (Carton)</li>
-                                  </ul>
+                                  <table className="w-full text-sm">
+                                    <tbody>
+                                      <tr>
+                                        <td>Milk (Pack of 6)</td>
+                                        <td className="text-right">£5.49</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Bread (Item)</td>
+                                        <td className="text-right">£1.99</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Eggs</td>
+                                        <td className="text-right">£2.79</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Buns (Pack of 6)</td>
+                                        <td className="text-right">£2.49</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Yoghurt (Tub)</td>
+                                        <td className="text-right">£3.29</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Oat Milk (Carton)</td>
+                                        <td className="text-right">£1.89</td>
+                                      </tr>
+                                      <tr className="border-t mt-2">
+                                        <td className="pt-2 font-medium">Total</td>
+                                        <td className="pt-2 text-right font-medium">£17.94</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
                                 </div>
                               </div>
                             </PopoverContent>
