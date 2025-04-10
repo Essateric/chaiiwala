@@ -167,7 +167,7 @@ app.use(cookieParser());
 // Enhanced CORS configuration for Netlify deployment
 const corsOptions = {
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl requests, or same-origin)
     if (!origin) return callback(null, true);
     
     // List of allowed origins
@@ -181,21 +181,33 @@ const corsOptions = {
     
     // Allow localhost and netlify dev server in non-production
     if (process.env.NODE_ENV !== 'production') {
-      allowedOrigins.push('http://localhost:3000', 'http://localhost:5000', 'http://localhost:8888');
+      allowedOrigins.push(
+        'http://localhost:3000', 
+        'http://localhost:5000', 
+        'http://localhost:8888'
+      );
     }
     
-    // Check if the origin is allowed
-    if (allowedOrigins.includes(origin) || origin.endsWith('.netlify.app')) {
+    console.log('CORS request from origin:', origin);
+    
+    // Check if the origin is allowed - more permissive for Netlify subdomain
+    if (allowedOrigins.includes(origin) || 
+        origin.endsWith('.netlify.app') || 
+        /https?:\/\/[a-zA-Z0-9-]+--chaiiwala-dashboard\.netlify\.app/.test(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Temporarily allow all origins for testing
+      // More permissive CORS in development, but log it
+      console.log('Allowing non-whitelisted origin:', origin);
+      callback(null, true);
     }
   },
-  credentials: true,
+  credentials: true, // Critical for cookies/auth to work
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie'],
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
+  maxAge: 86400 // 24 hours - cache preflight request results
 };
 
 app.use(cors(corsOptions));
@@ -207,9 +219,11 @@ const sessionSettings = {
   saveUninitialized: false,
   store: storage.sessionStore,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Always use secure cookies in production environment (Netlify)
+    secure: process.env.NETLIFY === "true" || process.env.NODE_ENV === "production",
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax', // Important for cross-site cookies
+    // Use 'none' for Netlify deployment to enable cross-site cookies
+    sameSite: process.env.NETLIFY === "true" ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 };
@@ -217,8 +231,8 @@ const sessionSettings = {
 // Always set trust proxy for Netlify deployment
 app.set("trust proxy", 1);
 
-// Force secure cookies in production
-if (process.env.NODE_ENV === "production") {
+// Ensure secure cookies are set correctly for Netlify
+if (process.env.NETLIFY === "true" || process.env.NODE_ENV === "production") {
   sessionSettings.cookie.secure = true;
 }
 
@@ -303,35 +317,56 @@ app.post("/api/register", async (req, res, next) => {
 });
 
 app.post("/api/login", (req, res, next) => {
+  console.log("Login attempt for username:", req.body.username);
+  
+  // Validate request body
+  if (!req.body.username || !req.body.password) {
+    console.warn("Login attempt missing username or password");
+    return res.status(400).json({
+      message: "Username and password are required",
+      status: "error"
+    });
+  }
+  
   // Custom passport authenticate to provide better error messages
   passport.authenticate("local", (err, user, info) => {
     if (err) {
       console.error("Login error:", err);
       return res.status(500).json({ 
         message: "Internal server error during login",
-        status: "error"
+        status: "error",
+        details: process.env.NODE_ENV === 'production' ? null : err.message
       });
     }
     
     if (!user) {
+      console.warn(`Failed login attempt for user: ${req.body.username}`);
       return res.status(401).json({ 
         message: "Invalid username or password",
         status: "error"
       });
     }
     
+    console.log(`User ${user.username} authenticated successfully, establishing session...`);
+    
     req.login(user, (err) => {
       if (err) {
         console.error("Session error:", err);
         return res.status(500).json({ 
           message: "Failed to create session",
-          status: "error"
+          status: "error",
+          details: process.env.NODE_ENV === 'production' ? null : err.message
         });
       }
       
       // Remove password from response
       const userResponse = { ...user };
       delete userResponse.password;
+      
+      console.log(`Login successful for ${user.username}, session established`);
+      
+      // Set a custom header to confirm successful authentication
+      res.header('X-Auth-Confirmed', 'true');
       
       res.status(200).json({
         message: "Login successful",
@@ -375,6 +410,21 @@ app.post("/api/logout", (req, res, next) => {
 
 app.get("/api/user", (req, res) => {
   try {
+    console.log("User authentication check, isAuthenticated:", req.isAuthenticated());
+    
+    // Log session info for debugging (without sensitive data)
+    if (req.session) {
+      const sessionInfo = { 
+        id: req.session.id,
+        cookie: { ...req.session.cookie },
+        // Don't log passport data as it may contain sensitive info
+        hasPassport: !!req.session.passport
+      };
+      console.log("Session info:", JSON.stringify(sessionInfo));
+    } else {
+      console.warn("No session object found");
+    }
+    
     if (!req.isAuthenticated()) {
       return res.status(401).json({ 
         message: "Not authenticated",
@@ -382,9 +432,14 @@ app.get("/api/user", (req, res) => {
       });
     }
     
+    console.log(`User data requested for: ${req.user.username}`);
+    
     // Remove password from response
     const userResponse = { ...req.user };
     delete userResponse.password;
+    
+    // Add custom header for debugging
+    res.header('X-Auth-Status', 'authenticated');
     
     res.status(200).json({
       user: userResponse,
@@ -394,6 +449,7 @@ app.get("/api/user", (req, res) => {
     console.error("Auth check error:", error);
     res.status(500).json({
       message: "Error retrieving user data",
+      details: process.env.NODE_ENV === 'production' ? null : error.message,
       status: "error"
     });
   }
@@ -592,6 +648,51 @@ app.use((err, req, res, next) => {
     path: req.path,
     timestamp: new Date().toISOString()
   });
+});
+
+// Debug route to check authentication status and session details
+app.get("/api/auth-test", (req, res) => {
+  try {
+    // Don't require authentication for this route
+    const authStatus = {
+      isAuthenticated: req.isAuthenticated(),
+      timestamp: new Date().toISOString(),
+      hasSession: !!req.session,
+      hasPassport: !!(req.session && req.session.passport),
+      cookies: req.headers.cookie ? "Present" : "None",
+      // Safe environment info that doesn't expose sensitive data
+      env: {
+        isNetlify: !!process.env.NETLIFY,
+        isProduction: process.env.NODE_ENV === 'production',
+        host: req.get('host'),
+        origin: req.get('origin'),
+        referer: req.get('referer')
+      }
+    };
+    
+    // If authenticated, add safe user info
+    if (req.isAuthenticated() && req.user) {
+      authStatus.user = {
+        id: req.user.id,
+        username: req.user.username,
+        name: req.user.name,
+        role: req.user.role
+      };
+    }
+    
+    res.status(200).json({
+      status: "success",
+      message: "Authentication test",
+      data: authStatus
+    });
+  } catch (error) {
+    console.error("Auth test error:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Error during authentication test",
+      details: error.message
+    });
+  }
 });
 
 // Add a catch-all route for debugging purposes
