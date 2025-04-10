@@ -192,52 +192,180 @@ export default function StockOrdersPage() {
                     <span>Freshways Order</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>New Freshways Order</DialogTitle>
                     <DialogDescription>
                       Place an order for supplies from Freshways
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="account-number" className="text-right">
-                        Account #
-                      </Label>
-                      <Input
-                        id="account-number"
-                        placeholder="Your Freshways account number"
-                        className="col-span-3"
-                      />
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      
+                      // Collect all checked items
+                      const selectedItems = [];
+                      if (formData.get('milk')) selectedItems.push('Milk (Pack of 6)');
+                      if (formData.get('bread')) selectedItems.push('Bread (Item)');
+                      if (formData.get('buns')) selectedItems.push('Buns (Pack of 6)');
+                      if (formData.get('yoghurt')) selectedItems.push('Yoghurt (Tub)');
+                      if (formData.get('eggs')) selectedItems.push('Eggs');
+                      if (formData.get('oatMilk')) selectedItems.push('Oat Milk (Carton)');
+                      
+                      // Format account number and delivery date
+                      const accountNumber = formData.get('account-number');
+                      const deliveryDate = formData.get('delivery-date');
+                      
+                      // Send order to webhook
+                      fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          accountNumber,
+                          deliveryDate,
+                          items: selectedItems,
+                          orderType: 'Freshways',
+                          store: formData.get('store-name'),
+                          notes: formData.get('notes')
+                        }),
+                      })
+                        .then((response) => {
+                          if (response.ok) {
+                            alert('Freshways order submitted successfully!');
+                            setOpenFreshwaysDialog(false);
+                          } else {
+                            alert('Failed to submit order. Please try again.');
+                          }
+                        })
+                        .catch((error) => {
+                          console.error('Error submitting order:', error);
+                          alert('Error submitting order. Please try again.');
+                        });
+                    }}
+                  >
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="store-name" className="text-right">
+                          Store
+                        </Label>
+                        <Input
+                          id="store-name"
+                          name="store-name"
+                          placeholder="Your store name"
+                          className="col-span-3"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="account-number" className="text-right">
+                          Account #
+                        </Label>
+                        <Input
+                          id="account-number"
+                          name="account-number"
+                          placeholder="Your Freshways account number"
+                          className="col-span-3"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-4 items-start gap-4">
+                        <Label className="text-right pt-2">
+                          Items
+                        </Label>
+                        <div className="col-span-3 border rounded-md p-3 space-y-2">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left pb-2">Item</th>
+                                <th className="text-right pb-2">Price</th>
+                                <th className="text-center pb-2 w-24">Order</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="py-2">Milk (Pack of 6)</td>
+                                <td className="text-right">£5.49</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="milk" id="milk" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2">Bread (Item)</td>
+                                <td className="text-right">£1.99</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="bread" id="bread" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2">Buns (Pack of 6)</td>
+                                <td className="text-right">£2.49</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="buns" id="buns" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2">Yoghurt (Tub)</td>
+                                <td className="text-right">£3.29</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="yoghurt" id="yoghurt" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2">Eggs</td>
+                                <td className="text-right">£2.79</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="eggs" id="eggs" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2">Oat Milk (Carton)</td>
+                                <td className="text-right">£1.89</td>
+                                <td className="text-center">
+                                  <input type="checkbox" name="oatMilk" id="oatMilk" className="h-4 w-4" />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="delivery-date" className="text-right">
+                          Delivery Date
+                        </Label>
+                        <Input
+                          id="delivery-date"
+                          name="delivery-date"
+                          type="date"
+                          className="col-span-3"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="notes" className="text-right">
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          name="notes"
+                          placeholder="Any special instructions or notes"
+                          className="col-span-3"
+                          rows={2}
+                        />
+                      </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="items-freshways" className="text-right">
-                        Items
-                      </Label>
-                      <Textarea
-                        id="items-freshways"
-                        placeholder="Enter items and quantities (one per line)"
-                        className="col-span-3"
-                        rows={5}
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="delivery-date" className="text-right">
-                        Delivery Date
-                      </Label>
-                      <Input
-                        id="delivery-date"
-                        type="date"
-                        className="col-span-3"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={() => setOpenFreshwaysDialog(false)} variant="outline">
-                      Cancel
-                    </Button>
-                    <Button type="submit">Place Order</Button>
-                  </DialogFooter>
+                    <DialogFooter>
+                      <Button type="button" onClick={() => setOpenFreshwaysDialog(false)} variant="outline">
+                        Cancel
+                      </Button>
+                      <Button type="submit">Place Order</Button>
+                    </DialogFooter>
+                  </form>
                 </DialogContent>
               </Dialog>
 
