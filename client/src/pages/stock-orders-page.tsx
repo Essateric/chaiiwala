@@ -267,26 +267,18 @@ export default function StockOrdersPage() {
                       };
                       
                       // Collect all checked items with prices
-                      const selectedItems: OrderItem[] = [];
-                      const itemPrices = {
-                        'milk': { name: 'Milk (Pack of 6)', price: 5.49 },
-                        'bread': { name: 'Bread (Item)', price: 1.99 },
-                        'buns': { name: 'Buns (Pack of 6)', price: 2.49 },
-                        'yoghurt': { name: 'Yoghurt (Tub)', price: 3.29 },
-                        'eggs': { name: 'Eggs', price: 2.79 },
-                        'oatMilk': { name: 'Oat Milk (Carton)', price: 1.89 }
-                      };
-                      
+                      const orderItems: OrderItem[] = [];
                       let totalPrice = 0;
                       
-                      Object.entries(itemPrices).forEach(([key, item]) => {
-                        if (formData.get(key)) {
-                          selectedItems.push({
-                            name: item.name,
-                            price: item.price,
-                            priceFormatted: `£${item.price.toFixed(2)}`
+                      // Use the selectedItems state to determine which items are checked
+                      Object.entries(selectedItems).forEach(([key, isSelected]) => {
+                        if (isSelected && itemPrices[key]) {
+                          orderItems.push({
+                            name: itemPrices[key].name,
+                            price: itemPrices[key].price,
+                            priceFormatted: `£${itemPrices[key].price.toFixed(2)}`
                           });
-                          totalPrice += item.price;
+                          totalPrice += itemPrices[key].price;
                         }
                       });
                       
@@ -318,7 +310,7 @@ export default function StockOrdersPage() {
                           orderId,
                           accountNumber,
                           deliveryDate,
-                          items: selectedItems,
+                          items: orderItems,
                           orderType: 'Freshways',
                           store: 'Chaiiwala Stockport Road',
                           storeAddress: '165 Stockport Road, Manchester M12 4WH',
@@ -426,32 +418,90 @@ export default function StockOrdersPage() {
                                 <td className="py-2">Buns (Pack of 6)</td>
                                 <td className="text-right">£2.49</td>
                                 <td className="text-center">
-                                  <input type="checkbox" name="buns" id="buns" className="h-4 w-4" />
+                                  <input 
+                                    type="checkbox" 
+                                    name="buns" 
+                                    id="buns" 
+                                    className="h-4 w-4"
+                                    checked={selectedItems.buns}
+                                    onChange={(e) => {
+                                      setSelectedItems({
+                                        ...selectedItems,
+                                        buns: e.target.checked
+                                      });
+                                    }}
+                                  />
                                 </td>
                               </tr>
                               <tr>
                                 <td className="py-2">Yoghurt (Tub)</td>
                                 <td className="text-right">£3.29</td>
                                 <td className="text-center">
-                                  <input type="checkbox" name="yoghurt" id="yoghurt" className="h-4 w-4" />
+                                  <input 
+                                    type="checkbox" 
+                                    name="yoghurt" 
+                                    id="yoghurt" 
+                                    className="h-4 w-4"
+                                    checked={selectedItems.yoghurt}
+                                    onChange={(e) => {
+                                      setSelectedItems({
+                                        ...selectedItems,
+                                        yoghurt: e.target.checked
+                                      });
+                                    }}
+                                  />
                                 </td>
                               </tr>
                               <tr>
                                 <td className="py-2">Eggs</td>
                                 <td className="text-right">£2.79</td>
                                 <td className="text-center">
-                                  <input type="checkbox" name="eggs" id="eggs" className="h-4 w-4" />
+                                  <input 
+                                    type="checkbox" 
+                                    name="eggs" 
+                                    id="eggs" 
+                                    className="h-4 w-4"
+                                    checked={selectedItems.eggs}
+                                    onChange={(e) => {
+                                      setSelectedItems({
+                                        ...selectedItems,
+                                        eggs: e.target.checked
+                                      });
+                                    }}
+                                  />
                                 </td>
                               </tr>
                               <tr>
                                 <td className="py-2">Oat Milk (Carton)</td>
                                 <td className="text-right">£1.89</td>
                                 <td className="text-center">
-                                  <input type="checkbox" name="oatMilk" id="oatMilk" className="h-4 w-4" />
+                                  <input 
+                                    type="checkbox" 
+                                    name="oatMilk" 
+                                    id="oatMilk" 
+                                    className="h-4 w-4"
+                                    checked={selectedItems.oatMilk}
+                                    onChange={(e) => {
+                                      setSelectedItems({
+                                        ...selectedItems,
+                                        oatMilk: e.target.checked
+                                      });
+                                    }}
+                                  />
                                 </td>
                               </tr>
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+
+                      {/* Total price display */}
+                      <div className="mt-4 border-t pt-4">
+                        <div className="flex justify-between items-center font-medium">
+                          <span>Total Order Value:</span>
+                          <span className="text-lg text-right">
+                            £{calculateTotalPrice().toFixed(2)}
+                          </span>
                         </div>
                       </div>
                       

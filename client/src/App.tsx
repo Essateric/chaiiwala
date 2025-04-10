@@ -8,6 +8,7 @@ import EventOrdersPage from "@/pages/event-orders-page";
 import StockOrdersPage from "@/pages/stock-orders-page";
 import StoresPage from "@/pages/stores-page";
 import SchedulePage from "@/pages/schedule-page";
+import AnnouncementsPage from "@/pages/announcements-page";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
@@ -129,6 +130,11 @@ function App() {
       <Route path="/schedule">
         <ProtectedComponent roles={["admin", "regional", "store", "staff"]}>
           <SchedulePage />
+        </ProtectedComponent>
+      </Route>
+      <Route path="/announcements">
+        <ProtectedComponent roles={["admin", "regional", "store"]}>
+          <AnnouncementsPage />
         </ProtectedComponent>
       </Route>
       <Route path="/dashboard">
