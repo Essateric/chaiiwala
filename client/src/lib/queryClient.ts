@@ -10,7 +10,11 @@ const isNetlify = window.location.hostname.includes('netlify.app') ||
 function transformApiUrl(url: string): string {
   // Only transform API URLs
   if (url.startsWith('/api/')) {
-    return isNetlify ? `/.netlify/functions/api${url.replace('/api', '')}` : url;
+    if (isNetlify) {
+      // For Netlify, we need to route all API requests to the serverless function
+      return `/.netlify/functions/api${url.substring('/api'.length)}`;
+    }
+    return url;
   }
   return url;
 }
@@ -28,6 +32,11 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const transformedUrl = transformApiUrl(url);
+  
+  // Debug log for URL transformation in production
+  if (isNetlify) {
+    console.log(`API Request: ${method} ${url} → ${transformedUrl}`);
+  }
   
   const res = await fetch(transformedUrl, {
     method,
@@ -48,6 +57,11 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const url = queryKey[0] as string;
     const transformedUrl = transformApiUrl(url);
+    
+    // Debug log for query URL transformation
+    if (isNetlify) {
+      console.log(`Query Request: GET ${url} → ${transformedUrl}`);
+    }
     
     const res = await fetch(transformedUrl, {
       credentials: "include",
