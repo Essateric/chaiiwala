@@ -255,7 +255,7 @@ export default function StockOrdersPage() {
                           items: selectedItems,
                           orderType: 'Freshways',
                           store: 'Chaiiwala Stockport Road',
-                          storeAddress: '165 Stockport Road, Manchester M12 4WH, United Kingdom',
+                          storeAddress: '165 Stockport Road, Manchester M12 4WH',
                           storePhone: '+44-161-273-7890',
                           notes: formData.get('notes'),
                           totalPrice: totalPrice,
@@ -287,7 +287,6 @@ export default function StockOrdersPage() {
                             <p className="font-medium">Chaiiwala Stockport Road</p>
                             <p className="text-sm text-muted-foreground">165 Stockport Road</p>
                             <p className="text-sm text-muted-foreground">Manchester M12 4WH</p>
-                            <p className="text-sm text-muted-foreground">United Kingdom</p>
                             <p className="text-sm text-muted-foreground">Tel: +44-161-273-7890</p>
                           </div>
                         </div>
@@ -486,7 +485,7 @@ export default function StockOrdersPage() {
                     <TableBody>
                       <TableRow>
                         <TableCell>Apr 10, 2025</TableCell>
-                        <TableCell className="font-medium">FW-SR-25041001</TableCell>
+                        <TableCell className="font-medium">FW-JC250410-01</TableCell>
                         <TableCell>Freshways</TableCell>
                         <TableCell>
                           <Popover>
@@ -534,7 +533,7 @@ export default function StockOrdersPage() {
                           </Popover>
                         </TableCell>
                         <TableCell>Apr 12, 2025</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <Badge>Awaiting Confirmation</Badge>
                         </TableCell>
                         <TableCell className="text-right">
