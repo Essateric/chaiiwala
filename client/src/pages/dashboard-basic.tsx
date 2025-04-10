@@ -137,226 +137,239 @@ export default function DashboardBasic() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                  <Store className="h-6 w-6 text-yellow-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
-                    <dd>
-                      <div className="text-lg font-semibold text-gray-900">{stores.length}</div>
-                    </dd>
-                  </dl>
-                </div>
+        {/* 2x2 Dashboard Grid */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* 1. Sales by Store Chart */}
+          <div className="bg-white shadow rounded-lg p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-medium text-gray-900">Sales by Store</h3>
+              <div className="flex-shrink-0 bg-green-100 rounded-md p-2">
+                <Sparkles className="h-5 w-5 text-green-600" />
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                  <Sparkles className="h-6 w-6 text-green-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Sales (Weekly)</dt>
-                    <dd>
-                      <div className="text-lg font-semibold text-gray-900">£ {salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                  <Users className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Staff</dt>
-                    <dd>
-                      <div className="text-lg font-semibold text-gray-900">28</div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Compact Stock Widget */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex flex-col">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                        <Package className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <div className="ml-2">
-                        <span className="text-sm font-medium text-gray-500">Stock</span>
-                      </div>
-                    </div>
-                    <div className="ml-12 mt-1">
-                      {!selectedStoreId && inventory ? (
-                        <span className="text-lg font-semibold text-gray-900">{inventory.length} items</span>
-                      ) : selectedStoreId && inventory ? (
-                        <div>
-                          <span className="text-lg font-semibold text-gray-900">{inventory.length} items</span>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {inventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock').length > 0 ? (
-                              <span className="text-yellow-600">
-                                {inventory.filter(item => item.status === 'low_stock').length} low stock
-                              </span>
-                            ) : (
-                              <span className="text-green-600">Stock levels good</span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-lg font-semibold text-gray-900">Loading...</span>
-                      )}
-                    </div>
-                  </div>
-                  <select 
-                    className="border rounded-md py-1 px-2 text-xs bg-white"
-                    value={selectedStoreId?.toString() || "all"}
-                    onChange={handleStoreChange}
-                  >
-                    <option value="all">All Stores</option>
-                    {stores.map((store) => (
-                      <option key={store.id} value={store.id.toString()}>
-                        {store.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="mt-1 text-xs text-gray-600">
-                  <div 
-                    onClick={() => {
-                      handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } } as React.ChangeEvent<HTMLSelectElement>);
-                      setIsStockDialogOpen(true);
-                    }}
-                    className="cursor-pointer hover:underline text-chai-gold"
-                  >
-                    View details
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Charts & Tables */}
-        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {/* Sales Chart */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Sales by Store (Weekly)</h3>
-            <div className="h-72">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={salesData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                  margin={{ top: 5, right: 5, left: 0, bottom: 55 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis 
                     dataKey="name" 
                     angle={-45} 
                     textAnchor="end" 
-                    height={70}
-                    tick={{ fontSize: 12 }}
+                    height={60}
+                    tick={{ fontSize: 10 }}
                   />
-                  <YAxis />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value) => `£${value}`} />
                   <Bar dataKey="sales" fill="#D4AF37" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <div className="text-sm text-right mt-2">
+              <span className="text-gray-500">Total: </span>
+              <span className="font-semibold">£{salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</span>
+            </div>
           </div>
           
-          {/* Tasks */}
+          {/* 2. Upcoming Tasks */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Upcoming Tasks</h3>
+            <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-base font-medium text-gray-900">Upcoming Tasks</h3>
+              <div className="flex-shrink-0 bg-blue-100 rounded-md p-2">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
             </div>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
               {tasks.map(task => (
-                <div key={task.id} className="px-6 py-4">
+                <div key={task.id} className="px-5 py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <div className={`flex-shrink-0 h-4 w-4 rounded-full ${task.completed ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                      <div className={`flex-shrink-0 h-3 w-3 rounded-full ${task.completed ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
                       <div className="ml-3">
                         <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                        <p className="text-sm text-gray-500">{task.location} • Due {new Date(task.dueDate).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">{task.location} • Due {new Date(task.dueDate).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div>
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {task.completed ? 'Completed' : 'Pending'}
+                        {task.completed ? 'Done' : 'Pending'}
                       </span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="px-6 py-3 bg-gray-50 text-right">
-              <button onClick={() => toast({ title: "Coming soon", description: "Task management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
+            <div className="px-5 py-3 bg-gray-50 text-right border-t">
+              <button onClick={() => toast({ title: "Coming soon", description: "Task management will be available in the next version" })} className="text-xs font-medium text-chai-gold hover:text-yellow-600">
                 View All Tasks
+              </button>
+            </div>
+          </div>
+          
+          {/* 3. Stock Overview */}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-base font-medium text-gray-900">Stock Overview</h3>
+              <div className="flex-shrink-0 bg-purple-100 rounded-md p-2">
+                <Package className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <div className="p-5 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  {!selectedStoreId && inventory ? (
+                    <span className="text-sm font-semibold text-gray-900">{inventory.length} items across all stores</span>
+                  ) : selectedStoreId && inventory ? (
+                    <div>
+                      <span className="text-sm font-semibold text-gray-900">{inventory.length} items in {selectedStoreName}</span>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {inventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock').length > 0 ? (
+                          <span className="text-yellow-600">
+                            {inventory.filter(item => item.status === 'low_stock').length} low stock items
+                          </span>
+                        ) : (
+                          <span className="text-green-600">All stock levels good</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-900">Loading...</span>
+                  )}
+                </div>
+                <select 
+                  className="border rounded-md py-1 px-2 text-xs bg-white"
+                  value={selectedStoreId?.toString() || "all"}
+                  onChange={handleStoreChange}
+                >
+                  <option value="all">All Stores</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id.toString()}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="mt-3 space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600">In Stock</span>
+                  <span className="font-medium text-green-600">
+                    {inventory ? inventory.filter(item => item.status === 'in_stock').length : '...'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600">Low Stock</span>
+                  <span className="font-medium text-yellow-600">
+                    {inventory ? inventory.filter(item => item.status === 'low_stock').length : '...'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600">Out of Stock</span>
+                  <span className="font-medium text-red-600">
+                    {inventory ? inventory.filter(item => item.status === 'out_of_stock').length : '...'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600">On Order</span>
+                  <span className="font-medium text-blue-600">
+                    {inventory ? inventory.filter(item => item.status === 'on_order').length : '...'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="mt-4 text-right">
+                <button 
+                  onClick={() => {
+                    handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } } as React.ChangeEvent<HTMLSelectElement>);
+                    setIsStockDialogOpen(true);
+                  }}
+                  className="text-xs font-medium text-chai-gold hover:text-yellow-600"
+                >
+                  View Full Inventory
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* 4. Recent Notifications */}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-base font-medium text-gray-900">Recent Notifications</h3>
+              <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              </div>
+            </div>
+            <div className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
+              {notifications.map((notification) => (
+                <div key={notification.id} className={`px-5 py-3 ${notification.isHighlighted ? 'bg-yellow-50' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center">
+                        {notification.isHighlighted && (
+                          <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2" />
+                        )}
+                        <p className={`text-sm font-medium ${notification.isHighlighted ? 'text-yellow-800' : 'text-gray-900'}`}>
+                          {notification.title}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">{notification.description}</p>
+                    </div>
+                    <div className="ml-6 flex-shrink-0">
+                      <p className="text-xs text-gray-500">{notification.time}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 bg-gray-50 text-right border-t">
+              <button onClick={() => toast({ title: "Coming soon", description: "Notifications management will be available in the next version" })} className="text-xs font-medium text-chai-gold hover:text-yellow-600">
+                View All Notifications
               </button>
             </div>
           </div>
         </div>
         
-        {/* Stock Widget */}
-        <div className="mt-8">
-          <StockWidget stores={stores} />
-        </div>
-        
-        {/* Notifications */}
-        <div className="mt-8 mb-12">
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            <div className="px-6 py-5 border-b border-gray-200">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Recent Notifications</h3>
+        {/* Store Summary Stats - Compact Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 mb-6">
+          <div className="bg-white p-3 rounded-lg shadow flex items-center">
+            <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 mr-3">
+              <Store className="h-4 w-4 text-yellow-600" />
             </div>
-            <ul className="divide-y divide-gray-200">
-              {notifications.map((notification) => (
-                <li key={notification.id} className={notification.isHighlighted ? 'bg-yellow-50' : ''}>
-                  <div className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          {notification.isHighlighted && (
-                            <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-                          )}
-                          <p className={`text-sm font-medium ${notification.isHighlighted ? 'text-yellow-800' : 'text-gray-900'}`}>
-                            {notification.title}
-                          </p>
-                        </div>
-                        <p className="mt-1 text-sm text-gray-500">{notification.description}</p>
-                      </div>
-                      <div className="ml-6 flex-shrink-0">
-                        <p className="text-sm text-gray-500">{notification.time}</p>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="px-6 py-3 bg-gray-50 text-right">
-              <button onClick={() => toast({ title: "Coming soon", description: "Notifications management will be available in the next version" })} className="text-sm font-medium text-chai-gold hover:text-yellow-600">
-                View All Notifications
-              </button>
+            <div>
+              <div className="text-xs text-gray-500">Stores</div>
+              <div className="text-sm font-semibold">{stores.length}</div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-3 rounded-lg shadow flex items-center">
+            <div className="flex-shrink-0 bg-green-100 rounded-md p-2 mr-3">
+              <Sparkles className="h-4 w-4 text-green-600" />
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Weekly Sales</div>
+              <div className="text-sm font-semibold">£{(salesData.reduce((sum, item) => sum + item.sales, 0)/1000).toFixed(1)}k</div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-3 rounded-lg shadow flex items-center">
+            <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 mr-3">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Staff</div>
+              <div className="text-sm font-semibold">28</div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-3 rounded-lg shadow flex items-center">
+            <div className="flex-shrink-0 bg-purple-100 rounded-md p-2 mr-3">
+              <Package className="h-4 w-4 text-purple-600" />
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Inventory</div>
+              <div className="text-sm font-semibold">{inventory ? inventory.length : '...'} items</div>
             </div>
           </div>
         </div>
