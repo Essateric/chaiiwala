@@ -231,7 +231,7 @@ export default function StockManagementView() {
                 <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
                 Dashboard
               </a>
-              <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+              <a href="/stock-management" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                 <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
                 Stock Management
               </a>
@@ -270,7 +270,7 @@ export default function StockManagementView() {
               <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
               Dashboard
             </a>
-            <a href="/inventory" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+            <a href="/stock-management" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
               <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
               Stock Management
             </a>
