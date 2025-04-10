@@ -79,6 +79,15 @@ export default function StockOrdersPage() {
     return 'Chaiiwala Stockport Road';
   });
   
+  // Add state for store locations to be used in dropdown
+  const [storeLocations, setStoreLocations] = useState<{id: number, name: string}[]>([
+    { id: 1, name: 'Chaiiwala Stockport Road' },
+    { id: 2, name: 'Chaiiwala Wilmslow Road' },
+    { id: 3, name: 'Chaiiwala Deansgate' },
+    { id: 4, name: 'Chaiiwala Manchester Airport' },
+    { id: 5, name: 'Chaiiwala Leeds' }
+  ]);
+  
   // State for Freshways order form with dynamic total calculation
   const [selectedItems, setSelectedItems] = useState<{[key: string]: boolean}>({
     milk: false,
@@ -787,16 +796,32 @@ export default function StockOrdersPage() {
                 <Label htmlFor="receipt-location" className="text-right">
                   Location
                 </Label>
-                <Input
-                  id="receipt-location"
-                  placeholder="Store location"
-                  className="col-span-3"
-                  value={receiptLocation}
-                  onChange={(e) => setReceiptLocation(e.target.value)}
-                  // Disabled to use the user's assigned store automatically
-                  disabled
-                  required
-                />
+                {user?.role === 'admin' ? (
+                  <select
+                    id="receipt-location"
+                    className="col-span-3 w-full p-2 border rounded"
+                    value={receiptLocation}
+                    onChange={(e) => setReceiptLocation(e.target.value)}
+                    required
+                  >
+                    {storeLocations.map((store) => (
+                      <option key={store.id} value={store.name}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id="receipt-location"
+                    placeholder="Store location"
+                    className="col-span-3"
+                    value={receiptLocation}
+                    onChange={(e) => setReceiptLocation(e.target.value)}
+                    // Disabled for non-admin users to use their assigned store
+                    disabled
+                    required
+                  />
+                )}
               </div>
             </div>
             <DialogFooter>
