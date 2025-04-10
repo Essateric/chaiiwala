@@ -243,6 +243,20 @@ export default function StockOrdersPage() {
                       const accountNumber = formData.get('account-number');
                       const deliveryDate = formData.get('delivery-date');
                       
+                      // Generate order ID with user's initials
+                      const currentDate = new Date();
+                      const year = currentDate.getFullYear().toString().slice(-2);
+                      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(currentDate.getDate()).padStart(2, '0');
+                      const dateStr = `${year}${month}${day}`;
+                      
+                      // Get user initials from logged in user (or default to UA)
+                      const userInitials = user?.username 
+                        ? user.username.substring(0, 2).toUpperCase() 
+                        : 'UA';
+                      
+                      const orderId = `FW-${userInitials}${dateStr}-01`;
+                      
                       // Send order to webhook with hardcoded store information
                       fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
                         method: 'POST',
@@ -250,6 +264,7 @@ export default function StockOrdersPage() {
                           'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
+                          orderId,
                           accountNumber,
                           deliveryDate,
                           items: selectedItems,
@@ -485,7 +500,7 @@ export default function StockOrdersPage() {
                     <TableBody>
                       <TableRow>
                         <TableCell>Apr 10, 2025</TableCell>
-                        <TableCell className="font-medium">FW-JC250410-01</TableCell>
+                        <TableCell className="font-medium">FW-UA250410-01</TableCell>
                         <TableCell>Freshways</TableCell>
                         <TableCell>
                           <Popover>
