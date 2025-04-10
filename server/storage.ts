@@ -9,7 +9,8 @@ import {
   Announcement, InsertAnnouncement,
   JobLog, InsertJobLog,
   EventOrder, InsertEventOrder,
-  StockConfig, InsertStockConfig
+  StockConfig, InsertStockConfig,
+  Permission, InsertPermission
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -149,6 +150,8 @@ export class MemStorage implements IStorage {
     this.announcementId = 1;
     this.jobLogId = 1;
     this.eventOrderId = 1;
+    this.stockConfigId = 1;
+    this.permissionId = 1;
 
     // Seed data
     this.seedInitialData();
@@ -496,6 +499,102 @@ export class MemStorage implements IStorage {
     
     this.eventOrders.set(id, updatedEventOrder);
     return updatedEventOrder;
+  }
+
+  // Stock Configuration methods
+  async getAllStockConfig(): Promise<StockConfig[]> {
+    return Array.from(this.stockConfigs.values());
+  }
+
+  async getStockConfigByItemCode(itemCode: string): Promise<StockConfig | undefined> {
+    return Array.from(this.stockConfigs.values()).find(config => config.itemCode === itemCode);
+  }
+
+  async createStockConfig(stockConfig: InsertStockConfig): Promise<StockConfig> {
+    const id = this.stockConfigId++;
+    const newConfig: StockConfig = {
+      ...stockConfig,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.stockConfigs.set(id, newConfig);
+    return newConfig;
+  }
+
+  async updateStockConfig(id: number, data: Partial<StockConfig>): Promise<StockConfig | undefined> {
+    const config = this.stockConfigs.get(id);
+    if (!config) return undefined;
+
+    const updatedConfig: StockConfig = {
+      ...config,
+      ...data,
+      updatedAt: new Date()
+    };
+    this.stockConfigs.set(id, updatedConfig);
+    return updatedConfig;
+  }
+
+  // Permission methods
+  async getAllPermissions(): Promise<Permission[]> {
+    return Array.from(this.permissions.values());
+  }
+
+  async getPermissionsByRole(role: string): Promise<Permission[]> {
+    // This is a simplified implementation. In a real system, we would have a mapping table
+    // between roles and permissions. Here we're just returning all permissions for admin,
+    // some for regional, and fewer for store and staff roles.
+    const allPermissions = Array.from(this.permissions.values());
+    
+    switch (role) {
+      case 'admin':
+        return allPermissions;
+      case 'regional':
+        return allPermissions.filter(p => !p.name.includes('admin_'));
+      case 'store':
+        return allPermissions.filter(p => 
+          p.name.includes('store_') || 
+          p.name.includes('inventory_') || 
+          p.name.includes('staff_')
+        );
+      case 'staff':
+        return allPermissions.filter(p => 
+          p.name.includes('staff_') || 
+          p.name.startsWith('view_')
+        );
+      default:
+        return [];
+    }
+  }
+
+  async getPermission(id: number): Promise<Permission | undefined> {
+    return this.permissions.get(id);
+  }
+
+  async createPermission(permission: InsertPermission): Promise<Permission> {
+    const id = this.permissionId++;
+    const newPermission: Permission = {
+      ...permission,
+      id
+    };
+    this.permissions.set(id, newPermission);
+    return newPermission;
+  }
+
+  async updatePermission(id: number, data: Partial<Permission>): Promise<Permission | undefined> {
+    const permission = this.permissions.get(id);
+    if (!permission) return undefined;
+
+    const updatedPermission: Permission = {
+      ...permission,
+      ...data
+    };
+    this.permissions.set(id, updatedPermission);
+    return updatedPermission;
+  }
+
+  async deletePermission(id: number): Promise<void> {
+    this.permissions.delete(id);
   }
 
   // Helper methods
