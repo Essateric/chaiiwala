@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from '@tanstack/react-query';
+import { getQueryFn } from "@/lib/queryClient";
+import { User as SelectUser } from "@shared/schema";
 import { 
   Search,
   Filter,
@@ -103,11 +106,27 @@ export default function StockManagementView() {
   const [filteredData, setFilteredData] = useState(inventoryData);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [storeFilter, setStoreFilter] = useState(currentUser.role === 'store' ? String(currentUser.storeId) : 'all');
   const [sort, setSort] = useState({ field: '', direction: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [storeFilter, setStoreFilter] = useState('all');
 
   const { toast } = useToast();
+  
+  // Fetch real authenticated user data
+  const { data: user } = useQuery<SelectUser | undefined, Error>({
+    queryKey: ["/api/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+  
+  // Use authenticated user or fallback to demo data
+  const currentUser = user || users[2];
+  
+  // Set store filter based on user role, once we have user data
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'store' && currentUser.storeId) {
+      setStoreFilter(String(currentUser.storeId));
+    }
+  }, [currentUser]);
 
   // Count stats
   const lowStockCount = inventoryData.filter(item => item.status === 'low_stock').length;
