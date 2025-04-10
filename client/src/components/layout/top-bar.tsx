@@ -88,12 +88,18 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
                     <p className="text-sm font-medium text-gray-900">Task due today: Weekly inventory check</p>
                     <p className="text-xs text-gray-600">Cheetham Hill location • 1 hour ago</p>
                   </a>
-                  <a href="#" className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-chai-gold">
+                  <a 
+                    onClick={() => navigate("/announcements")} 
+                    className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-chai-gold cursor-pointer"
+                  >
                     <p className="text-sm font-medium text-gray-900">New announcement from Head Office</p>
                     <p className="text-xs text-gray-600">Company-wide • 3 hours ago</p>
                   </a>
                 </div>
-                <a href="#" className="block text-center px-4 py-2 text-sm text-chai-gold font-medium border-t border-gray-200">
+                <a 
+                  onClick={() => navigate("/announcements")} 
+                  className="block text-center px-4 py-2 text-sm text-chai-gold font-medium border-t border-gray-200 cursor-pointer"
+                >
                   View all notifications
                 </a>
               </div>
