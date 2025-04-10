@@ -252,30 +252,55 @@ export default function DashboardBasic() {
                 </select>
               </div>
               
-              <div className="mt-3 space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">In Stock</span>
-                  <span className="font-medium text-green-600">
-                    {inventory ? inventory.filter(item => item.status === 'in_stock').length : '...'}
-                  </span>
+              <div className="my-3 border-b pb-2">
+                <div className="text-xs font-medium mb-1 text-gray-700">Status Breakdown</div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">In Stock</span>
+                    <span className="font-medium text-green-600">
+                      {inventory ? inventory.filter(item => item.status === 'in_stock').length : '...'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">Low Stock</span>
+                    <span className="font-medium text-yellow-600">
+                      {inventory ? inventory.filter(item => item.status === 'low_stock').length : '...'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">Out of Stock</span>
+                    <span className="font-medium text-red-600">
+                      {inventory ? inventory.filter(item => item.status === 'out_of_stock').length : '...'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600">On Order</span>
+                    <span className="font-medium text-blue-600">
+                      {inventory ? inventory.filter(item => item.status === 'on_order').length : '...'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Low Stock</span>
-                  <span className="font-medium text-yellow-600">
-                    {inventory ? inventory.filter(item => item.status === 'low_stock').length : '...'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Out of Stock</span>
-                  <span className="font-medium text-red-600">
-                    {inventory ? inventory.filter(item => item.status === 'out_of_stock').length : '...'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">On Order</span>
-                  <span className="font-medium text-blue-600">
-                    {inventory ? inventory.filter(item => item.status === 'on_order').length : '...'}
-                  </span>
+              </div>
+              
+              {/* Store Location Breakdown */}
+              <div className="mt-3">
+                <div className="text-xs font-medium mb-1 text-gray-700">Store Locations</div>
+                <div className="space-y-2">
+                  {stores.map(store => (
+                    <div key={store.id} className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600">{store.name}</span>
+                      <span className="font-medium">
+                        {inventory ? 
+                          inventory.filter(item => 
+                            selectedStoreId ? 
+                              item.storeId === store.id : 
+                              (item.storeBreakdown?.some(sb => sb.id === store.id) || item.storeId === store.id)
+                          ).length : 
+                          '...'
+                        }
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
               
@@ -366,7 +391,7 @@ export default function DashboardBasic() {
                       <div>
                         <div className="font-medium">{item.name}</div>
                         <div className="text-xs text-gray-500">
-                          SKU: {item.sku} • Category: {item.category}
+                          SKU: {item.sku} • Category: {item.category} • Location: {selectedStoreId ? stores.find(s => s.id === item.storeId)?.name || 'Unknown' : 'Multiple'}
                         </div>
                         {!selectedStoreId && item.storeBreakdown && (
                           <div className="mt-1 text-xs text-gray-500">
