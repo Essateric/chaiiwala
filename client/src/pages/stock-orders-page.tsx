@@ -607,9 +607,8 @@ export default function StockOrdersPage() {
               </Dialog>
             </div>
             <Tabs defaultValue="pending">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="inTransit">In Transit</TabsTrigger>
                 <TabsTrigger value="received">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="p-4">
@@ -718,14 +717,7 @@ export default function StockOrdersPage() {
                   </Table>
                 </div>
               </TabsContent>
-              <TabsContent value="inTransit" className="p-4">
-                <Alert>
-                  <TruckIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No orders in transit. Orders that have been shipped but not yet received will be shown here.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
+
               <TabsContent value="received" className="p-4">
                 <div className="rounded-md border">
                   <Table>
@@ -871,7 +863,7 @@ export default function StockOrdersPage() {
                 const orderId = orderRow.querySelector('td:nth-child(2)')?.textContent || 'FW-UA250410-01';
                 const supplier = orderRow.querySelector('td:nth-child(3)')?.textContent || 'Freshways';
                 
-                // Remove the row from the "pending" or "inTransit" tab
+                // Remove the row from the "pending" tab
                 orderRow.remove();
                 
                 // Add the order to the "received" tab with the updated status
