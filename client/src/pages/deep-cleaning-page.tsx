@@ -34,6 +34,7 @@ import { Loader2, Plus, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
+import DashboardLayout from "@/components/layout/dashboard-layout";
 
 // Deep cleaning tasks
 const DEEP_CLEANING_TASKS = [
