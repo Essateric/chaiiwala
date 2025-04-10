@@ -44,6 +44,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -243,6 +251,55 @@ export default function StockManagementView() {
         return 'Out of Stock';
       default:
         return status;
+    }
+  };
+  
+  // Handle edit item
+  const handleEditItem = (item: any) => {
+    setEditItem(item);
+    setDialogOpen(true);
+  };
+  
+  // Handle save changes
+  const handleSaveChanges = (updatedItem: any) => {
+    // Find the index of the item being edited
+    const index = inventoryData.findIndex(item => 
+      item.itemCode === editItem?.itemCode && 
+      item.storeId === editItem?.storeId
+    );
+    
+    if (index !== -1) {
+      // Update the item in the inventoryData array
+      const updatedInventoryData = [...inventoryData];
+      updatedInventoryData[index] = {
+        ...updatedInventoryData[index],
+        ...updatedItem
+      };
+      
+      // In a real application, this would make an API call to update the database
+      // Update local state to reflect changes immediately
+      const updatedFilteredData = filteredData.map(item => {
+        if (item.itemCode === editItem?.itemCode && item.storeId === editItem?.storeId) {
+          return { ...item, ...updatedItem };
+        }
+        return item;
+      });
+      setFilteredData(updatedFilteredData);
+      
+      toast({
+        title: "Stock Updated",
+        description: `${updatedItem.product} stock has been updated successfully.`,
+      });
+      
+      // Close the dialog
+      setDialogOpen(false);
+      setEditItem(null);
+      
+      // In a production app with a real API, we would use something like:
+      // updateInventoryMutation.mutate({
+      //   id: editItem.id,
+      //   data: updatedItem
+      // });
     }
   };
 
@@ -646,6 +703,97 @@ export default function StockManagementView() {
           </div>
         </main>
       </div>
+      
+      {/* Edit Inventory Item Dialog */}
+      {dialogOpen && editItem && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Inventory Item</DialogTitle>
+              <DialogDescription>
+                Update stock quantity and status for {editItem.product}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="text-right text-sm font-medium col-span-1">Item Code:</div>
+                <div className="col-span-3 font-mono">{editItem.itemCode}</div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="text-right text-sm font-medium col-span-1">Product:</div>
+                <div className="col-span-3 font-semibold">{editItem.product}</div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="text-right text-sm font-medium col-span-1">Price:</div>
+                <div className="col-span-3">£{editItem.price.toFixed(2)}</div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">
+                  Stock:
+                </label>
+                <div className="col-span-3">
+                  <Input 
+                    id="stock" 
+                    type="number" 
+                    className="col-span-3" 
+                    defaultValue={editItem.stock}
+                    min={0}
+                    onChange={(e) => {
+                      setEditItem({
+                        ...editItem,
+                        stock: parseInt(e.target.value),
+                        status: parseInt(e.target.value) === 0 
+                          ? 'out_of_stock' 
+                          : parseInt(e.target.value) <= 5 
+                            ? 'low_stock' 
+                            : 'in_stock'
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="status" className="text-right text-sm font-medium col-span-1">
+                  Status:
+                </label>
+                <Select 
+                  defaultValue={editItem.status}
+                  onValueChange={(value) => setEditItem({...editItem, status: value})}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_stock">In Stock</SelectItem>
+                    <SelectItem value="low_stock">Low Stock</SelectItem>
+                    <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                    <SelectItem value="on_order">On Order</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="text-right text-sm font-medium col-span-1">Store:</div>
+                <div className="col-span-3">{editItem.storeName}</div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => handleSaveChanges(editItem)}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
