@@ -67,8 +67,17 @@ export default function StockOrdersPage() {
   // State for order receipt dialog
   const [openReceiptDialog, setOpenReceiptDialog] = useState(false);
   const [receiptDate, setReceiptDate] = useState('');
-  const [receivedBy, setReceivedBy] = useState('');
-  const [receiptLocation, setReceiptLocation] = useState('');
+  
+  // Initialize received by with current user's name
+  const [receivedBy, setReceivedBy] = useState(() => {
+    return user?.name || '';
+  });
+  
+  // Initialize location with the user's assigned store
+  const [receiptLocation, setReceiptLocation] = useState(() => {
+    // For this example, setting static store name as this is from a data row
+    return 'Chaiiwala Stockport Road';
+  });
   
   return (
     <DashboardLayout title="Stock Orders">
@@ -647,6 +656,8 @@ export default function StockOrdersPage() {
                   className="col-span-3"
                   value={receivedBy}
                   onChange={(e) => setReceivedBy(e.target.value)}
+                  // Disabled to use the current user's name automatically
+                  disabled
                   required
                 />
               </div>
@@ -659,7 +670,8 @@ export default function StockOrdersPage() {
                     id="received-date"
                     type="date"
                     className="flex-1"
-                    value={receiptDate}
+                    // Set default value to current date
+                    value={receiptDate || new Date().toISOString().split('T')[0]}
                     onChange={(e) => setReceiptDate(e.target.value)}
                     required
                   />
@@ -671,10 +683,12 @@ export default function StockOrdersPage() {
                 </Label>
                 <Input
                   id="receipt-location"
-                  placeholder="Where the order was received"
+                  placeholder="Store location"
                   className="col-span-3"
                   value={receiptLocation}
                   onChange={(e) => setReceiptLocation(e.target.value)}
+                  // Disabled to use the user's assigned store automatically
+                  disabled
                   required
                 />
               </div>
