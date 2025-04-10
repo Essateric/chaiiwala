@@ -9,7 +9,18 @@ import {
   ShoppingBasket,
   AlertTriangle,
   Menu,
-  X
+  X,
+  HomeIcon,
+  ClipboardListIcon,
+  CalendarIcon,
+  ArchiveIcon,
+  BellIcon,
+  UsersIcon,
+  SettingsIcon,
+  ClipboardCheckIcon,
+  CalendarDaysIcon,
+  WrenchIcon,
+  PackageIcon
 } from 'lucide-react';
 import { 
   Table, 
@@ -228,12 +239,48 @@ export default function StockManagementView() {
           <div className="mt-5 flex-1 flex flex-col">
             <nav className="flex-1 px-2 pb-4 space-y-1">
               <a href="/" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                <HomeIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
                 Dashboard
               </a>
+              <a href="/maintenance" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <WrenchIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Maintenance
+              </a>
+              <a href="/event-orders" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <CalendarDaysIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Event Orders
+              </a>
+              <a href="/stock-orders" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <PackageIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Stock Orders
+              </a>
               <a href="/stock-management" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
+                <ArchiveIcon className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
                 Stock Management
+              </a>
+              <a href="/deep-cleaning" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <ClipboardCheckIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Deep Cleaning
+              </a>
+              <a href="/schedule" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <CalendarIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Staff Schedule
+              </a>
+              <a href="/tasks" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <ClipboardListIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Tasks
+              </a>
+              <a href="/announcements" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <BellIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Announcements
+              </a>
+              <a href="/users" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <UsersIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                User Management
+              </a>
+              <a href="/settings" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <SettingsIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-300" />
+                Settings
               </a>
             </nav>
           </div>
@@ -267,12 +314,48 @@ export default function StockManagementView() {
         <div className="md:hidden fixed inset-0 z-10 bg-[#1c1f2a] pt-14">
           <nav className="px-4 pt-4 pb-5 space-y-1">
             <a href="/" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <Store className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              <HomeIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
               Dashboard
             </a>
+            <a href="/maintenance" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <WrenchIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Maintenance
+            </a>
+            <a href="/event-orders" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <CalendarDaysIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Event Orders
+            </a>
+            <a href="/stock-orders" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <PackageIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Stock Orders
+            </a>
             <a href="/stock-management" className="bg-chai-gold text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
-              <ShoppingBasket className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
+              <ArchiveIcon className="mr-3 flex-shrink-0 h-6 w-6 text-white" />
               Stock Management
+            </a>
+            <a href="/deep-cleaning" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <ClipboardCheckIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Deep Cleaning
+            </a>
+            <a href="/schedule" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <CalendarIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Staff Schedule
+            </a>
+            <a href="/tasks" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <ClipboardListIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Tasks
+            </a>
+            <a href="/announcements" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <BellIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Announcements
+            </a>
+            <a href="/users" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <UsersIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              User Management
+            </a>
+            <a href="/settings" className="text-gray-300 hover:bg-gray-700 hover:text-white group flex items-center px-2 py-2 text-base font-medium rounded-md">
+              <SettingsIcon className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400" />
+              Settings
             </a>
           </nav>
         </div>
