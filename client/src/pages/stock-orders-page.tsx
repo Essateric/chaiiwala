@@ -627,7 +627,7 @@ export default function StockOrdersPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      <TableRow>
+                      <TableRow data-order-id="FW-UA250410-01">
                         <TableCell>Apr 10, 2025</TableCell>
                         <TableCell className="font-medium">FW-UA250410-01</TableCell>
                         <TableCell>Freshways</TableCell>
@@ -727,12 +727,86 @@ export default function StockOrdersPage() {
                 </Alert>
               </TabsContent>
               <TabsContent value="received" className="p-4">
-                <Alert>
-                  <PackageIcon className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    No received orders. Your history of completed stock orders will be displayed here.
-                  </AlertDescription>
-                </Alert>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order Date</TableHead>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Items</TableHead>
+                        <TableHead>Received Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody id="received-orders-table">
+                      {/* This is where new received orders will be added */}
+                      <TableRow data-order-id="CH-UA230409-01">
+                        <TableCell>Apr 9, 2025</TableCell>
+                        <TableCell className="font-medium">CH-UA230409-01</TableCell>
+                        <TableCell>Chaiiwala</TableCell>
+                        <TableCell>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">View Items</Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="grid gap-2">
+                                <div className="rounded-md bg-muted p-2">
+                                  <table className="w-full text-sm">
+                                    <tbody>
+                                      <tr>
+                                        <td>Chai Masala (500g)</td>
+                                        <td className="text-right">£12.49</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Elachi Tea (250g)</td>
+                                        <td className="text-right">£8.99</td>
+                                      </tr>
+                                      <tr>
+                                        <td>Kashmiri Tea (250g)</td>
+                                        <td className="text-right">£9.99</td>
+                                      </tr>
+                                      <tr className="border-t mt-2">
+                                        <td className="pt-2 font-medium">Total</td>
+                                        <td className="pt-2 text-right font-medium">£31.47</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell>Apr 10, 2025</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Received</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVerticalIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56" align="end">
+                              <div className="grid gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  className="flex items-center justify-start px-2 h-9 gap-2"
+                                >
+                                  <UserIcon className="h-4 w-4" />
+                                  <span>View Details</span>
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -751,7 +825,98 @@ export default function StockOrdersPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              alert("Order marked as received successfully!");
+              
+              // Create a custom notification instead of using the browser's alert
+              const notification = document.createElement('div');
+              notification.style.position = 'fixed';
+              notification.style.bottom = '20px';
+              notification.style.right = '20px';
+              notification.style.backgroundColor = '#1c1f2a';
+              notification.style.color = 'white';
+              notification.style.padding = '16px 24px';
+              notification.style.borderRadius = '8px';
+              notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              notification.style.zIndex = '9999';
+              notification.style.display = 'flex';
+              notification.style.flexDirection = 'column';
+              notification.style.alignItems = 'center';
+              notification.style.justifyContent = 'space-between';
+              notification.innerHTML = `
+                <p style="margin: 0 0 12px 0; font-weight: 500;">Order marked as received successfully!</p>
+                <button style="background-color: #5BCEFA; color: #1c1f2a; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 500;">OK</button>
+              `;
+              document.body.appendChild(notification);
+              
+              // Handle the OK button click
+              const okButton = notification.querySelector('button');
+              if (okButton) {
+                okButton.addEventListener('click', () => {
+                  document.body.removeChild(notification);
+                });
+              }
+              
+              // Auto remove after 5 seconds
+              setTimeout(() => {
+                if (document.body.contains(notification)) {
+                  document.body.removeChild(notification);
+                }
+              }, 5000);
+              
+              // Update the order status in the UI
+              // In a real implementation, we would update the database as well
+              const orderRow = document.querySelector('tr[data-order-id="FW-UA250410-01"]');
+              if (orderRow) {
+                // Get the order details
+                const orderDate = orderRow.querySelector('td:nth-child(1)')?.textContent || 'Apr 10, 2025';
+                const orderId = orderRow.querySelector('td:nth-child(2)')?.textContent || 'FW-UA250410-01';
+                const supplier = orderRow.querySelector('td:nth-child(3)')?.textContent || 'Freshways';
+                
+                // Remove the row from the "pending" or "inTransit" tab
+                orderRow.remove();
+                
+                // Add the order to the "received" tab with the updated status
+                const receivedOrdersTable = document.getElementById('received-orders-table');
+                if (receivedOrdersTable) {
+                  const newRow = document.createElement('tr');
+                  newRow.setAttribute('data-order-id', orderId);
+                  
+                  // Format today's date
+                  const today = new Date();
+                  const formattedDate = today.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+                  
+                  newRow.innerHTML = `
+                    <td>${orderDate}</td>
+                    <td class="font-medium">${orderId}</td>
+                    <td>${supplier}</td>
+                    <td>
+                      <button class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">View Items</button>
+                    </td>
+                    <td>${formattedDate}</td>
+                    <td class="text-center">
+                      <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-green-100 text-green-800 hover:bg-green-100">Received</span>
+                    </td>
+                    <td class="text-right">
+                      <button class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-none bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9 p-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                      </button>
+                    </td>
+                  `;
+                  
+                  // Add the new row to the received orders table
+                  receivedOrdersTable.appendChild(newRow);
+                  
+                  // Switch to the "received" tab
+                  const receivedTab = document.querySelector('[value="received"]');
+                  if (receivedTab) {
+                    (receivedTab as HTMLElement).click();
+                  }
+                }
+              }
+              
               setOpenReceiptDialog(false);
             }}
           >
