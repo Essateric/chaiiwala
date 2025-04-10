@@ -81,6 +81,12 @@ export default function SettingsPage() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
   
+  // Fetch all staff members with their assigned stores
+  const { data: allStaff = [] } = useQuery<{ id: number; name: string; role: string; color: string; storeId?: number; }[]>({
+    queryKey: ['/api/staff'],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+  
   // Function to generate item code based on category and name
   const generateItemCode = (category: string, name: string) => {
     const prefix = category === 'Food' ? 'BP' : 
@@ -216,9 +222,10 @@ export default function SettingsPage() {
                     <select 
                       id="theme" 
                       className="w-full p-2 border rounded"
+                      defaultValue="dark"
                     >
                       <option value="light">Light</option>
-                      <option value="dark" selected>Dark</option>
+                      <option value="dark">Dark</option>
                       <option value="system">System Default</option>
                     </select>
                   </div>
@@ -228,8 +235,9 @@ export default function SettingsPage() {
                     <select 
                       id="language" 
                       className="w-full p-2 border rounded"
+                      defaultValue="en"
                     >
-                      <option value="en" selected>English</option>
+                      <option value="en">English</option>
                       <option value="fr">French</option>
                       <option value="es">Spanish</option>
                       <option value="de">German</option>
@@ -367,8 +375,9 @@ export default function SettingsPage() {
                     <select 
                       id="dashboard-view" 
                       className="w-full p-2 border rounded"
+                      defaultValue="summary"
                     >
-                      <option value="summary" selected>Summary View</option>
+                      <option value="summary">Summary View</option>
                       <option value="detailed">Detailed View</option>
                       <option value="kanban">Kanban View</option>
                     </select>
@@ -483,15 +492,19 @@ export default function SettingsPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label htmlFor="user-select">Select User</Label>
-                              <Select defaultValue="user-1">
+                              <Select defaultValue="">
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select user" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="user-1">Jubayed Alam (Store Manager)</SelectItem>
-                                  <SelectItem value="user-2">Imran Khan (Store Manager)</SelectItem>
-                                  <SelectItem value="user-3">Zahra Ahmed (Store Manager)</SelectItem>
-                                  <SelectItem value="user-4">Usman Ali (Regional Manager)</SelectItem>
+                                  {allStaff
+                                    .filter(staff => staff.role !== 'Admin') // Filter out Admin users
+                                    .map(staff => (
+                                      <SelectItem key={staff.id} value={String(staff.id)}>
+                                        {staff.name} ({staff.role})
+                                      </SelectItem>
+                                    ))
+                                  }
                                 </SelectContent>
                               </Select>
                             </div>
@@ -531,46 +544,42 @@ export default function SettingsPage() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                <TableRow>
-                                  <TableCell>Jubayed Alam</TableCell>
-                                  <TableCell>Store Manager</TableCell>
-                                  <TableCell>Stockport Road</TableCell>
-                                  <TableCell className="text-right">
-                                    <Button variant="outline" size="sm">
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                  <TableCell>Imran Khan</TableCell>
-                                  <TableCell>Store Manager</TableCell>
-                                  <TableCell>Wilmslow Road</TableCell>
-                                  <TableCell className="text-right">
-                                    <Button variant="outline" size="sm">
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                  <TableCell>Zahra Ahmed</TableCell>
-                                  <TableCell>Store Manager</TableCell>
-                                  <TableCell>Deansgate</TableCell>
-                                  <TableCell className="text-right">
-                                    <Button variant="outline" size="sm">
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                  <TableCell>Usman Ali</TableCell>
-                                  <TableCell>Regional Manager</TableCell>
-                                  <TableCell>All Stores</TableCell>
-                                  <TableCell className="text-right">
-                                    <Button variant="outline" size="sm" disabled>
-                                      <Lock className="h-4 w-4" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
+                                {allStaff.map(staff => {
+                                  // Find the store name for this staff member if they have a storeId
+                                  const store = staff.storeId 
+                                    ? allStores.find(s => s.id === staff.storeId) 
+                                    : null;
+                                  
+                                  const storeName = staff.role === 'Regional Manager' || staff.role === 'Admin'
+                                    ? 'All Stores'
+                                    : (store ? store.name : 'None');
+                                  
+                                  const isManagementRole = staff.role === 'Admin' || staff.role === 'Regional Manager';
+                                  
+                                  return (
+                                    <TableRow key={staff.id}>
+                                      <TableCell>{staff.name}</TableCell>
+                                      <TableCell>{staff.role}</TableCell>
+                                      <TableCell>{storeName}</TableCell>
+                                      <TableCell className="text-right">
+                                        <Button variant="outline" size="sm" disabled={isManagementRole}>
+                                          {isManagementRole ? (
+                                            <Lock className="h-4 w-4" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                          )}
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                {allStaff.length === 0 && (
+                                  <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                                      No staff members found
+                                    </TableCell>
+                                  </TableRow>
+                                )}
                               </TableBody>
                             </Table>
                           </div>
