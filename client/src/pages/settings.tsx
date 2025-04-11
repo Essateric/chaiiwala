@@ -24,6 +24,8 @@ interface StockConfigItem {
   name: string;
   lowStockThreshold: number;
   category: string;
+  price: number;
+  sku: string;
 }
 
 const initialStockConfig: StockConfigItem[] = [
@@ -32,35 +34,45 @@ const initialStockConfig: StockConfigItem[] = [
     itemCode: "BP401", 
     name: "Masala Beans", 
     lowStockThreshold: 5, 
-    category: "Food" 
+    category: "Food",
+    price: 3.99,
+    sku: "CHW-MB-001"
   },
   { 
     id: 2, 
     itemCode: "BP402", 
     name: "Daal", 
     lowStockThreshold: 4, 
-    category: "Food" 
+    category: "Food",
+    price: 2.99,
+    sku: "CHW-DA-001"
   },
   { 
     id: 3, 
     itemCode: "BP440", 
     name: "Mogo Sauce", 
     lowStockThreshold: 6, 
-    category: "Food" 
+    category: "Food",
+    price: 1.99,
+    sku: "CHW-MS-001"
   },
   { 
     id: 4, 
     itemCode: "DP196", 
     name: "Orange Juice (12x250ml)", 
     lowStockThreshold: 3, 
-    category: "Drinks" 
+    category: "Drinks",
+    price: 6.99,
+    sku: "CHW-OJ-001"
   },
   { 
     id: 5, 
     itemCode: "FPFC204", 
     name: "Karak Chaii Sugar free (50 per box)", 
     lowStockThreshold: 2, 
-    category: "Drinks" 
+    category: "Drinks",
+    price: 24.99,
+    sku: "CHW-KC-001"
   },
 ];
 
@@ -72,7 +84,9 @@ export default function SettingsPage() {
   const [newItem, setNewItem] = useState({
     name: "",
     lowStockThreshold: 5,
-    category: "Food"
+    category: "Food",
+    price: 0.00,
+    sku: ""
   });
   
   // Fetch all stores for the store dropdown
@@ -168,7 +182,9 @@ export default function SettingsPage() {
     setNewItem({
       name: "",
       lowStockThreshold: 5,
-      category: "Food"
+      category: "Food",
+      price: 0.00,
+      sku: ""
     });
     setIsAddDialogOpen(false);
     
@@ -218,7 +234,9 @@ export default function SettingsPage() {
           itemCode: generateItemCode(item.category, item.name),
           name: item.name,
           category: item.category,
-          lowStockThreshold: item.lowStockThreshold
+          lowStockThreshold: item.lowStockThreshold,
+          price: item.price,
+          sku: item.sku
         }));
         
         setStockConfig([...stockConfig, ...newItems]);
@@ -265,8 +283,16 @@ export default function SettingsPage() {
     const nameIndex = headers.indexOf('name');
     const categoryIndex = headers.indexOf('category');
     const thresholdIndex = headers.indexOf('low stock threshold');
+    const priceIndex = headers.indexOf('price');
+    const skuIndex = headers.indexOf('sku');
     
-    const items: { name: string; category: string; lowStockThreshold: number }[] = [];
+    const items: { 
+      name: string; 
+      category: string; 
+      lowStockThreshold: number;
+      price: number;
+      sku: string;
+    }[] = [];
     
     // Skip header row and process data
     for (let i = 1; i < lines.length; i++) {
@@ -274,18 +300,24 @@ export default function SettingsPage() {
       
       const values = lines[i].split(',').map(val => val.trim());
       
-      // Skip rows with insufficient data
-      if (values.length < headers.length) continue;
+      // Skip rows with insufficient data for required columns
+      if (values.length < Math.max(nameIndex, categoryIndex, thresholdIndex) + 1) continue;
       
       const name = values[nameIndex];
       const category = mapCategory(values[categoryIndex]);
       const threshold = parseInt(values[thresholdIndex]);
       
+      // Parse optional fields with defaults
+      const price = priceIndex >= 0 && values[priceIndex] ? parseFloat(values[priceIndex]) : 0.00;
+      const sku = skuIndex >= 0 && values[skuIndex] ? values[skuIndex] : "";
+      
       if (name && category && !isNaN(threshold) && threshold > 0) {
         items.push({
           name,
           category,
-          lowStockThreshold: threshold
+          lowStockThreshold: threshold,
+          price: isNaN(price) ? 0.00 : price,
+          sku
         });
       }
     }
@@ -315,12 +347,12 @@ export default function SettingsPage() {
   const downloadCsvTemplate = () => {
     // Create CSV header and example rows
     const csvContent = [
-      'Name,Category,Low Stock Threshold',
-      'Masala Chai Tea,Drinks,10',
-      'Karak Original Mix,Dry Food,8',
-      'Samosa Pastry Sheets,Frozen Food,15',
-      'Carry Bags Large,Packaging,20',
-      'Takeaway Containers,Miscellaneous,25'
+      'Name,Category,Low Stock Threshold,Price,SKU',
+      'Masala Chai Tea,Drinks,10,4.99,CHW-MCT-001',
+      'Karak Original Mix,Dry Food,8,3.50,CHW-KOM-001',
+      'Samosa Pastry Sheets,Frozen Food,15,6.75,CHW-SPS-001',
+      'Carry Bags Large,Packaging,20,1.25,CHW-CBL-001',
+      'Takeaway Containers,Miscellaneous,25,2.99,CHW-TWC-001'
     ].join('\n');
     
     // Create a Blob with the CSV content
@@ -485,11 +517,14 @@ export default function SettingsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-1/6">Item Code</TableHead>
-                        <TableHead className="w-2/6">Name</TableHead>
-                        <TableHead className="w-1/6">Category</TableHead>
-                        <TableHead className="w-1/6 text-center">Low Stock Threshold</TableHead>
-                        <TableHead className="w-1/6 text-right">Actions</TableHead>
+                        <TableHead className="w-[10%]">Item Code</TableHead>
+                        <TableHead className="w-[20%]">Name</TableHead>
+                        <TableHead className="w-[15%]">Category</TableHead>
+                        <TableHead className="w-[10%] text-center">Stock</TableHead>
+                        <TableHead className="w-[10%] text-center">Threshold</TableHead>
+                        <TableHead className="w-[10%] text-center">Price</TableHead>
+                        <TableHead className="w-[15%]">SKU</TableHead>
+                        <TableHead className="w-[10%] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -500,8 +535,21 @@ export default function SettingsPage() {
                           <TableCell>{item.category}</TableCell>
                           <TableCell className="text-center">
                             <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                              No Stock
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-sm">
                               {item.lowStockThreshold} units
                             </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-sm">
+                              £{item.price.toFixed(2)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {item.sku || "-"}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-2">
@@ -553,6 +601,8 @@ export default function SettingsPage() {
                           <li><strong>Name</strong> - The name of the stock item</li>
                           <li><strong>Category</strong> - One of: Food, Dry Food, Frozen Food, Drinks, Packaging, Miscellaneous</li>
                           <li><strong>Low Stock Threshold</strong> - A positive number</li>
+                          <li><strong>Price</strong> - (Optional) The price of the item</li>
+                          <li><strong>SKU</strong> - (Optional) Stock Keeping Unit code</li>
                         </ul>
                         <div className="mt-2">
                           <Button 
