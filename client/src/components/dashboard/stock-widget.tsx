@@ -18,14 +18,17 @@ export function StockWidget({ stores }: StockWidgetProps) {
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(undefined);
   const { inventory, isLoading } = useInventory(selectedStoreId);
 
-  // Group inventory items by store
+  // Group inventory items by store with full store names
   const inventoryByStore: Record<string, InventoryType[]> = {};
 
   // Safely process inventory data with appropriate type checking
   const safeInventory = inventory || [];
   if (safeInventory.length > 0) {
     safeInventory.forEach((item: InventoryType) => {
-      const storeName = stores.find(s => s.id === item.storeId)?.name || 'Unknown Store';
+      // Find the store by ID and use its full name
+      const store = stores.find(s => s.id === item.storeId);
+      const storeName = store ? store.name : `Unknown Location (ID: ${item.storeId})`;
+      
       if (!inventoryByStore[storeName]) {
         inventoryByStore[storeName] = [];
       }
