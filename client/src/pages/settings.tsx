@@ -267,24 +267,23 @@ export default function SettingsPage() {
     const lines = csvData.split(/\r?\n/);
     const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
     
-    // Validate headers
-    const requiredColumns = ['name', 'category', 'low stock threshold'];
+    // Validate headers based on Cleaned_Stock_Data.csv format
+    const requiredColumns = ['item_code', 'product', 'price_box'];
     const missingColumns = requiredColumns.filter(col => !headers.includes(col));
     
     if (missingColumns.length > 0) {
       toast({
         title: "CSV Format Error",
-        description: `Missing required columns: ${missingColumns.join(', ')}`,
+        description: `Missing required columns: ${missingColumns.join(', ')}. Expected format: item_code, alt_item_code, product, price_box`,
         variant: "destructive"
       });
       return [];
     }
     
-    const nameIndex = headers.indexOf('name');
-    const categoryIndex = headers.indexOf('category');
-    const thresholdIndex = headers.indexOf('low stock threshold');
-    const priceIndex = headers.indexOf('price');
-    const skuIndex = headers.indexOf('sku');
+    const itemCodeIndex = headers.indexOf('item_code');
+    const altItemCodeIndex = headers.indexOf('alt_item_code');
+    const productIndex = headers.indexOf('product');
+    const priceIndex = headers.indexOf('price_box');
     
     const items: { 
       name: string; 
@@ -301,23 +300,39 @@ export default function SettingsPage() {
       const values = lines[i].split(',').map(val => val.trim());
       
       // Skip rows with insufficient data for required columns
-      if (values.length < Math.max(nameIndex, categoryIndex, thresholdIndex) + 1) continue;
+      if (values.length < 3 || !values[itemCodeIndex] || !values[productIndex]) continue;
       
-      const name = values[nameIndex];
-      const category = mapCategory(values[categoryIndex]);
-      const threshold = parseInt(values[thresholdIndex]);
-      
-      // Parse optional fields with defaults
+      const itemCode = values[itemCodeIndex];
+      const altItemCode = altItemCodeIndex >= 0 ? values[altItemCodeIndex] : "";
+      const name = values[productIndex];
       const price = priceIndex >= 0 && values[priceIndex] ? parseFloat(values[priceIndex]) : 0.00;
-      const sku = skuIndex >= 0 && values[skuIndex] ? values[skuIndex] : "";
       
-      if (name && category && !isNaN(threshold) && threshold > 0) {
+      // Determine category from item code
+      let category = 'Other';
+      if (itemCode.startsWith('BP')) {
+        category = 'Food';
+      } else if (itemCode.startsWith('DP')) {
+        category = 'Drinks';
+      } else if (itemCode.startsWith('PP')) {
+        category = 'Packaging';
+      } else if (itemCode.startsWith('MS')) {
+        category = 'Miscellaneous';
+      } else if (itemCode.startsWith('DF')) {
+        category = 'Dry Food';
+      } else if (itemCode.startsWith('FZ')) {
+        category = 'Frozen Food';
+      }
+      
+      // Default threshold based on category
+      const threshold = 10;
+      
+      if (name && itemCode) {
         items.push({
           name,
           category,
           lowStockThreshold: threshold,
           price: isNaN(price) ? 0.00 : price,
-          sku
+          sku: altItemCode || itemCode
         });
       }
     }
@@ -347,12 +362,12 @@ export default function SettingsPage() {
   const downloadCsvTemplate = () => {
     // Create CSV header and example rows
     const csvContent = [
-      'Name,Category,Low Stock Threshold,Price,SKU',
-      'Masala Chai Tea,Drinks,10,4.99,CHW-MCT-001',
-      'Karak Original Mix,Dry Food,8,3.50,CHW-KOM-001',
-      'Samosa Pastry Sheets,Frozen Food,15,6.75,CHW-SPS-001',
-      'Carry Bags Large,Packaging,20,1.25,CHW-CBL-001',
-      'Takeaway Containers,Miscellaneous,25,2.99,CHW-TWC-001'
+      'item_code,alt_item_code,product,price_box',
+      'BP401,FPBC101,Masala Beans,52.91',
+      'BP402,FPBC102,Daal,32.39',
+      'BP440,FPBC105,Mogo Sauce,9.00',
+      'DP196,FF722,Orange Juice (12x250ml),127.62',
+      'DP190,FPFC204,Karak Chaii Sugar free (50 per box),5.70'
     ].join('\n');
     
     // Create a Blob with the CSV content
@@ -598,11 +613,10 @@ export default function SettingsPage() {
                         <p className="font-medium">CSV Import Instructions</p>
                         <p>To import stock items via CSV, your file should include the following columns:</p>
                         <ul className="ml-6 mt-1 list-disc">
-                          <li><strong>Name</strong> - The name of the stock item</li>
-                          <li><strong>Category</strong> - One of: Food, Dry Food, Frozen Food, Drinks, Packaging, Miscellaneous</li>
-                          <li><strong>Low Stock Threshold</strong> - A positive number</li>
-                          <li><strong>Price</strong> - (Optional) The price of the item</li>
-                          <li><strong>SKU</strong> - (Optional) Stock Keeping Unit code</li>
+                          <li><strong>item_code</strong> - The unique item code (e.g., BP401, DP196)</li>
+                          <li><strong>alt_item_code</strong> - Alternative item code or SKU reference</li>
+                          <li><strong>product</strong> - The name of the product</li>
+                          <li><strong>price_box</strong> - The price of the box/unit</li>
                         </ul>
                         <div className="mt-2">
                           <Button 

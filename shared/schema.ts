@@ -133,8 +133,20 @@ export const stockConfig = pgTable("stock_config", {
   name: text("name").notNull(), // Item name
   category: text("category").notNull(), // Category (Food, Drinks, Packaging, Other)
   lowStockThreshold: integer("low_stock_threshold").notNull(), // Threshold for low stock alert
+  price: integer("price").notNull().default(0), // Price of the item (stored as integer, display as decimal)
+  sku: text("sku"), // Stock Keeping Unit
   createdAt: timestamp("created_at").notNull().defaultNow(), // When the item was added
   updatedAt: timestamp("updated_at").notNull().defaultNow(), // When the item was last updated
+});
+
+// Store Stock Levels Table - tracks stock quantities at each store
+export const storeStockLevels = pgTable("store_stock_levels", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").notNull(), // Store ID
+  stockItemId: integer("stock_item_id").notNull(), // Reference to stockConfig
+  quantity: integer("quantity").notNull().default(0), // Current quantity at this store
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(), // When the quantity was last updated
+  updatedBy: integer("updated_by").notNull(), // User ID who last updated the quantity
 });
 
 // Event Orders Table
@@ -186,6 +198,7 @@ export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, c
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStoreStockLevelSchema = createInsertSchema(storeStockLevels).omit({ id: true, lastUpdated: true });
 export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
 
 // Type Exports
@@ -227,5 +240,8 @@ export type InsertStockConfig = z.infer<typeof insertStockConfigSchema>;
 
 export type Permission = typeof permissions.$inferSelect;
 export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+
+export type StoreStockLevel = typeof storeStockLevels.$inferSelect;
+export type InsertStoreStockLevel = z.infer<typeof insertStoreStockLevelSchema>;
 
 export type Session = typeof session.$inferSelect;
