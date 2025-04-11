@@ -7,6 +7,7 @@ import MaintenancePage from "@/pages/maintenance-page";
 import EventOrdersPage from "@/pages/event-orders-page";
 import StockOrdersPage from "@/pages/stock-orders-page";
 import StockLevelsPage from "@/pages/stock-levels-page";
+import StoreStockUpdatePage from "@/pages/store-stock-update";
 import StoresPage from "@/pages/stores-page";
 import SchedulePage from "@/pages/schedule-page";
 import AnnouncementsPage from "@/pages/announcements-page";

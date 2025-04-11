@@ -594,7 +594,7 @@ export default function StockManagementView() {
                           <ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
-                      <TableHead className="w-[100px]">Secondary Code</TableHead>
+
                       <TableHead>
                         <button 
                           className="flex items-center"
@@ -658,7 +658,7 @@ export default function StockManagementView() {
                   <TableBody>
                     {filteredData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                           {currentUser.role === 'store' 
                             ? `No products found for your store (${currentStoreName})`
                             : 'No products found matching your criteria'}
@@ -668,7 +668,6 @@ export default function StockManagementView() {
                       filteredData.map((item) => (
                         <TableRow key={item.itemCode}>
                           <TableCell className="font-medium">{item.itemCode}</TableCell>
-                          <TableCell>{item.secondaryCode}</TableCell>
                           <TableCell>{item.product}</TableCell>
                           {/* Store column - only visible to admin and regional managers */}
                           {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
