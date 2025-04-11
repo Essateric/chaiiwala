@@ -432,6 +432,29 @@ export class DatabaseStorage implements IStorage {
       for (const store of storeData) {
         await this.createStore(store);
       }
+      
+      // Seed inventory items with real data across different stores
+      const inventoryData: InsertInventory[] = [
+        { name: "Chai Masala", sku: "CM001", category: "Spices", storeId: 1, quantity: "45 boxes", status: "in_stock" },
+        { name: "Tea bags (Assam)", sku: "TB002", category: "Tea", storeId: 1, quantity: "12 boxes", status: "low_stock" },
+        { name: "Cardamom", sku: "CD003", category: "Spices", storeId: 1, quantity: "30 bags", status: "in_stock" },
+        { name: "Ginger powder", sku: "GP004", category: "Spices", storeId: 2, quantity: "0 bags", status: "out_of_stock" },
+        { name: "Milk powder", sku: "MP005", category: "Dairy", storeId: 2, quantity: "15 bags", status: "in_stock" },
+        { name: "Sugar", sku: "SG006", category: "Sweeteners", storeId: 3, quantity: "50 kg", status: "in_stock" },
+        { name: "Paper cups", sku: "PC007", category: "Packaging", storeId: 3, quantity: "10 packs", status: "low_stock" },
+        { name: "Samosa pastry", sku: "SP008", category: "Food", storeId: 4, quantity: "8 packs", status: "low_stock" },
+        { name: "Paper bags", sku: "PB009", category: "Packaging", storeId: 5, quantity: "100 pcs", status: "in_stock" },
+        { name: "Paneer", sku: "PN010", category: "Dairy", storeId: 6, quantity: "5 kg", status: "on_order" },
+        { name: "Chai Masala", sku: "CM0011", category: "Spices", storeId: 8, quantity: "35 boxes", status: "in_stock" },
+        { name: "Tea bags (Assam)", sku: "TB0012", category: "Tea", storeId: 9, quantity: "25 boxes", status: "in_stock" },
+        { name: "Disposable cups", sku: "DC011", category: "Packaging", storeId: 8, quantity: "200 pcs", status: "in_stock" },
+        { name: "Teapots", sku: "TP012", category: "Equipment", storeId: 9, quantity: "12 units", status: "in_stock" },
+        { name: "Saffron", sku: "SF013", category: "Spices", storeId: 1, quantity: "2 bottles", status: "low_stock" }
+      ];
+      
+      for (const item of inventoryData) {
+        await this.createInventoryItem(item);
+      }
   
       // Seed users with password 'password123'
       const hashPassword = 'c8680ca3ea7be0ac4fef3954ccf3bb114ba12f8fab964e0a6f55ff9386c022a4f4a78e71343bd0e2213c11c86266a8c1a13d507752bdd80b492ae04a5ee9f2b6.b6e5be78c42ffc3595c7352fbd88fe9f'; 
