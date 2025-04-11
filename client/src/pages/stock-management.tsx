@@ -630,7 +630,7 @@ export default function StockManagementView() {
                           className="flex items-center justify-center"
                           onClick={() => handleSort('stock')}
                         >
-                          Stock
+                          Quantity
                           <ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
@@ -733,7 +733,7 @@ export default function StockManagementView() {
               
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">
-                  Stock:
+                  Quantity:
                 </label>
                 <div className="col-span-3">
                   <Input 
