@@ -90,6 +90,7 @@ export function usePermissions() {
       'dashboard': ['admin', 'regional', 'store', 'staff'],
       'inventory': ['admin', 'regional', 'store', 'staff'],
       'stock_management': ['admin', 'regional'],
+      'store_stock_update': ['store'],
       'tasks': ['admin', 'regional', 'store', 'staff'],
       'staff_schedule': ['admin', 'regional', 'store', 'staff'],
       'announcements': ['admin', 'regional', 'store'],
