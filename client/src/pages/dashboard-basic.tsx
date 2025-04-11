@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
-import { User as SelectUser, Store as StoreModel } from "@shared/schema";
+import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockWidget } from "@/components/dashboard/stock-widget";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
@@ -31,16 +31,14 @@ import {
   X
 } from 'lucide-react';
 
-// Store data from the user's input
-const chaiiwalaStores = [
-  { id: 1, name: 'Cheetham Hill', address: '74 Bury Old Rd, Manchester M8 5BW', area: 1, manager: 'MGR_CH' },
-  { id: 2, name: 'Oxford Road', address: '149 Oxford Rd, Manchester M1 7EE', area: 1, manager: 'MGR_OX' },
-  { id: 3, name: 'Old Trafford', address: 'Ayres Rd, Old Trafford, Stretford, 89 M16 7GS', area: 1, manager: 'MGR_OT' },
-  { id: 4, name: 'Trafford Centre', address: 'Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford', area: 2, manager: 'MGR_TC' },
-  { id: 5, name: 'Stockport', address: '884-886 Stockport Rd, Levenshulme, Manchester', area: 1, manager: 'MGR_SR' },
-  { id: 6, name: 'Rochdale', address: '35 Milkstone Rd, Rochdale OL11 1EB', area: 2, manager: 'MGR_RD' },
-  { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
-];
+// Store interface for typing
+interface StoreData {
+  id: number;
+  name: string;
+  address: string;
+  area?: number;
+  manager?: string;
+}
 
 // Sample sales data for visualization
 const salesData = [
@@ -84,7 +82,7 @@ export default function DashboardBasic() {
   });
   
   // Fetch real store data from database
-  const { data: stores = [], isLoading } = useQuery<StoreModel[]>({
+  const { data: stores = [], isLoading } = useQuery<StoreData[]>({
     queryKey: ['/api/stores'],
     // No custom queryFn needed as the default fetcher is set up to work with our backend
   });
@@ -112,7 +110,7 @@ export default function DashboardBasic() {
     
     // Update the selected store name
     if (storeId) {
-      const store = stores.find(s => s.id === storeId);
+      const store = stores.find((s: StoreData) => s.id === storeId);
       setSelectedStoreName(store?.name || "Unknown Store");
     } else {
       setSelectedStoreName("All Stores");
@@ -240,7 +238,7 @@ export default function DashboardBasic() {
                   onChange={handleStoreChange}
                 >
                   <option value="all">All Stores</option>
-                  {stores.map((store) => (
+                  {stores.map((store: StoreData) => (
                     <option key={store.id} value={store.id.toString()}>
                       {store.name}
                     </option>
