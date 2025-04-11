@@ -66,18 +66,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ['admin', 'regional', 'store']
     },
     { 
-      name: 'Stock Levels', 
+      name: 'Stock Management', 
       icon: ArchiveIcon, 
-      href: '/stock-levels', 
-      active: currentPage === 'stock-levels' || currentPage === 'stock-management',
+      href: '/stock-management', 
+      active: currentPage === 'stock-management',
       roles: ['admin', 'regional'] 
-    },
-    { 
-      name: 'Store Stock Update', 
-      icon: PackageIcon, 
-      href: '/store-stock-update', 
-      active: currentPage === 'store-stock-update',
-      roles: ['store'] 
     },
     { 
       name: 'Deep Cleaning', 

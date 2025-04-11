@@ -48,10 +48,6 @@ function App() {
         <StockLevelsPage />
       </ProtectedRoute>
 
-      <ProtectedRoute path="/store-stock-update" feature="store_stock_update">
-        <StoreStockUpdatePage />
-      </ProtectedRoute>
-
       <ProtectedRoute path="/stores" feature="inventory">
         <StoresPage />
       </ProtectedRoute>
