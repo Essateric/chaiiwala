@@ -187,7 +187,7 @@ export default function StoreStockUpdatePage() {
     const matchesSearch = searchTerm === '' || 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.sku ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) : false);
     
     // Category filter
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
@@ -338,7 +338,7 @@ export default function StoreStockUpdatePage() {
                             </TableCell>
                             <TableCell>
                               <div className="font-medium">{item.name}</div>
-                              <div className="text-xs text-muted-foreground">{item.sku}</div>
+                              <div className="text-xs text-muted-foreground">{item.sku || 'No SKU'}</div>
                             </TableCell>
                             <TableCell>{item.category}</TableCell>
                             <TableCell className="text-center">{currentQuantity}</TableCell>
