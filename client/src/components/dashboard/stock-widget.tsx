@@ -1,19 +1,14 @@
 import { useState } from "react";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
-import { useAuth } from "@/hooks/use-auth";
-import { usePermissions } from "@/hooks/use-permissions";
-import { useLocation } from "wouter";
 import { Inventory as InventoryType } from "@shared/schema";
 import { 
   Card, 
   CardHeader, 
   CardTitle, 
-  CardContent,
-  CardFooter 
+  CardContent
 } from "@/components/ui/card";
-import { Package, ExternalLink } from "lucide-react";
+import { Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 
 interface StockWidgetProps {
   stores: { id: number; name: string }[];
@@ -22,9 +17,6 @@ interface StockWidgetProps {
 export function StockWidget({ stores }: StockWidgetProps) {
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(undefined);
   const { inventory, isLoading } = useInventory(selectedStoreId);
-  const { user } = useAuth();
-  const { canAccess } = usePermissions();
-  const [, navigate] = useLocation();
 
   // Group inventory items by store with full store names
   const inventoryByStore: Record<string, InventoryType[]> = {};
@@ -158,34 +150,6 @@ export function StockWidget({ stores }: StockWidgetProps) {
           <div className="text-center py-6 text-gray-500">No stock data available</div>
         )}
       </CardContent>
-      {/* Add CardFooter for admin/regional stock management links */}
-      {user && (user.role === 'admin' || user.role === 'regional') && (
-        <CardFooter className="pt-2 pb-4 flex justify-between">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="ml-auto hover:bg-chai-gold hover:text-white"
-            onClick={() => navigate('/stock-levels')}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Manage Stock Levels
-          </Button>
-        </CardFooter>
-      )}
-      {/* For store managers, link to their daily stock update page */}
-      {user && user.role === 'store' && (
-        <CardFooter className="pt-2 pb-4 flex justify-between">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="ml-auto hover:bg-chai-gold hover:text-white"
-            onClick={() => navigate('/store-stock-update')}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Update Store Stock
-          </Button>
-        </CardFooter>
-      )}
     </Card>
   );
 }
