@@ -8,7 +8,9 @@ import {
   Schedule, InsertSchedule, schedules,
   Announcement, InsertAnnouncement, announcements,
   JobLog, InsertJobLog, jobLogs,
-  EventOrder, InsertEventOrder, eventOrders
+  EventOrder, InsertEventOrder, eventOrders,
+  StockConfig, InsertStockConfig, stockConfig,
+  StoreStockLevel, InsertStoreStockLevel, storeStockLevels
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
