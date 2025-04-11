@@ -10,7 +10,8 @@ import {
   JobLog, InsertJobLog, jobLogs,
   EventOrder, InsertEventOrder, eventOrders,
   StockConfig, InsertStockConfig, stockConfig,
-  StoreStockLevel, InsertStoreStockLevel, storeStockLevels
+  StoreStockLevel, InsertStoreStockLevel, storeStockLevels,
+  Permission, InsertPermission, permissions
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -363,6 +364,102 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updatedJobLog;
+  }
+  
+  // Stock Config methods
+  async getAllStockConfig(): Promise<StockConfig[]> {
+    return await db.select().from(stockConfig);
+  }
+
+  async getStockConfigByItemCode(itemCode: string): Promise<StockConfig | undefined> {
+    const [config] = await db.select().from(stockConfig).where(eq(stockConfig.itemCode, itemCode));
+    return config;
+  }
+
+  async getStockConfigItem(id: number): Promise<StockConfig | undefined> {
+    const [config] = await db.select().from(stockConfig).where(eq(stockConfig.id, id));
+    return config;
+  }
+
+  async createStockConfigItem(insertStockConfig: InsertStockConfig): Promise<StockConfig> {
+    const now = new Date();
+    const [item] = await db.insert(stockConfig)
+      .values({
+        ...insertStockConfig,
+        createdAt: now,
+        updatedAt: now
+      })
+      .returning();
+    return item;
+  }
+
+  async updateStockConfigItem(id: number, data: Partial<StockConfig>): Promise<StockConfig | undefined> {
+    const [updatedItem] = await db.update(stockConfig)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(stockConfig.id, id))
+      .returning();
+    return updatedItem;
+  }
+
+  // Stock Levels methods
+  async getAllStockLevels(): Promise<StoreStockLevel[]> {
+    return await db.select().from(storeStockLevels);
+  }
+
+  async getStockLevelsByStore(storeId: number): Promise<StoreStockLevel[]> {
+    return await db.select()
+      .from(storeStockLevels)
+      .where(eq(storeStockLevels.storeId, storeId));
+  }
+
+  async getStockLevel(storeId: number, stockItemId: number): Promise<StoreStockLevel | undefined> {
+    const [stockLevel] = await db.select()
+      .from(storeStockLevels)
+      .where(
+        and(
+          eq(storeStockLevels.storeId, storeId),
+          eq(storeStockLevels.stockItemId, stockItemId)
+        )
+      );
+    return stockLevel;
+  }
+
+  async updateStockLevel(storeId: number, stockItemId: number, quantity: number, updatedBy: number): Promise<StoreStockLevel> {
+    // Check if the stock level already exists for this store and item
+    const existingLevel = await this.getStockLevel(storeId, stockItemId);
+    
+    if (existingLevel) {
+      // Update existing level
+      const [updatedLevel] = await db.update(storeStockLevels)
+        .set({
+          quantity,
+          lastUpdated: new Date(),
+          updatedBy
+        })
+        .where(
+          and(
+            eq(storeStockLevels.storeId, storeId),
+            eq(storeStockLevels.stockItemId, stockItemId)
+          )
+        )
+        .returning();
+      return updatedLevel;
+    } else {
+      // Create new level
+      const [newLevel] = await db.insert(storeStockLevels)
+        .values({
+          storeId,
+          stockItemId,
+          quantity,
+          lastUpdated: new Date(),
+          updatedBy
+        })
+        .returning();
+      return newLevel;
+    }
   }
   
   // Event Orders methods
