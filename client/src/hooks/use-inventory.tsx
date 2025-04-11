@@ -54,8 +54,8 @@ export function useInventory(storeId?: number) {
             const store = stores.find(s => s.id === item.storeId);
             return {
               storeId: item.storeId,
-              // Use store name if found, otherwise use a generic name
-              name: store ? store.name : `Store ${item.storeId}`,
+              // Use full store name with location instead of generic "Store X"
+              name: store ? store.name : `Unknown Location (ID: ${item.storeId})`,
               quantity: item.quantity
             };
           });
