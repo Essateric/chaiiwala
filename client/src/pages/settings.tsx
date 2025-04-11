@@ -89,9 +89,13 @@ export default function SettingsPage() {
   
   // Function to generate item code based on category and name
   const generateItemCode = (category: string, name: string) => {
-    const prefix = category === 'Food' ? 'BP' : 
-                  category === 'Drinks' ? 'DP' : 
-                  category === 'Packaging' ? 'FPFC' : 'IT';
+    const prefix = 
+      category === 'Food' ? 'BP' : 
+      category === 'Drinks' ? 'DP' : 
+      category === 'Packaging' ? 'FPFC' : 
+      category === 'Dry Food' ? 'DF' :
+      category === 'Miscellaneous' ? 'MS' :
+      category === 'Frozen Food' ? 'FZ' : 'IT';
                   
     // Generate a random 3-digit number
     const suffix = Math.floor(100 + Math.random() * 900).toString();
@@ -672,8 +676,11 @@ export default function SettingsPage() {
                   onChange={(e) => setEditItem({...editItem, category: e.target.value})}
                 >
                   <option value="Food">Food</option>
+                  <option value="Dry Food">Dry Food</option>
+                  <option value="Frozen Food">Frozen Food</option>
                   <option value="Drinks">Drinks</option>
                   <option value="Packaging">Packaging</option>
+                  <option value="Miscellaneous">Miscellaneous</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
@@ -751,8 +758,11 @@ export default function SettingsPage() {
                 onChange={(e) => setNewItem({...newItem, category: e.target.value})}
               >
                 <option value="Food">Food</option>
+                <option value="Dry Food">Dry Food</option>
+                <option value="Frozen Food">Frozen Food</option>
                 <option value="Drinks">Drinks</option>
                 <option value="Packaging">Packaging</option>
+                <option value="Miscellaneous">Miscellaneous</option>
                 <option value="Other">Other</option>
               </select>
             </div>
