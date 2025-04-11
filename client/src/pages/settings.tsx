@@ -223,6 +223,31 @@ export default function SettingsPage() {
                       id="theme" 
                       className="w-full p-2 border rounded"
                       defaultValue="dark"
+                      onChange={(e) => {
+                        const newTheme = e.target.value;
+                        // Apply theme to document element
+                        const html = document.documentElement;
+                        
+                        // Remove existing theme classes
+                        html.classList.remove('light', 'dark');
+                        
+                        if (newTheme === 'system') {
+                          // Check system preference
+                          const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                          html.classList.add(systemPreference);
+                        } else {
+                          // Apply selected theme
+                          html.classList.add(newTheme);
+                        }
+                        
+                        // Store preference
+                        localStorage.setItem('theme', newTheme);
+                        
+                        toast({
+                          title: "Theme updated",
+                          description: `Changed to ${newTheme} theme`,
+                        });
+                      }}
                     >
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
