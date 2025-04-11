@@ -6,6 +6,7 @@ import DeepCleaningPage from "@/pages/deep-cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
 import EventOrdersPage from "@/pages/event-orders-page";
 import StockOrdersPage from "@/pages/stock-orders-page";
+import StockLevelsPage from "@/pages/stock-levels-page";
 import StoresPage from "@/pages/stores-page";
 import SchedulePage from "@/pages/schedule-page";
 import AnnouncementsPage from "@/pages/announcements-page";
@@ -40,6 +41,10 @@ function App() {
 
       <ProtectedRoute path="/stock-orders" feature="stock_orders">
         <StockOrdersPage />
+      </ProtectedRoute>
+
+      <ProtectedRoute path="/stock-levels" feature="stock_management">
+        <StockLevelsPage />
       </ProtectedRoute>
 
       <ProtectedRoute path="/stores" feature="inventory">
