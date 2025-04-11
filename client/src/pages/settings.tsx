@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog } from 'lucide-react';
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -189,6 +189,161 @@ export default function SettingsPage() {
     });
   };
   
+  // Handle CSV upload
+  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csvData = e.target?.result as string;
+        const items = processCSV(csvData);
+        
+        if (items.length === 0) {
+          toast({
+            title: "Error",
+            description: "No valid data found in CSV file.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        // Add the items to stock config
+        const currentIds = stockConfig.map(item => item.id);
+        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 1;
+        
+        const newItems = items.map((item, index) => ({
+          id: nextId + index,
+          itemCode: generateItemCode(item.category, item.name),
+          name: item.name,
+          category: item.category,
+          lowStockThreshold: item.lowStockThreshold
+        }));
+        
+        setStockConfig([...stockConfig, ...newItems]);
+        
+        // Reset file input
+        event.target.value = '';
+        
+        toast({
+          title: "Import Successful",
+          description: `${newItems.length} items were imported.`,
+        });
+        
+      } catch (error) {
+        console.error('Error processing CSV:', error);
+        toast({
+          title: "Import Failed",
+          description: "There was an error processing the CSV file. Please check the format.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+  
+  // Process CSV data
+  const processCSV = (csvData: string) => {
+    const lines = csvData.split(/\r?\n/);
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    
+    // Validate headers
+    const requiredColumns = ['name', 'category', 'low stock threshold'];
+    const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+    
+    if (missingColumns.length > 0) {
+      toast({
+        title: "CSV Format Error",
+        description: `Missing required columns: ${missingColumns.join(', ')}`,
+        variant: "destructive"
+      });
+      return [];
+    }
+    
+    const nameIndex = headers.indexOf('name');
+    const categoryIndex = headers.indexOf('category');
+    const thresholdIndex = headers.indexOf('low stock threshold');
+    
+    const items: { name: string; category: string; lowStockThreshold: number }[] = [];
+    
+    // Skip header row and process data
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue; // Skip empty lines
+      
+      const values = lines[i].split(',').map(val => val.trim());
+      
+      // Skip rows with insufficient data
+      if (values.length < headers.length) continue;
+      
+      const name = values[nameIndex];
+      const category = mapCategory(values[categoryIndex]);
+      const threshold = parseInt(values[thresholdIndex]);
+      
+      if (name && category && !isNaN(threshold) && threshold > 0) {
+        items.push({
+          name,
+          category,
+          lowStockThreshold: threshold
+        });
+      }
+    }
+    
+    return items;
+  };
+  
+  // Map category string to valid category
+  const mapCategory = (category: string): string => {
+    const categoryMap: Record<string, string> = {
+      'food': 'Food',
+      'drinks': 'Drinks',
+      'packaging': 'Packaging',
+      'dry food': 'Dry Food',
+      'dry': 'Dry Food',
+      'frozen food': 'Frozen Food',
+      'frozen': 'Frozen Food',
+      'miscellaneous': 'Miscellaneous',
+      'misc': 'Miscellaneous',
+      'other': 'Other'
+    };
+    
+    return categoryMap[category.toLowerCase()] || 'Other';
+  };
+  
+  // Function to download a CSV template
+  const downloadCsvTemplate = () => {
+    // Create CSV header and example rows
+    const csvContent = [
+      'Name,Category,Low Stock Threshold',
+      'Masala Chai Tea,Drinks,10',
+      'Karak Original Mix,Dry Food,8',
+      'Samosa Pastry Sheets,Frozen Food,15',
+      'Carry Bags Large,Packaging,20',
+      'Takeaway Containers,Miscellaneous,25'
+    ].join('\n');
+    
+    // Create a Blob with the CSV content
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Create a download link and trigger the download
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'stock_items_template.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Template Downloaded",
+      description: "CSV template has been downloaded successfully.",
+    });
+  };
+  
   return (
     <DashboardLayout title="Settings">
       <div className="container max-w-7xl mx-auto py-6">
@@ -300,13 +455,30 @@ export default function SettingsPage() {
                   <div className="text-sm text-muted-foreground">
                     Configure when items should be marked as "low stock"
                   </div>
-                  <Button 
-                    onClick={() => setIsAddDialogOpen(true)}
-                    className="bg-chai-gold hover:bg-amber-600"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Item
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => setIsAddDialogOpen(true)}
+                      className="bg-chai-gold hover:bg-amber-600"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Item
+                    </Button>
+                    <input
+                      type="file"
+                      id="csv-upload"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={handleCsvUpload}
+                    />
+                    <Button 
+                      onClick={() => document.getElementById('csv-upload')?.click()}
+                      variant="outline"
+                      className="border-chai-gold text-chai-gold hover:bg-amber-50"
+                    >
+                      <FileUp className="mr-2 h-4 w-4" />
+                      Import CSV
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="border rounded-md">
@@ -356,16 +528,43 @@ export default function SettingsPage() {
                   </Table>
                 </div>
                 
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                    <div className="text-sm text-amber-800">
-                      <p className="font-medium">Important</p>
-                      <p>Stock status is automatically updated based on these thresholds:</p>
-                      <ul className="ml-6 mt-1 list-disc">
-                        <li>Items with stock level <strong>at or below</strong> the threshold will be marked as <strong>Low Stock</strong></li>
-                        <li>Items with <strong>zero</strong> stock will be marked as <strong>Out of Stock</strong></li>
-                      </ul>
+                <div className="mt-4 space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium">Important</p>
+                        <p>Stock status is automatically updated based on these thresholds:</p>
+                        <ul className="ml-6 mt-1 list-disc">
+                          <li>Items with stock level <strong>at or below</strong> the threshold will be marked as <strong>Low Stock</strong></li>
+                          <li>Items with <strong>zero</strong> stock will be marked as <strong>Out of Stock</strong></li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex">
+                      <FileUp className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium">CSV Import Instructions</p>
+                        <p>To import stock items via CSV, your file should include the following columns:</p>
+                        <ul className="ml-6 mt-1 list-disc">
+                          <li><strong>Name</strong> - The name of the stock item</li>
+                          <li><strong>Category</strong> - One of: Food, Dry Food, Frozen Food, Drinks, Packaging, Miscellaneous</li>
+                          <li><strong>Low Stock Threshold</strong> - A positive number</li>
+                        </ul>
+                        <div className="mt-2">
+                          <Button 
+                            onClick={downloadCsvTemplate}
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                          >
+                            Download Template
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
