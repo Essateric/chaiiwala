@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useInventory } from "@/hooks/use-inventory";
+import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
 import { Inventory as InventoryType } from "@shared/schema";
 import { 
   Card, 
@@ -98,6 +98,12 @@ export function StockWidget({ stores }: StockWidgetProps) {
                       <div>
                         <div className="font-medium text-sm">{item.name}</div>
                         <div className="text-xs text-gray-500">SKU: {item.sku}</div>
+                        {(item as any).storeBreakdown && 
+                         (item as any).storeBreakdown.length > 1 && (
+                          <div className="text-xs text-chai-gold mt-1">
+                            Multiple Locations: {(item as any).storeBreakdown.map((s: any) => s.name).join(', ')}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="text-sm">{item.quantity}</div>
@@ -117,6 +123,12 @@ export function StockWidget({ stores }: StockWidgetProps) {
                         <div>
                           <div className="font-medium text-sm">{item.name}</div>
                           <div className="text-xs text-gray-500">SKU: {item.sku}</div>
+                          {(item as any).storeBreakdown && 
+                           (item as any).storeBreakdown.length > 1 && (
+                            <div className="text-xs text-chai-gold mt-1">
+                              Multiple Locations: {(item as any).storeBreakdown.map((s: any) => s.name).join(', ')}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="text-sm">{item.quantity}</div>
