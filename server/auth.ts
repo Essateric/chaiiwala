@@ -7,9 +7,11 @@ import { User as SelectUser } from "@shared/schema";
 
 // Define test users with fixed passwords for debugging
 const TEST_USERS = [
-  { username: "shabnam", password: "password123", name: "Shabnam Essa", role: "admin" },
-  { username: "usman", password: "password123", name: "Usman Aftab", role: "regional" },
-  { username: "jubayed", password: "password123", name: "Jubayed Chowdhury", role: "store", storeId: 5 }
+  { username: "shabnam", password: "password123", firstName: "Shabnam", lastName: "Essa", name: "Shabnam Essa", role: "admin", email: "shabnam@chaiiwala.com" },
+  { username: "usman", password: "password123", firstName: "Usman", lastName: "Aftab", name: "Usman Aftab", role: "regional", email: "usman@chaiiwala.com" },
+  { username: "jubayed", password: "password123", firstName: "Jubayed", lastName: "Chowdhury", name: "Jubayed Chowdhury", role: "store", storeId: 5, email: "jubayed@chaiiwala.com" },
+  { username: "imran", password: "password123", firstName: "Imran", lastName: "Khan", name: "Imran Khan", role: "store", storeId: 2, email: "imran@chaiiwala.com" },
+  { username: "zahra", password: "password123", firstName: "Zahra", lastName: "Mahmood", name: "Zahra Mahmood", role: "store", storeId: 3, email: "zahra@chaiiwala.com" }
 ];
 
 declare global {
@@ -47,8 +49,7 @@ export function setupAuth(app: Express) {
       if (!existingUser) {
         console.log(`Creating test user: ${testUser.username}`);
         await storage.createUser({
-          ...testUser,
-          email: null
+          ...testUser
         });
       }
     }
