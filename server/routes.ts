@@ -537,6 +537,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Configuration Items
+  app.get("/api/stock-config", isAuthenticated, async (req, res) => {
+    try {
+      const stockItems = await storage.getAllStockConfig();
+      res.json(stockItems);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to retrieve stock configuration items" });
+    }
+  });
+
+  app.post("/api/stock-config", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const stockItemData = insertStockConfigSchema.parse(req.body);
+      const stockItem = await storage.createStockConfigItem(stockItemData);
+      res.status(201).json(stockItem);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create stock configuration item" });
+      }
+    }
+  });
+
+  app.patch("/api/stock-config/:id", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedStockItem = await storage.updateStockConfigItem(id, req.body);
+      if (updatedStockItem) {
+        res.json(updatedStockItem);
+      } else {
+        res.status(404).json({ message: "Stock configuration item not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update stock configuration item" });
+    }
+  });
+
+  // Store Stock Levels
+  app.get("/api/stock-levels/:storeId", isAuthenticated, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      
+      // Check if user has permission to access this store's data
+      const userRole = req.user.role;
+      const userStoreId = req.user.storeId;
+      
+      if (userRole !== 'admin' && userRole !== 'regional' && userStoreId !== storeId) {
+        return res.status(403).json({ message: "Forbidden: You don't have permission to access this store's data" });
+      }
+      
+      const stockLevels = await storage.getStockLevelsByStore(storeId);
+      res.json(stockLevels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to retrieve store stock levels" });
+    }
+  });
+
+  app.get("/api/stock-levels", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const stockLevels = await storage.getAllStockLevels();
+      res.json(stockLevels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to retrieve all stock levels" });
+    }
+  });
+
+  app.post("/api/stock-levels/update", isAuthenticated, async (req, res) => {
+    try {
+      const { storeId, stockItemId, quantity, updatedBy } = req.body;
+      
+      // Check if user has permission to update this store's data
+      const userRole = req.user.role;
+      const userStoreId = req.user.storeId;
+      
+      if (userRole !== 'admin' && userRole !== 'regional' && userStoreId !== storeId) {
+        return res.status(403).json({ message: "Forbidden: You don't have permission to update this store's data" });
+      }
+      
+      const stockLevel = await storage.updateStockLevel(storeId, stockItemId, quantity, updatedBy);
+      res.status(200).json(stockLevel);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update stock level" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

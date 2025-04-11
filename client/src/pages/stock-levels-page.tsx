@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import DashboardLayout from '@/components/dashboard/dashboard-layout';
+import DashboardLayout from '@/components/layout/dashboard-layout';
 import {
   Table,
   TableBody,

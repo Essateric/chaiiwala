@@ -72,8 +72,15 @@ export interface IStorage {
   // Stock Configuration methods
   getAllStockConfig(): Promise<StockConfig[]>;
   getStockConfigByItemCode(itemCode: string): Promise<StockConfig | undefined>;
-  createStockConfig(stockConfig: InsertStockConfig): Promise<StockConfig>;
-  updateStockConfig(id: number, data: Partial<StockConfig>): Promise<StockConfig | undefined>;
+  getStockConfigItem(id: number): Promise<StockConfig | undefined>;
+  createStockConfigItem(stockConfig: InsertStockConfig): Promise<StockConfig>;
+  updateStockConfigItem(id: number, data: Partial<StockConfig>): Promise<StockConfig | undefined>;
+  
+  // Stock Levels methods
+  getAllStockLevels(): Promise<StoreStockLevel[]>;
+  getStockLevelsByStore(storeId: number): Promise<StoreStockLevel[]>;
+  getStockLevel(storeId: number, stockItemId: number): Promise<StoreStockLevel | undefined>;
+  updateStockLevel(storeId: number, stockItemId: number, quantity: number, updatedBy: number): Promise<StoreStockLevel>;
   
   // Event Orders methods
   getAllEventOrders(): Promise<EventOrder[]>;
