@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, Store as StoreModel } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockWidget } from "@/components/dashboard/stock-widget";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
@@ -23,7 +23,7 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { 
-  Store, 
+  Store as StoreIcon, 
   Users, 
   AlertTriangle,
   Sparkles,
@@ -83,14 +83,10 @@ export default function DashboardBasic() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
   
-  // Simulate query for stores to be ready for real API integration later
-  const { data: stores = chaiiwalaStores, isLoading } = useQuery({
+  // Fetch real store data from database
+  const { data: stores = [], isLoading } = useQuery<StoreModel[]>({
     queryKey: ['/api/stores'],
-    queryFn: async () => {
-      // This would normally fetch from API
-      return chaiiwalaStores;
-    },
-    enabled: false // Disable actual fetching since we're using sample data
+    // No custom queryFn needed as the default fetcher is set up to work with our backend
   });
   
   // Get status color for inventory items
