@@ -53,10 +53,12 @@ type StockItemWithLevel = {
   lowStockThreshold: number;
   category: string;
   price: number;
-  sku: string;
+  sku: string | null;
   quantity: number;
-  lastUpdated: string | null;
+  lastUpdated: Date | string | null;
   isEdited: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export default function StoreStockUpdatePage() {
@@ -206,7 +208,8 @@ export default function StoreStockUpdatePage() {
   });
 
   // Get unique categories for the filter
-  const categories = [...new Set(stockItems.map(item => item.category))];
+  const categoriesSet = new Set(stockItems.map(item => item.category));
+  const categories = Array.from(categoriesSet);
 
   // Helper to determine stock status for styling
   const getStockStatusClass = (item: StockItemWithLevel) => {
