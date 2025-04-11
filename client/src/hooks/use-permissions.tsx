@@ -120,11 +120,31 @@ export function usePermissions() {
     return allowedRoles.includes(user.role);
   };
 
+  // Check if user has access to a specific store
+  const hasStoreAccess = (storeId: number): boolean => {
+    return isAssignedToStore(storeId);
+  };
+
+  // Check if user can edit stock levels
+  const canEditStockLevels = (): boolean => {
+    if (!user) return false;
+    
+    // Admin and regional managers can edit all stock levels
+    if (user.role === 'admin' || user.role === 'regional') return true;
+    
+    // Store managers can edit their own store's stock levels
+    if (user.role === 'store' && user.storeId) return true;
+    
+    return false;
+  };
+
   return {
     hasPermission,
     hasRole,
     isAssignedToStore,
     canAccess,
+    hasStoreAccess,
+    canEditStockLevels,
     isAuthenticated: !!user,
     userRole: user?.role || null,
     isLoading,
