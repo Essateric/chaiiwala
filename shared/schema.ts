@@ -126,6 +126,16 @@ export const managerDetails = pgTable("manager_details", {
   lastLoginDate: text("last_login_date").notNull(),
 });
 
+// Stock Categories Table
+export const stockCategories = pgTable("stock_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // Category name
+  prefix: text("prefix").notNull().unique(), // Prefix used for item codes (e.g. 'DF', 'BP')
+  description: text("description"), // Optional description
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Stock Configuration Table
 export const stockConfig = pgTable("stock_config", {
   id: serial("id").primaryKey(),
@@ -198,6 +208,7 @@ export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, c
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStockCategorySchema = createInsertSchema(stockCategories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStoreStockLevelSchema = createInsertSchema(storeStockLevels).omit({ id: true, lastUpdated: true });
 export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
 
@@ -237,6 +248,9 @@ export type InsertEventOrder = z.infer<typeof insertEventOrderSchema>;
 
 export type StockConfig = typeof stockConfig.$inferSelect;
 export type InsertStockConfig = z.infer<typeof insertStockConfigSchema>;
+
+export type StockCategory = typeof stockCategories.$inferSelect;
+export type InsertStockCategory = z.infer<typeof insertStockCategorySchema>;
 
 export type Permission = typeof permissions.$inferSelect;
 export type InsertPermission = z.infer<typeof insertPermissionSchema>;

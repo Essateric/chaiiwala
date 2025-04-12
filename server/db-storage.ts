@@ -10,6 +10,7 @@ import {
   JobLog, InsertJobLog, jobLogs,
   EventOrder, InsertEventOrder, eventOrders,
   StockConfig, InsertStockConfig, stockConfig,
+  StockCategory, InsertStockCategory, stockCategories,
   StoreStockLevel, InsertStoreStockLevel, storeStockLevels,
   Permission, InsertPermission, permissions
 } from "@shared/schema";
