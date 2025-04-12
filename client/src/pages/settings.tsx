@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp, Tags } from 'lucide-react';
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useStockCategories } from "@/hooks/use-stock-categories";
 
 // Mock stock configuration data
 // Type declaration for stock items
@@ -88,6 +89,22 @@ export default function SettingsPage() {
     price: 0.00,
     sku: ""
   });
+  
+  // State for category management
+  const [newCategory, setNewCategory] = useState({ name: "", prefix: "", description: "" });
+  const [editingCategory, setEditingCategory] = useState<SelectStockCategory | null>(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  
+  // Fetch stock categories
+  const { 
+    categories, 
+    createCategory, 
+    updateCategory, 
+    deleteCategory, 
+    isCreating, 
+    isUpdating, 
+    isDeleting 
+  } = useStockCategories();
   
   // Fetch all stores for the store dropdown
   const { data: allStores = [] } = useQuery<SelectStore[]>({
