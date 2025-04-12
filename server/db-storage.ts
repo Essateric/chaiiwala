@@ -383,10 +383,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStockCategory(insertCategory: InsertStockCategory): Promise<StockCategory> {
+    const now = new Date();
     const [category] = await db.insert(stockCategories)
       .values({
         ...insertCategory,
-        createdAt: new Date()
+        createdAt: now,
+        updatedAt: now
       })
       .returning();
     return category;
@@ -394,7 +396,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateStockCategory(id: number, data: Partial<StockCategory>): Promise<StockCategory | undefined> {
     const [updatedCategory] = await db.update(stockCategories)
-      .set(data)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
       .where(eq(stockCategories.id, id))
       .returning();
     return updatedCategory;
