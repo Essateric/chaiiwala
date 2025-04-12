@@ -651,6 +651,185 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Categories Management Section */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Tag className="mr-2 h-5 w-5" />
+                  Stock Categories
+                </CardTitle>
+                <CardDescription>
+                  Manage product categories and their prefix codes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between mb-4">
+                  <div className="text-sm text-muted-foreground">
+                    These categories are used for organizing stock items and generating item codes
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      setNewCategory({ name: "", prefix: "", description: "" });
+                      setCategoryDialogOpen(true);
+                    }}
+                    className="bg-chai-gold hover:bg-amber-600"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Category
+                  </Button>
+                </div>
+                
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Prefix</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categories && categories.length > 0 ? (
+                      categories.map((category) => (
+                        <TableRow key={category.id}>
+                          <TableCell className="font-medium">{category.name}</TableCell>
+                          <TableCell>{category.prefix}</TableCell>
+                          <TableCell>{category.description || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingCategory(category);
+                                  setNewCategory({
+                                    name: category.name,
+                                    prefix: category.prefix,
+                                    description: category.description || "",
+                                  });
+                                  setCategoryDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="text-red-500"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete ${category.name}?`)) {
+                                    deleteCategory(category.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                          No categories found. Add your first category to get started.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            
+            {/* Category Add/Edit Dialog */}
+            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingCategory ? 'Edit Category' : 'Add New Category'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingCategory 
+                      ? 'Update the details of the existing category' 
+                      : 'Add a new category for stock item organization'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="categoryName">Category Name</Label>
+                    <Input 
+                      id="categoryName" 
+                      value={newCategory.name} 
+                      onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                      placeholder="e.g. Drinks, Food, Packaging"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="categoryPrefix">Prefix Code</Label>
+                    <Input 
+                      id="categoryPrefix" 
+                      value={newCategory.prefix} 
+                      onChange={(e) => setNewCategory({ ...newCategory, prefix: e.target.value.toUpperCase() })}
+                      placeholder="e.g. DP, BP, FPFC"
+                      maxLength={5}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Short code used for generating item codes (max 5 characters)
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="categoryDescription">Description (Optional)</Label>
+                    <Input 
+                      id="categoryDescription" 
+                      value={newCategory.description} 
+                      onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                      placeholder="Brief description of this category"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    disabled={!newCategory.name || !newCategory.prefix || isCreating || isUpdating}
+                    onClick={() => {
+                      if (editingCategory) {
+                        updateCategory({
+                          id: editingCategory.id,
+                          data: {
+                            name: newCategory.name,
+                            prefix: newCategory.prefix,
+                            description: newCategory.description || null
+                          }
+                        });
+                      } else {
+                        createCategory({
+                          name: newCategory.name,
+                          prefix: newCategory.prefix,
+                          description: newCategory.description || null
+                        });
+                      }
+                      setCategoryDialogOpen(false);
+                      setEditingCategory(null);
+                    }}
+                    className="bg-chai-gold hover:bg-amber-600"
+                  >
+                    {isCreating || isUpdating ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {editingCategory ? 'Updating...' : 'Creating...'}
+                      </span>
+                    ) : (
+                      <span>{editingCategory ? 'Update Category' : 'Create Category'}</span>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
           
           {/* User Preferences Tab */}
