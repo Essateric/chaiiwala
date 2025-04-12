@@ -367,6 +367,48 @@ export class DatabaseStorage implements IStorage {
     return updatedJobLog;
   }
   
+  // Stock Categories methods
+  async getAllStockCategories(): Promise<StockCategory[]> {
+    return await db.select().from(stockCategories);
+  }
+
+  async getStockCategory(id: number): Promise<StockCategory | undefined> {
+    const [category] = await db.select().from(stockCategories).where(eq(stockCategories.id, id));
+    return category;
+  }
+
+  async getCategoryByPrefix(prefix: string): Promise<StockCategory | undefined> {
+    const [category] = await db.select().from(stockCategories).where(eq(stockCategories.prefix, prefix));
+    return category;
+  }
+
+  async createStockCategory(insertCategory: InsertStockCategory): Promise<StockCategory> {
+    const now = new Date();
+    const [category] = await db.insert(stockCategories)
+      .values({
+        ...insertCategory,
+        createdAt: now,
+        updatedAt: now
+      })
+      .returning();
+    return category;
+  }
+
+  async updateStockCategory(id: number, data: Partial<StockCategory>): Promise<StockCategory | undefined> {
+    const [updatedCategory] = await db.update(stockCategories)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(stockCategories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+
+  async deleteStockCategory(id: number): Promise<void> {
+    await db.delete(stockCategories).where(eq(stockCategories.id, id));
+  }
+  
   // Stock Config methods
   async getAllStockConfig(): Promise<StockConfig[]> {
     return await db.select().from(stockConfig);

@@ -18,6 +18,7 @@ import {
   insertJobLogSchema,
   insertEventOrderSchema,
   insertPermissionSchema,
+  insertStockCategorySchema,
   taskStatusEnum,
   priorityEnum,
   inventoryStatusEnum,

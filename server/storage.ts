@@ -10,7 +10,9 @@ import {
   JobLog, InsertJobLog,
   EventOrder, InsertEventOrder,
   StockConfig, InsertStockConfig,
-  Permission, InsertPermission
+  StockCategory, InsertStockCategory,
+  Permission, InsertPermission,
+  StoreStockLevel
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -68,6 +70,14 @@ export interface IStorage {
   getJobLog(id: number): Promise<JobLog | undefined>;
   createJobLog(jobLog: InsertJobLog): Promise<JobLog>;
   updateJobLog(id: number, data: Partial<JobLog>): Promise<JobLog | undefined>;
+  
+  // Stock Categories methods
+  getAllStockCategories(): Promise<StockCategory[]>;
+  getStockCategory(id: number): Promise<StockCategory | undefined>;
+  getCategoryByPrefix(prefix: string): Promise<StockCategory | undefined>;
+  createStockCategory(category: InsertStockCategory): Promise<StockCategory>;
+  updateStockCategory(id: number, data: Partial<StockCategory>): Promise<StockCategory | undefined>;
+  deleteStockCategory(id: number): Promise<void>;
   
   // Stock Configuration methods
   getAllStockConfig(): Promise<StockConfig[]>;
