@@ -576,6 +576,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Categories
+  app.get("/api/stock-categories", isAuthenticated, async (req, res) => {
+    try {
+      const categories = await storage.getAllStockCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stock categories" });
+    }
+  });
+  
+  app.get("/api/stock-categories/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getStockCategory(id);
+      if (category) {
+        res.json(category);
+      } else {
+        res.status(404).json({ message: "Category not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stock category" });
+    }
+  });
+  
+  app.post("/api/stock-categories", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const categoryData = insertStockCategorySchema.parse(req.body);
+      const category = await storage.createStockCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create category" });
+      }
+    }
+  });
+  
+  app.patch("/api/stock-categories/:id", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedCategory = await storage.updateStockCategory(id, req.body);
+      if (updatedCategory) {
+        res.json(updatedCategory);
+      } else {
+        res.status(404).json({ message: "Category not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+  
+  app.delete("/api/stock-categories/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteStockCategory(id);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
   // Store Stock Levels
   app.get("/api/stock-levels/:storeId", isAuthenticated, async (req, res) => {
     try {
