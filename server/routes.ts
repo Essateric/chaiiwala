@@ -177,8 +177,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Checklists
   app.get("/api/checklists", isAuthenticated, async (req, res) => {
-    const checklists = await storage.getAllChecklists();
-    res.json(checklists);
+    // If storeId is provided as a query parameter, filter checklists by store
+    if (req.query.storeId) {
+      const storeId = parseInt(req.query.storeId as string);
+      const allChecklists = await storage.getAllChecklists();
+      const filteredChecklists = allChecklists.filter(checklist => checklist.storeId === storeId);
+      res.json(filteredChecklists);
+    } else {
+      const checklists = await storage.getAllChecklists();
+      res.json(checklists);
+    }
   });
 
   app.post("/api/checklists", isAuthenticated, hasRole(["admin", "regional", "store"]), async (req, res) => {
