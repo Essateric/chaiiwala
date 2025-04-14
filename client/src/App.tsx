@@ -1,6 +1,9 @@
 import { Route, Switch } from "wouter";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import AuthPageNew from "@/pages/auth-page-new";
 import DashboardBasic from "@/pages/dashboard-basic";
+import StoreManagerDashboard from "@/pages/store-manager-dashboard";
 import StockManagementView from "@/pages/stock-management";
 import DeepCleaningPage from "@/pages/deep-cleaning-page";
 import MaintenancePage from "@/pages/maintenance-page";
@@ -14,8 +17,36 @@ import AnnouncementsPage from "@/pages/announcements-page";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/components/protected-route";
+import { Loader2 } from "lucide-react";
+
+// IDs of the 7 specific store locations that get the special dashboard
+const SPECIAL_DASHBOARD_STORE_IDS = [1, 2, 3, 4, 5, 6, 7];
 
 function App() {
+  const { user, isLoading } = useAuth();
+  const [isRouteLoading, setIsRouteLoading] = useState(true);
+  
+  useEffect(() => {
+    if (!isLoading) {
+      setIsRouteLoading(false);
+    }
+  }, [isLoading]);
+
+  // Show loading screen while routes are being determined
+  if (isRouteLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      </div>
+    );
+  }
+
+  const shouldUseSpecialDashboard = 
+    user && 
+    user.role === 'store' && 
+    user.storeId && 
+    SPECIAL_DASHBOARD_STORE_IDS.includes(user.storeId);
+
   return (
     <Switch>
       {/* Public route - no protection needed */}
@@ -48,6 +79,10 @@ function App() {
         <StockLevelsPage />
       </ProtectedRoute>
 
+      <ProtectedRoute path="/store-stock-update" feature="inventory">
+        <StoreStockUpdatePage />
+      </ProtectedRoute>
+
       <ProtectedRoute path="/stores" feature="inventory">
         <StoresPage />
       </ProtectedRoute>
@@ -64,12 +99,13 @@ function App() {
         <SettingsPage />
       </ProtectedRoute>
 
+      {/* Dashboard routes - conditionally render based on user role and store ID */}
       <ProtectedRoute path="/dashboard" feature="dashboard">
-        <DashboardBasic />
+        {shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
       </ProtectedRoute>
 
       <ProtectedRoute path="/" feature="dashboard">
-        <DashboardBasic />
+        {shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
       </ProtectedRoute>
 
       {/* 404 route */}
