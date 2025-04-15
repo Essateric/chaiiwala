@@ -102,7 +102,7 @@ export default function StoreStockUpdatePage() {
 
   // Fetch stock levels for this store
   const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery<StoreStockLevel[]>({
-    queryKey: ['/api/stock-levels', storeId],
+    queryKey: [`/api/stock-levels/${storeId}`],
     enabled: !!user && !!storeId,
   });
 
@@ -126,7 +126,7 @@ export default function StoreStockUpdatePage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stock-levels', storeId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-levels/${storeId}`] });
       toast({
         title: "Stock Updated",
         description: "Stock quantities have been successfully updated",
