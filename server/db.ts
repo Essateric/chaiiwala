@@ -3,6 +3,18 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
+// Fix for ErrorEvent which has only a getter issue
+const originalWSError = ws.ErrorEvent;
+ws.ErrorEvent = function ErrorEvent(error) {
+  const event = new originalWSError(error);
+  Object.defineProperty(event, 'message', {
+    get() { return error.message; },
+    set() { /* ignore */ },
+    configurable: true,
+  });
+  return event;
+};
+
 neonConfig.webSocketConstructor = ws;
 
 // Variables to be exported
