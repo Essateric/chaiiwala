@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { StockWidget } from "@/components/dashboard/stock-widget";
+import { StockLevelPanel } from "@/components/dashboard/stock-level-panel";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
 import { 
   Dialog,
@@ -202,90 +202,8 @@ export default function DashboardBasic() {
             </div>
           </div>
           
-          {/* 3. Stock Overview */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-base font-medium text-gray-900">Stock Overview</h3>
-              <div className="flex-shrink-0 bg-purple-100 rounded-md p-2">
-                <Package className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-            <div className="p-5 pt-3">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  {!selectedStoreId && inventory ? (
-                    <span className="text-sm font-semibold text-gray-900">{inventory.length} items across all stores</span>
-                  ) : selectedStoreId && inventory ? (
-                    <div>
-                      <span className="text-sm font-semibold text-gray-900">{inventory.length} items in {selectedStoreName}</span>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {inventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock').length > 0 ? (
-                          <span className="text-yellow-600">
-                            {inventory.filter(item => item.status === 'low_stock').length} low stock items
-                          </span>
-                        ) : (
-                          <span className="text-green-600">All stock levels good</span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-sm font-semibold text-gray-900">Loading...</span>
-                  )}
-                </div>
-                <select 
-                  className="border rounded-md py-1 px-2 text-xs bg-white"
-                  value={selectedStoreId?.toString() || "all"}
-                  onChange={handleStoreChange}
-                >
-                  <option value="all">All Stores</option>
-                  {stores.map((store: StoreData) => (
-                    <option key={store.id} value={store.id.toString()}>
-                      {store.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="mt-3 space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">In Stock</span>
-                  <span className="font-medium text-green-600">
-                    {inventory ? inventory.filter(item => item.status === 'in_stock').length : '...'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Low Stock</span>
-                  <span className="font-medium text-yellow-600">
-                    {inventory ? inventory.filter(item => item.status === 'low_stock').length : '...'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Out of Stock</span>
-                  <span className="font-medium text-red-600">
-                    {inventory ? inventory.filter(item => item.status === 'out_of_stock').length : '...'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">On Order</span>
-                  <span className="font-medium text-blue-600">
-                    {inventory ? inventory.filter(item => item.status === 'on_order').length : '...'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mt-4 text-right">
-                <button 
-                  onClick={() => {
-                    handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } } as React.ChangeEvent<HTMLSelectElement>);
-                    setIsStockDialogOpen(true);
-                  }}
-                  className="text-xs font-medium text-chai-gold hover:text-yellow-600"
-                >
-                  View Full Inventory
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* 3. Stock Overview - using our new component */}
+          <StockLevelPanel />
           
           {/* 4. Recent Notifications */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
