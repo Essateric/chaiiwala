@@ -69,6 +69,8 @@ export default function StoreStockUpdatePage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatus, setStockStatus] = useState('all');
   const [editedItems, setEditedItems] = useState<{ [key: number]: number }>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Get user's store
   const storeId = user?.storeId;
@@ -258,11 +260,20 @@ export default function StoreStockUpdatePage() {
                   placeholder="Search by name or code..."
                   className="pl-8"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1); // Reset to first page when search changes
+                  }}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <Select 
+                  value={categoryFilter} 
+                  onValueChange={(value) => {
+                    setCategoryFilter(value);
+                    setCurrentPage(1); // Reset to first page when category changes
+                  }}
+                >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
@@ -274,7 +285,13 @@ export default function StoreStockUpdatePage() {
                   </SelectContent>
                 </Select>
                 
-                <Select value={stockStatus} onValueChange={setStockStatus}>
+                <Select 
+                  value={stockStatus} 
+                  onValueChange={(value) => {
+                    setStockStatus(value);
+                    setCurrentPage(1); // Reset to first page when status changes
+                  }}
+                >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -326,7 +343,10 @@ export default function StoreStockUpdatePage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStockItems.map((item) => {
+                      // Apply pagination
+                      filteredStockItems
+                        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                        .map((item) => {
                         const currentQuantity = item.quantity;
                         const editedQuantity = editedItems[item.id] !== undefined ? editedItems[item.id] : currentQuantity;
                         const hasChanged = editedQuantity !== currentQuantity;
@@ -389,31 +409,58 @@ export default function StoreStockUpdatePage() {
               </div>
             )}
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <div className="text-sm text-muted-foreground">
-              {filteredStockItems.length} items shown • 
-              {Object.keys(editedItems).length > 0 ? 
-                ` ${Object.keys(editedItems).length} items modified` : 
-                ' No changes pending'}
+          <CardFooter className="flex flex-col gap-4">
+            <div className="flex justify-between w-full">
+              <div className="text-sm text-muted-foreground">
+                {filteredStockItems.length} items shown • 
+                {Object.keys(editedItems).length > 0 ? 
+                  ` ${Object.keys(editedItems).length} items modified` : 
+                  ' No changes pending'}
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline" 
+                  onClick={handleResetChanges}
+                  disabled={Object.keys(editedItems).length === 0 || updateStockLevelMutation.isPending}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset
+                </Button>
+                <Button
+                  onClick={handleSaveChanges}
+                  disabled={Object.keys(editedItems).length === 0 || updateStockLevelMutation.isPending}
+                  className="bg-chai-gold hover:bg-amber-600"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {updateStockLevelMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
             </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline" 
-                onClick={handleResetChanges}
-                disabled={Object.keys(editedItems).length === 0 || updateStockLevelMutation.isPending}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Reset
-              </Button>
-              <Button
-                onClick={handleSaveChanges}
-                disabled={Object.keys(editedItems).length === 0 || updateStockLevelMutation.isPending}
-                className="bg-chai-gold hover:bg-amber-600"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {updateStockLevelMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
+            
+            {/* Pagination controls */}
+            {filteredStockItems.length > itemsPerPage && (
+              <div className="flex items-center justify-center space-x-2 w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {Math.ceil(filteredStockItems.length / itemsPerPage)}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredStockItems.length / itemsPerPage), prev + 1))}
+                  disabled={currentPage >= Math.ceil(filteredStockItems.length / itemsPerPage)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </CardFooter>
         </Card>
       </div>
