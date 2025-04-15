@@ -361,7 +361,16 @@ export default function StoreStockUpdatePage() {
                               <div className="text-xs text-muted-foreground">{item.sku || 'No SKU'}</div>
                             </TableCell>
                             <TableCell>{item.category}</TableCell>
-                            <TableCell className="text-center">{currentQuantity}</TableCell>
+                            <TableCell className="text-center">
+                              {hasChanged ? (
+                                <div className="flex items-center justify-center">
+                                  <span className="line-through text-gray-400 mr-2">{currentQuantity}</span>
+                                  <span className="font-medium">{editedQuantity}</span>
+                                </div>
+                              ) : (
+                                currentQuantity
+                              )}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center space-x-1">
                                 <Button 
