@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
   const [editItem, setEditItem] = useState<StockConfigItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [newItem, setNewItem] = useState({
     name: "",
     lowStockThreshold: 5,
@@ -592,17 +593,46 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 
+                {/* Category Filter */}
+                <div className="mb-4 flex items-center gap-3">
+                  <Label htmlFor="categoryFilter" className="whitespace-nowrap">Filter by Category:</Label>
+                  <Select 
+                    onValueChange={(value) => {
+                      // We would implement filtering here if we had actual filtering state
+                      // For now, we'll just use all items
+                    }}
+                    defaultValue="all"
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories?.map((category) => (
+                        <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <div className="ml-auto text-sm">
+                    <span className="font-medium">Total Items:</span> {isLoadingStockConfig ? (
+                      <span className="animate-pulse rounded-md bg-muted inline-block h-4 w-10 align-middle"></span>
+                    ) : (
+                      <span className="ml-1">{stockConfig.length}</span>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="border rounded-md">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[10%]">Item Code</TableHead>
-                        <TableHead className="w-[20%]">Name</TableHead>
-                        <TableHead className="w-[15%]">Category</TableHead>
+                        <TableHead className="w-[15%]">Item Code</TableHead>
+                        <TableHead className="w-[25%]">Name</TableHead>
+                        <TableHead className="w-[20%]">Category</TableHead>
                         <TableHead className="w-[10%] text-center">Stock</TableHead>
-                        <TableHead className="w-[10%] text-center">Threshold</TableHead>
-                        <TableHead className="w-[10%] text-center">Price</TableHead>
-                        <TableHead className="w-[15%]">SKU</TableHead>
+                        <TableHead className="w-[15%] text-center">Threshold</TableHead>
+                        <TableHead className="w-[15%] text-center">Price</TableHead>
                         <TableHead className="w-[10%] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -617,7 +647,6 @@ export default function SettingsPage() {
                             <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
                             <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
                             <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-16" /></TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
                                 <div className="animate-pulse rounded-md bg-muted h-8 w-8" />
@@ -629,7 +658,7 @@ export default function SettingsPage() {
                       ) : stockConfig.length === 0 ? (
                         // Empty state
                         <TableRow>
-                          <TableCell colSpan={8} className="h-24 text-center">
+                          <TableCell colSpan={7} className="h-24 text-center">
                             <div className="flex flex-col items-center justify-center">
                               <PackageX className="h-8 w-8 text-muted-foreground mb-2" />
                               <p className="text-muted-foreground">No stock items found</p>
@@ -658,9 +687,6 @@ export default function SettingsPage() {
                               <span className="text-sm">
                                 £{(item.price / 100).toFixed(2)}
                               </span>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {item.sku || "-"}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
