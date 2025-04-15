@@ -45,10 +45,17 @@ export function useStockData(storeId?: number) {
       stockLevel = storeStockLevels.find(level => level.stockItemId === item.id);
     }
 
+    // Convert Date objects to string format for proper typing
+    const lastUpdated = stockLevel?.lastUpdated 
+      ? (stockLevel.lastUpdated instanceof Date 
+          ? stockLevel.lastUpdated.toISOString() 
+          : stockLevel.lastUpdated.toString())
+      : null;
+
     return {
       ...item,
       quantity: stockLevel?.quantity || 0,
-      lastUpdated: stockLevel?.lastUpdated || null,
+      lastUpdated,
     };
   });
 
