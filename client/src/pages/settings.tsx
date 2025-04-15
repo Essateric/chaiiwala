@@ -29,56 +29,9 @@ interface StockConfigItem {
   sku: string;
 }
 
-const initialStockConfig: StockConfigItem[] = [
-  { 
-    id: 1, 
-    itemCode: "BP401", 
-    name: "Masala Beans", 
-    lowStockThreshold: 5, 
-    category: "Food",
-    price: 3.99,
-    sku: "CHW-MB-001"
-  },
-  { 
-    id: 2, 
-    itemCode: "BP402", 
-    name: "Daal", 
-    lowStockThreshold: 4, 
-    category: "Food",
-    price: 2.99,
-    sku: "CHW-DA-001"
-  },
-  { 
-    id: 3, 
-    itemCode: "BP440", 
-    name: "Mogo Sauce", 
-    lowStockThreshold: 6, 
-    category: "Food",
-    price: 1.99,
-    sku: "CHW-MS-001"
-  },
-  { 
-    id: 4, 
-    itemCode: "DP196", 
-    name: "Orange Juice (12x250ml)", 
-    lowStockThreshold: 3, 
-    category: "Drinks",
-    price: 6.99,
-    sku: "CHW-OJ-001"
-  },
-  { 
-    id: 5, 
-    itemCode: "FPFC204", 
-    name: "Karak Chaii Sugar free (50 per box)", 
-    lowStockThreshold: 2, 
-    category: "Drinks",
-    price: 24.99,
-    sku: "CHW-KC-001"
-  },
-];
+// Removed static initialStockConfig array - using real data from the API
 
 export default function SettingsPage() {
-  const [stockConfig, setStockConfig] = useState(initialStockConfig);
   const [activeTab, setActiveTab] = useState("general");
   const [editItem, setEditItem] = useState<StockConfigItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -88,6 +41,40 @@ export default function SettingsPage() {
     category: "Food",
     price: 0.00,
     sku: ""
+  });
+  
+  // Fetch stock configuration items from API
+  const { 
+    data: stockConfig = [], 
+    isLoading: isLoadingStockConfig,
+    refetch: refetchStockConfig
+  } = useQuery<StockConfigItem[]>({
+    queryKey: ['/api/stock-config'],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+  
+  // Create mutation for updating stock items
+  const updateStockItemMutation = useMutation({
+    mutationFn: async (data: { id: number, updates: Partial<StockConfigItem> }) => {
+      const response = await apiRequest('PATCH', `/api/stock-config/${data.id}`, data.updates);
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Refetch stock items after successful update
+      refetchStockConfig();
+    }
+  });
+  
+  // Create mutation for adding stock items
+  const addStockItemMutation = useMutation({
+    mutationFn: async (data: Omit<StockConfigItem, 'id'>) => {
+      const response = await apiRequest('POST', '/api/stock-config', data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Refetch stock items after successful addition
+      refetchStockConfig();
+    }
   });
   
   // State for category management
