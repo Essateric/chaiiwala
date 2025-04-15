@@ -357,7 +357,7 @@ export default function StoreStockUpdatePage() {
                                   type="number"
                                   value={editedQuantity}
                                   onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center"
+                                  className="w-16 text-center bg-white"
                                   min="0"
                                 />
                                 <Button 
