@@ -52,7 +52,14 @@ export default function JobLogsSection() {
   const [formStoreId, setFormStoreId] = useState<number>(initialStoreId);
   const { staff: storeStaff, isLoading: isLoadingStaff } = useStaffByStore(formStoreId);
 
-  const { jobLogs: allJobLogs, isLoading, createJobLog, isCreating } = useJobLogs();
+  // If user is a store manager, pass their store ID to ensure proper cache management
+  const storeIdForQuery = user?.role === "store" && typeof user?.storeId === "number" ? user.storeId : undefined;
+  const { 
+    jobLogs: allJobLogs, 
+    isLoading, 
+    createJobLog, 
+    isCreating 
+  } = useJobLogs(storeIdForQuery);
   
   // Filter job logs based on selected store
   const jobLogs = React.useMemo(() => {
@@ -87,8 +94,13 @@ export default function JobLogsSection() {
   
   async function onSubmit(values: any) {
     try {
-      await createJobLog(values);
+      const newJobLog = await createJobLog(values);
+      console.log("New job log created:", newJobLog);
+      
+      // Close the dialog
       setOpen(false);
+      
+      // Reset the form for next use
       form.reset({
         storeId: values.storeId,
         logDate: format(new Date(), "yyyy-MM-dd"),

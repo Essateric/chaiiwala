@@ -18,9 +18,23 @@ export function useJobLogs(storeId?: number) {
       const response = await apiRequest("POST", "/api/joblogs", jobLog);
       return await response.json();
     },
-    onSuccess: () => {
-      // Invalidate all job logs queries
+    onSuccess: (newJobLog) => {
+      // Invalidate all job logs queries to ensure immediate refresh
       queryClient.invalidateQueries({ queryKey: ["/api/joblogs"] });
+      
+      // Also update the current job logs data with the new job log
+      if (storeId) {
+        // For store-specific queries
+        queryClient.setQueryData(["/api/joblogs", storeId], (oldData: JobLog[] = []) => {
+          return [...oldData, newJobLog];
+        });
+      } else {
+        // For all job logs
+        queryClient.setQueryData(["/api/joblogs"], (oldData: JobLog[] = []) => {
+          return [...oldData, newJobLog];
+        });
+      }
+      
       toast({
         title: "Job Log Created",
         description: "The job log has been created successfully.",
