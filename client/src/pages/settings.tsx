@@ -598,8 +598,7 @@ export default function SettingsPage() {
                   <Label htmlFor="categoryFilter" className="whitespace-nowrap">Filter by Category:</Label>
                   <Select 
                     onValueChange={(value) => {
-                      // We would implement filtering here if we had actual filtering state
-                      // For now, we'll just use all items
+                      setSelectedCategory(value);
                     }}
                     defaultValue="all"
                   >
@@ -618,7 +617,13 @@ export default function SettingsPage() {
                     <span className="font-medium">Total Items:</span> {isLoadingStockConfig ? (
                       <span className="animate-pulse rounded-md bg-muted inline-block h-4 w-10 align-middle"></span>
                     ) : (
-                      <span className="ml-1">{stockConfig.length}</span>
+                      <span className="ml-1">
+                        {selectedCategory === "all" 
+                          ? stockConfig.length 
+                          : stockConfig.filter(item => item.category === selectedCategory).length
+                        }
+                        {selectedCategory !== "all" && ` / ${stockConfig.length}`}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -656,7 +661,7 @@ export default function SettingsPage() {
                           </TableRow>
                         ))
                       ) : stockConfig.length === 0 ? (
-                        // Empty state
+                        // Empty state when no items at all
                         <TableRow>
                           <TableCell colSpan={7} className="h-24 text-center">
                             <div className="flex flex-col items-center justify-center">
@@ -666,9 +671,22 @@ export default function SettingsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
+                      ) : stockConfig.filter(item => selectedCategory === "all" || item.category === selectedCategory).length === 0 ? (
+                        // Empty state when filtering yields no results
+                        <TableRow>
+                          <TableCell colSpan={7} className="h-24 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <PackageX className="h-8 w-8 text-muted-foreground mb-2" />
+                              <p className="text-muted-foreground">No items in this category</p>
+                              <p className="text-sm text-muted-foreground mt-1">Try selecting a different category or add items to this category</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         // Data display
-                        stockConfig.map((item) => (
+                        stockConfig
+                          .filter(item => selectedCategory === "all" || item.category === selectedCategory)
+                          .map((item) => (
                           <TableRow key={item.id}>
                             <TableCell className="font-mono">{item.itemCode}</TableCell>
                             <TableCell>{item.name}</TableCell>
