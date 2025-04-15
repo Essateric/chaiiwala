@@ -47,7 +47,7 @@ interface JobLogsCalendarProps {
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
   const { user } = useAuth();
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
-    user?.role === "store" ? user?.storeId : undefined
+    user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
   
   // Convert job logs to calendar events
@@ -55,56 +55,57 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return jobLogs
       .filter(job => !selectedStoreId || job.storeId === selectedStoreId)
       .map(job => {
-        // Create start date from logDate and logTime
-        const startDate = new Date(`${job.logDate}T${job.logTime}`);
-        
-        // Create end date - set to 1 hour after start for display purposes
-        const endDate = new Date(startDate);
-        endDate.setHours(endDate.getHours() + 1);
-        
-        // Find store name
-        const storeName = stores.find(store => store.id === job.storeId)?.name || 'Unknown Store';
-        
-        return {
-          id: job.id,
-          title: job.description,
-          start: startDate,
-          end: endDate,
-          storeId: job.storeId,
-          storeName,
-          flag: job.flag,
-          description: job.description,
-          loggedBy: job.loggedBy
-        };
-      });
+        try {
+          // Create start date from logDate and logTime
+          const startDate = new Date(`${job.logDate}T${job.logTime}`);
+          
+          // Create end date - set to 1 hour after start for display purposes
+          const endDate = new Date(startDate);
+          endDate.setHours(endDate.getHours() + 1);
+          
+          // Find store name
+          const storeName = stores.find(store => store.id === job.storeId)?.name || 'Unknown Store';
+          
+          return {
+            id: job.id,
+            title: job.description,
+            start: startDate,
+            end: endDate,
+            storeId: job.storeId,
+            storeName,
+            flag: job.flag,
+            description: job.description,
+            loggedBy: job.loggedBy
+          };
+        } catch (error) {
+          console.error("Error processing job log:", job, error);
+          return null; // This will be filtered out below
+        }
+      })
+      .filter((event): event is CalendarEvent => event !== null);
   }, [jobLogs, selectedStoreId, stores]);
   
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
     let backgroundColor;
-    let borderColor;
     
     switch (event.flag) {
       case 'urgent':
         backgroundColor = '#ef4444';
-        borderColor = '#b91c1c';
         break;
       case 'long_standing':
         backgroundColor = '#eab308';
-        borderColor = '#a16207';
         break;
       default:
         backgroundColor = '#3b82f6';
-        borderColor = '#1d4ed8';
     }
     
     return {
       style: {
         backgroundColor,
-        borderColor,
         color: 'white',
         borderRadius: '4px',
-        border: 'none',
+        borderStyle: 'none',
         display: 'block',
         opacity: 0.9,
       }
