@@ -208,7 +208,9 @@ export default function StoreStockUpdatePage() {
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     
     // Stock status filter
-    const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
+    // Important: Use the original quantity for filtering, not the edited quantity
+    // Only after save is clicked will the filtering reflect the new quantities
+    const quantity = item.quantity;
     const isOutOfStock = quantity === 0;
     const isLowStock = !isOutOfStock && quantity <= item.lowStockThreshold;
     const isInStock = !isOutOfStock && !isLowStock;
