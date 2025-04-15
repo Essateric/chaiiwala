@@ -85,8 +85,8 @@ function determineCategory(itemCode: string, categoryText: string): string {
   return "Miscellaneous";
 }
 
-async function importStockOrderSheet() {
-  console.log("Importing stock order sheet...");
+async function extractStockItems() {
+  console.log("Extracting stock items from CSV...");
   
   // Read the CSV file
   const filePath = path.join(process.cwd(), 'attached_assets', 'stock_order_sheet_categorized.csv');
@@ -168,34 +168,68 @@ async function importStockOrderSheet() {
     }
   }, [] as StockItem[]);
   
+  console.log(`Found ${uniqueItems.length} unique stock items`);
+  return uniqueItems;
+}
+
+async function importStockOrderSheet() {
+  // Get all stock items from CSV
+  const uniqueItems = await extractStockItems();
   console.log(`Importing ${uniqueItems.length} unique stock items...`);
   
-  // Add each stock item to the database
-  for (const item of uniqueItems) {
-    // Check if item already exists
-    const existing = await db.select().from(stockConfig).where(eq(stockConfig.itemCode, item.itemCode));
-    
-    if (existing.length === 0) {
-      // Add item
-      const now = new Date();
-      const [newItem] = await db.insert(stockConfig).values({
-        itemCode: item.itemCode,
-        name: item.name,
-        category: item.category,
-        lowStockThreshold: item.lowStockThreshold,
-        price: item.price,
-        sku: item.sku,
-        createdAt: now,
-        updatedAt: now
-      }).returning();
-      
-      console.log(`Added item: ${newItem.name} (${newItem.itemCode})`);
-    } else {
-      console.log(`Item ${item.name} (${item.itemCode}) already exists, skipping...`);
-    }
+  // Get all existing item codes from the database
+  const existingItems = await db.select({ itemCode: stockConfig.itemCode }).from(stockConfig);
+  const existingItemCodes = new Set(existingItems.map(item => item.itemCode));
+  
+  console.log(`Found ${existingItemCodes.size} existing items in database`);
+  
+  // Filter out items that already exist in the database
+  const itemsToAdd = uniqueItems.filter(item => !existingItemCodes.has(item.itemCode));
+  console.log(`Remaining items to add: ${itemsToAdd.length}`);
+  
+  if (itemsToAdd.length === 0) {
+    console.log("All items already imported, nothing to do.");
+    return 0;
   }
   
-  return uniqueItems.length;
+  // Process in batches of 30 items
+  const batchSize = 30;
+  const batches = Math.ceil(itemsToAdd.length / batchSize);
+  
+  let totalAdded = 0;
+  
+  for (let i = 0; i < batches; i++) {
+    console.log(`Processing batch ${i + 1} of ${batches}...`);
+    const start = i * batchSize;
+    const end = Math.min(start + batchSize, itemsToAdd.length);
+    const batch = itemsToAdd.slice(start, end);
+    
+    // Prepare all items in the batch for insertion
+    const now = new Date();
+    const batchValues = batch.map(item => ({
+      itemCode: item.itemCode,
+      name: item.name,
+      category: item.category,
+      lowStockThreshold: item.lowStockThreshold,
+      price: item.price,
+      sku: item.sku,
+      createdAt: now,
+      updatedAt: now
+    }));
+    
+    // Insert batch of items
+    const inserted = await db.insert(stockConfig).values(batchValues).returning();
+    
+    for (const item of inserted) {
+      console.log(`Added item: ${item.name} (${item.itemCode})`);
+    }
+    
+    totalAdded += inserted.length;
+    console.log(`Batch ${i + 1} complete. Progress: ${totalAdded}/${itemsToAdd.length} items processed`);
+  }
+  
+  console.log(`Import complete. Added ${totalAdded} new items.`);
+  return totalAdded;
 }
 
 async function main() {
