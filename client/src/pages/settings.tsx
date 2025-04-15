@@ -275,10 +275,11 @@ export default function SettingsPage() {
         
         for (const item of items) {
           try {
-            // Add item code if not present
+            // Generate item code for each item
+            const itemCode = generateItemCode(item.category, item.name);
             const itemToAdd = {
               ...item,
-              itemCode: item.itemCode || generateItemCode(item.category, item.name)
+              itemCode
             };
             
             // Send to API
@@ -352,6 +353,7 @@ export default function SettingsPage() {
       lowStockThreshold: number;
       price: number;
       sku: string;
+      itemCode?: string;
     }[] = [];
     
     // Skip header row and process data
@@ -393,7 +395,8 @@ export default function SettingsPage() {
           category,
           lowStockThreshold: threshold,
           price: isNaN(price) ? 0.00 : price,
-          sku: altItemCode || itemCode
+          sku: altItemCode || itemCode,
+          itemCode: itemCode
         });
       }
     }
@@ -608,17 +611,17 @@ export default function SettingsPage() {
                         // Loading state
                         Array.from({ length: 5 }).map((_, index) => (
                           <TableRow key={`skeleton-${index}`}>
-                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-16" /></TableCell>
+                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-24" /></TableCell>
+                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-20" /></TableCell>
+                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-16" /></TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
-                                <Skeleton className="h-8 w-8" />
-                                <Skeleton className="h-8 w-8" />
+                                <div className="animate-pulse rounded-md bg-muted h-8 w-8" />
+                                <div className="animate-pulse rounded-md bg-muted h-8 w-8" />
                               </div>
                             </TableCell>
                           </TableRow>
