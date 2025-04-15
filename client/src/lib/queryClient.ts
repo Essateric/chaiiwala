@@ -45,17 +45,28 @@ export async function apiRequest(
   // Debug log for URL transformation in production
   if (isNetlify) {
     console.log(`API Request: ${method} ${url} → ${transformedUrl}`);
+    if (data) {
+      console.log(`Request payload:`, data);
+    }
   }
   
-  const res = await fetch(transformedUrl, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const res = await fetch(transformedUrl, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+    
+    // Log response status for debugging
+    console.log(`Response from ${url}: status=${res.status}`);
+    
+    // Don't throw error - we'll handle it in the mutation function
+    return res;
+  } catch (error) {
+    console.error(`Network error for ${url}:`, error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -72,16 +83,30 @@ export const getQueryFn: <T>(options: {
       console.log(`Query Request: GET ${url} → ${transformedUrl}`);
     }
     
-    const res = await fetch(transformedUrl, {
-      credentials: "include",
-    });
+    try {
+      const res = await fetch(transformedUrl, {
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      console.log(`Response from query ${url}: status=${res.status}`);
+      
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        console.log("Returning null for 401 response as requested");
+        return null;
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Error response from ${url}: ${res.status} - ${errorText}`);
+        throw new Error(`${res.status}: ${errorText || res.statusText}`);
+      }
+      
+      const data = await res.json();
+      return data;
+    } catch (error) {
+      console.error(`Error in query ${url}:`, error);
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
