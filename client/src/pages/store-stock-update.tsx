@@ -145,7 +145,20 @@ export default function StoreStockUpdatePage() {
   // Handle quantity change
   const handleQuantityChange = (itemId: number, newQuantity: number) => {
     if (newQuantity < 0) newQuantity = 0;
-    setEditedItems(prev => ({...prev, [itemId]: newQuantity}));
+    
+    // Find the item's original quantity
+    const item = combinedStockData.find(i => i.id === itemId);
+    if (!item) return;
+    
+    if (newQuantity === item.quantity) {
+      // If setting back to original, remove from edited items
+      const newEditedItems = { ...editedItems };
+      delete newEditedItems[itemId];
+      setEditedItems(newEditedItems);
+    } else {
+      // Otherwise update with new value
+      setEditedItems(prev => ({...prev, [itemId]: newQuantity}));
+    }
   };
 
   // Quick increment/decrement functions
@@ -213,9 +226,14 @@ export default function StoreStockUpdatePage() {
   const categoriesSet = new Set(stockItems.map(item => item.category));
   const categories = Array.from(categoriesSet);
 
+  // Helper to get the current edited quantity for an item
+  const getEditedQuantity = (item: StockItemWithLevel): number => {
+    return editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
+  };
+
   // Helper to determine stock status for styling
   const getStockStatusClass = (item: StockItemWithLevel) => {
-    const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
+    const quantity = getEditedQuantity(item);
     
     if (quantity === 0) {
       return 'bg-red-100 text-red-800 border-red-200';
@@ -228,7 +246,7 @@ export default function StoreStockUpdatePage() {
 
   // Helper to get stock status text
   const getStockStatusText = (item: StockItemWithLevel) => {
-    const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
+    const quantity = getEditedQuantity(item);
     
     if (quantity === 0) {
       return 'Out of Stock';
@@ -348,11 +366,11 @@ export default function StoreStockUpdatePage() {
                         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                         .map((item) => {
                         const currentQuantity = item.quantity;
-                        const editedQuantity = editedItems[item.id] !== undefined ? editedItems[item.id] : currentQuantity;
+                        const editedQuantity = getEditedQuantity(item);
                         const hasChanged = editedQuantity !== currentQuantity;
                         
                         return (
-                          <TableRow key={item.id} className={hasChanged ? "bg-blue-50" : ""}>
+                          <TableRow key={item.id} data-item-id={item.id} className={hasChanged ? "bg-blue-50" : ""}>
                             <TableCell className="font-mono text-sm">
                               {item.itemCode}
                             </TableCell>
@@ -400,7 +418,7 @@ export default function StoreStockUpdatePage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-center">
-                              <Badge variant="outline" className={getStockStatusClass(item)}>
+                              <Badge variant="outline" className={`stock-status-badge ${getStockStatusClass(item)}`}>
                                 {getStockStatusText(item)}
                               </Badge>
                             </TableCell>
