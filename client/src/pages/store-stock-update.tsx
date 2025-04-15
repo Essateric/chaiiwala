@@ -171,7 +171,6 @@ export default function StoreStockUpdatePage() {
     toast({
       title: "Stock Levels Updated",
       description: "All changes have been saved to the database",
-      variant: "success",
     });
     
     // Refetch the data to ensure we have the latest stock levels
