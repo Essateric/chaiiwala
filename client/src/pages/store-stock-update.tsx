@@ -99,7 +99,7 @@ export default function StoreStockUpdatePage() {
   });
 
   // Fetch stock levels for this store
-  const { data: stockLevels = [], isLoading: isLoadingStockLevels, refetch: refetchStockLevels } = useQuery<StoreStockLevel[]>({
+  const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery<StoreStockLevel[]>({
     queryKey: ['/api/stock-levels', storeId],
     enabled: !!user && !!storeId,
   });
@@ -144,13 +144,6 @@ export default function StoreStockUpdatePage() {
   const handleQuantityChange = (itemId: number, newQuantity: number) => {
     if (newQuantity < 0) newQuantity = 0;
     setEditedItems(prev => ({...prev, [itemId]: newQuantity}));
-    
-    // Update quantity immediately in the database
-    updateStockLevelMutation.mutate({
-      storeId: storeId!,
-      stockItemId: itemId,
-      quantity: newQuantity
-    });
   };
 
   // Quick increment/decrement functions
@@ -162,29 +155,29 @@ export default function StoreStockUpdatePage() {
     handleQuantityChange(itemId, Math.max(0, (editedItems[itemId] !== undefined ? editedItems[itemId] : currentQuantity) - 1));
   };
 
-  // Clear edited items tracking and show confirmation
-  const handleSaveChanges = () => {
-    // Since we're already updating the database immediately when quantities change,
-    // this function just needs to clear the edited items state and show a confirmation
-    setEditedItems({});
-    
-    toast({
-      title: "Stock Levels Updated",
-      description: "All changes have been saved to the database",
+  // Save all edited items
+  const handleSaveChanges = async () => {
+    const updatePromises = Object.entries(editedItems).map(([itemId, quantity]) => {
+      return updateStockLevelMutation.mutateAsync({
+        storeId: storeId!,
+        stockItemId: parseInt(itemId),
+        quantity
+      });
     });
-    
-    // Refetch the data to ensure we have the latest stock levels
-    refetchStockLevels();
+
+    try {
+      await Promise.all(updatePromises);
+    } catch (error) {
+      console.error("Error updating stock levels:", error);
+    }
   };
 
-  // Reset all changes and refetch data from the server
+  // Reset all changes
   const handleResetChanges = () => {
     setEditedItems({});
-    // Refetch the data to ensure we display correct values from the database
-    refetchStockLevels();
     toast({
-      title: "View Reset",
-      description: "Latest data has been fetched from the database",
+      title: "Changes Reset",
+      description: "All unsaved changes have been discarded",
     });
   };
 
@@ -339,7 +332,7 @@ export default function StoreStockUpdatePage() {
                         const hasChanged = editedQuantity !== currentQuantity;
                         
                         return (
-                          <TableRow key={item.id} className={hasChanged ? "bg-blue-100 border-l-4 border-blue-500" : ""}>
+                          <TableRow key={item.id} className={hasChanged ? "bg-blue-50" : ""}>
                             <TableCell className="font-mono text-sm">
                               {item.itemCode}
                             </TableCell>
@@ -364,7 +357,7 @@ export default function StoreStockUpdatePage() {
                                   type="number"
                                   value={editedQuantity}
                                   onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center bg-white text-black font-medium"
+                                  className="w-16 text-center"
                                   min="0"
                                 />
                                 <Button 
