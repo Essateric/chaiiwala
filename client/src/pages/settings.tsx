@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, PackageX, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -139,20 +140,29 @@ export default function SettingsPage() {
   // Handle save changes
   const handleSaveChanges = () => {
     if (editItem) {
-      // In a real application, this would make an API call to update the database
-      const updatedConfig = stockConfig.map(item => 
-        item.id === editItem.id ? editItem : item
-      );
-      setStockConfig(updatedConfig);
-      
-      toast({
-        title: "Settings Updated",
-        description: `${editItem.name} threshold has been updated.`,
+      // Send update to the API
+      updateStockItemMutation.mutate({
+        id: editItem.id,
+        updates: editItem
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Settings Updated",
+            description: `${editItem.name} threshold has been updated.`,
+          });
+          
+          // Close the dialog
+          setDialogOpen(false);
+          setEditItem(null);
+        },
+        onError: (error) => {
+          toast({
+            title: "Update Failed",
+            description: error.message || "Failed to update stock item",
+            variant: "destructive"
+          });
+        }
       });
-      
-      // Close the dialog
-      setDialogOpen(false);
-      setEditItem(null);
     }
   };
   
@@ -171,42 +181,66 @@ export default function SettingsPage() {
     // Generate item code based on category and name
     const itemCode = generateItemCode(newItem.category, newItem.name);
     
-    // Create new item with a unique ID
-    const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
+    // Create new item to add
     const itemToAdd = {
       ...newItem,
-      itemCode,
-      id: newId
+      itemCode
     };
     
-    // Add to stock configuration
-    setStockConfig([...stockConfig, itemToAdd]);
-    
-    // Reset form and close dialog
-    setNewItem({
-      name: "",
-      lowStockThreshold: 5,
-      category: "Food",
-      price: 0.00,
-      sku: ""
-    });
-    setIsAddDialogOpen(false);
-    
-    toast({
-      title: "Item Added",
-      description: `${newItem.name} has been added to stock configuration.`,
+    // Add item via API
+    addStockItemMutation.mutate(itemToAdd, {
+      onSuccess: () => {
+        // Reset form and close dialog
+        setNewItem({
+          name: "",
+          lowStockThreshold: 5,
+          category: "Food",
+          price: 0.00,
+          sku: ""
+        });
+        setIsAddDialogOpen(false);
+        
+        toast({
+          title: "Item Added",
+          description: `${newItem.name} has been added to stock configuration.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Failed to Add Item",
+          description: error.message || "Could not add the item. Please try again.",
+          variant: "destructive"
+        });
+      }
     });
   };
   
   // Handle delete item
   const handleDeleteItem = (id: number) => {
-    const updatedConfig = stockConfig.filter(item => item.id !== id);
-    setStockConfig(updatedConfig);
-    
+    // In this version, we don't have a delete endpoint yet, 
+    // so we'll just show a notification
     toast({
-      title: "Item Removed",
-      description: "Item has been removed from stock configuration.",
+      title: "Delete Not Implemented",
+      description: "The delete operation is not yet implemented on the server.",
+      variant: "destructive"
     });
+    
+    // When the API is ready, we would implement:
+    // deleteStockItemMutation.mutate(id, {
+    //   onSuccess: () => {
+    //     toast({
+    //       title: "Item Removed",
+    //       description: "Item has been removed from stock configuration.",
+    //     });
+    //   },
+    //   onError: (error) => {
+    //     toast({
+    //       title: "Delete Failed",
+    //       description: error.message || "Could not delete the item",
+    //       variant: "destructive"
+    //     });
+    //   }
+    // });
   };
   
   // Handle CSV upload
@@ -215,7 +249,7 @@ export default function SettingsPage() {
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const csvData = e.target?.result as string;
         const items = processCSV(csvData);
@@ -229,29 +263,52 @@ export default function SettingsPage() {
           return;
         }
         
-        // Add the items to stock config
-        const currentIds = stockConfig.map(item => item.id);
-        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 1;
+        // Show processing notification
+        toast({
+          title: "Processing",
+          description: `Processing ${items.length} items...`,
+        });
         
-        const newItems = items.map((item, index) => ({
-          id: nextId + index,
-          itemCode: generateItemCode(item.category, item.name),
-          name: item.name,
-          category: item.category,
-          lowStockThreshold: item.lowStockThreshold,
-          price: item.price,
-          sku: item.sku
-        }));
+        // Use our API to add each item
+        let successCount = 0;
+        let errorCount = 0;
         
-        setStockConfig([...stockConfig, ...newItems]);
+        for (const item of items) {
+          try {
+            // Add item code if not present
+            const itemToAdd = {
+              ...item,
+              itemCode: item.itemCode || generateItemCode(item.category, item.name)
+            };
+            
+            // Send to API
+            await apiRequest("POST", "/api/stock-config", itemToAdd);
+            successCount++;
+          } catch (err) {
+            console.error("Error adding item:", err);
+            errorCount++;
+          }
+        }
+        
+        // Refresh the data
+        refetchStockConfig();
         
         // Reset file input
         event.target.value = '';
         
-        toast({
-          title: "Import Successful",
-          description: `${newItems.length} items were imported.`,
-        });
+        // Show results
+        if (successCount > 0) {
+          toast({
+            title: "Import Successful",
+            description: `${successCount} items were imported. ${errorCount > 0 ? `${errorCount} items failed.` : ''}`,
+          });
+        } else {
+          toast({
+            title: "Import Failed",
+            description: "Failed to import any items. Please check the console for errors.",
+            variant: "destructive"
+          });
+        }
         
       } catch (error) {
         console.error('Error processing CSV:', error);
@@ -547,50 +604,83 @@ export default function SettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockConfig.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono">{item.itemCode}</TableCell>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell className="text-center">
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                              No Stock
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-sm">
-                              {item.lowStockThreshold} units
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-sm">
-                              £{item.price.toFixed(2)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {item.sku || "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleEditItem(item)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleDeleteItem(item.id)}
-                                className="text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                      {isLoadingStockConfig ? (
+                        // Loading state
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={`skeleton-${index}`}>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell className="text-center"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Skeleton className="h-8 w-8" />
+                                <Skeleton className="h-8 w-8" />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : stockConfig.length === 0 ? (
+                        // Empty state
+                        <TableRow>
+                          <TableCell colSpan={8} className="h-24 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <PackageX className="h-8 w-8 text-muted-foreground mb-2" />
+                              <p className="text-muted-foreground">No stock items found</p>
+                              <p className="text-sm text-muted-foreground mt-1">Add items manually or import from a CSV file</p>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        // Data display
+                        stockConfig.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-mono">{item.itemCode}</TableCell>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                No Stock
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-sm">
+                                {item.lowStockThreshold} units
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-sm">
+                                £{(item.price / 100).toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {item.sku || "-"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleEditItem(item)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className="text-red-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
