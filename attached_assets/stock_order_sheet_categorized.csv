@@ -1,0 +1,160 @@
+col_0,col_1,col_2,col_3,col_4,col_5,col_6,col_7,col_8,col_9,col_10,col_11,col_12,col_13,col_14,col_15,Category
+BP401,Leak-proof box for sandwiches/cheesecakes,450,,52.91,0,0,FPBC101,Masala Beans,8,12,,44.43,0,0,,Frozen Food
+BP402,Hot drink cups 8oz,500,,32.39,0,0,FPBC102,Daal,8,12,,44.57,0,0,,Frozen Food
+BP440,Sip through lids,1000,,9,0,0,FPBC105,Mogo Sauce,12,8,,36.6,0,0,,Frozen Food
+BP460,Large 12oz Cups,500,,43.26,0,0,FPBC106,Paneer Sauce,6,24,,56.08,0,0,,Frozen Food
+BP461,Large 12oz Lids,1000,,11,0,0,FF709,Chilli Chutney,,12,,54.53,0,0,,Frozen Food
+BP447,4oz Hot Drink Cup,1000,,25.5,0,0,FPBC107,Pau Bhaji,8,8,,40.8,0,0,,Frozen Food
+BP404,Greaseproof paper Chaiiwala times paper,1000,,16.1,0,0,FF715,Kunafa Pisatchio Mix,16,8,,48.4,0,0,,Frozen Food
+DP127,Printed Greaseproof Paper Bag,1000,,30,0,0,FPFC208,Gajar Halwa (1 piece),1,1,,1.34,0,0,,Frozen Food
+BP405,Chaiiwala Napkins,6000,,52.02,0,0,FPFC209,Gulab Jaman (1 piece),1,1,,1.38,0,0,,Frozen Food
+BP442,12oz Chaiiwala PET cup,500,,51,0,0,FPBC103,Butter Chicken,25,8,,85,0,0,,Frozen Food
+BP443,12oz Chaiiwala PET dome lids,500,,1,0,0,FPFC206,Roti (50 per box),50,1,,12.85,0,0,,Frozen Food
+DP196,16oz Chaiiwala PET cup,1000,,127.62,0,0,FF722,Orange Juice (12x250ml),12,1,,14.25,0,0,,Frozen Food
+DP197,16oz Chaiiwala PET dome lids,1000,,1,0,0,FF686,Mini Sugared Doughnuts 13.5g (4x1),5,4,,14.41,0,0,,Frozen Food
+BP462,Chaiiwala Mugs,60,,120,0,0,FF690,Triple Belgium Choclate (36 x 80g),36,36,,17.93,0,0,,Frozen Food
+DP193,6 Cup Chaii Carrier,100,,120,0,0,FF691,Belgian Choclate Chunk Cookie (36x80g),36,36,,17.93,0,0,,Frozen Food
+BP446,Printed paper carrier bag EXTRA LARGE,250,,36.12,0,0,FF721,Victoria Sponge Swirl (12 per box),1,12,,13.56,0,0,,Frozen Food
+BP409,Printed paper carrier bag MEDIUM,250,,17.7,0,0,FF720,Chocolate Hazelnut Cake (12 per box),1,12,,15.72,0,0,,Frozen Food
+DP218,Printed No Handle Takeaway Bags,400,,39.5,0,0,FF719,Biscoff Cookie Pie (16 per box),1,16,,22,0,0,,Frozen Food
+BP406,Printed Dessert Container ,1000,,99,0,0,FF718,Rocky Road Cheesecake (16 per box),1,16,,19.84,0,0,,Frozen Food
+BP407,Dessert Container Lid,1000,,1,0,0,FF717,Chocolate Dream Cake (16 per box),1,16,,33.2,0,0,,Frozen Food
+DP237,Dome Lids for dessert Container,50,,1.7,0,0,FF716,NY Vanilla Cheesecake (16 per box),1,16,,20.12,0,0,,Frozen Food
+DP194,Printed Sleeve Slider box ,500,,79,0,0,FF711,Biscoff Milk Cake 12 pack,1,12,,22.5,0,0,,Frozen Food
+DP195,Slider box Insert,500,,1,0,0,FF710,Pistachio Milk Cake 12 pack,1,12,,22.5,0,0,,Frozen Food
+DP215,Printed Rice Bowl,300,,38,0,0,FF726,Date and Banana Milk Cake,1,30,,83.33,0,0,,Frozen Food
+DP216,Printed Rice Bowl Lid,300,,1,0,0,FF700,Bhaklava Fudge Cake,1,16,,17.43,0,0,,Frozen Food
+DP247,Kids Meal Boxes,250,,31.25,0,0,FF640,Chaii Cake,12,1,,13,0,0,,Frozen Food
+DP248,Kids Booklets,250,,23.43,0,0,FPFC234,Cheesecake Gulab Jamun (16 per box),16,1,,27,0,0,,Frozen Food
+DP249,Crayons,100,,8.13,0,0,FPFC219,Rose Ice Cream (5L),60,1,,10.94,0,0,,Frozen Food
+BP413,Teapot logo STICKER,500,,5,0,0,FPFC220,Mango Ice Cream (5L),60,1,,10.94,0,0,,Frozen Food
+BP459,Use by Sticker,1000,,5,0,0,FPFC224,Vanilla Ice Cream (5L),60,1,,8.04,0,0,,Frozen Food
+BP420,Coffee STICKER,1000,,3,0,0,FPG303,Frozen Paratha (120) per box),120,1,,22,0,0,,Frozen Food
+BP421,Sweet paratha  STICKER,500,,5,0,0,FPG305,Frozen mogo chips (500g x 20 per box),6,20,,41.33,0,0,,Frozen Food
+BP422,Paneer  STICKER,500,,5,0,0,FPG339,Chicken Seekh Kebab,100,1,,46.44,0,0,,Frozen Food
+BP423,Mogo  STICKER,500,,5,0,0,FPG340,Veg Kebab,100,1,,46.44,0,0,,Frozen Food
+BP424,Samosa  STICKER,500,,5,0,0,FF727,Chicken Nuggets (6x1kg),51,6,,28.75,0,0,,Frozen Food
+BP425,Butter chicken  STICKER,500,,5,0,0,FF728,Hot N Spicy Chicken Fillets (6x900g),54,6,,40.5,0,0,,Frozen Food
+BP426,Tarelli roti  STICKER,500,,5,0,0,FF729,Chicken Biryani (40x350g),40,40,,93.33,0,0,,Frozen Food
+BP427,Omelette wrap STICKER,500,,5,0,0,BBF311,Hashbrowns 4x2.5kg,80,4,,20.98,0,0,,Frozen Food
+BP428,Nutella wrap STICKER,500,,5,0,0,FPG309,Mozzarella Cheese (6x 2kg per box),66,6,,69.25,0,0,,Frozen Food
+BP429,Masala chips STICKER,500,,5,0,0,FPG310,Frozen Chips (4x2.5kg),12.5,4,,15.72,0,0,,Frozen Food
+BP430,Sugar free STICKER,1000,,3,0,0,FF611,Chicken Tikka Boti,8.5,18,,122.63,0,0,,Frozen Food
+BP431,Mint STICKER,1000,,3,0,0,FF614,Karach Bun Kebab Patty,10,18,,126,0,0,,Frozen Food
+BP432,Cinnamon  STICKER,1000,,3,0,0,FF617,Large Samosa (10x6),10,6,,28,0,0,,Frozen Food
+BP433,Saffron  STICKER,1000,,3,0,0,FF664,Breakfast Chicken Sausages (55g),100,1,,39.25,0,0,,Frozen Food
+BP451,Ginger Choc STICKER,1000,,3,0,0,FF619,Aloo Tikki ,30,4,,40.8,0,0,,Frozen Food
+BP449,Caramel Chaii STICKER,1000,,3,0,0,FF724,Vada (90x70g),90,,,33.75,0,0,,Frozen Food
+BP434,Sweet Stuff  STICKER,500,,5,0,0,FF624,Aloo Paratha,3,24,,25.21,0,0,,Frozen Food
+BP435,Cheese roti STICKER,500,,5,0,0,FF625,Poori,10,24,,38.5,0,0,,Frozen Food
+BP436,Garam Chocolate  STICKER,1000,,3,0,0,DF374,Mango Chutney (10kg) ,50,10,,49.38,0,0,,Frozen Food
+BP437,Bombay Sandwich Sticker,500,,5,0,0,FF663,Macon Halal (6x200x15pcs),90,6,,22.49,0,0,,Frozen Food
+BP438,Chaii latte  STICKER,1000,,3,0,0,FF712,Baguettes (40 per box),1,40,,15,0,0,,Frozen Food
+BP439,Roti STICKER,500,,5,0,0,FF641,Halwa,25,8,,23.9,0,0,,Frozen Food
+BP450,Checklist STICKER,1000,,6,0,0,FPBC112,Channa,1,20,,70.05,0,0,,Frozen Food
+BP457,Lotus STICKER,500,,5,0,0,FF696,Tomato Sauce (12kg),80,20,,53.5,0,0,,Frozen Food
+BP452,Kebab Roll STICKER,500,,5,0,0,FF698,Rice Basmati (8kg),6,8,,16.37,0,0,,Frozen Food
+BP453,Sugar Wali Roti STICKER,500,,5,0,0,FF708,Diced Frozen Strawberry 10kg,,4,,19.37,0,0,,Frozen Food
+BP454,Paratha STICKER,500,,5,0,0,FF699,Bombay Sandwiches (15 per case),30,1,,37.74,0,0,,Frozen Food
+BP458,Bun Omelette STICKER,500,,5,0,0,FF667,Kheema Mix 500g,20,20,,158.67,0,0,,Frozen Food
+BP464,Veg Kebab Roll STICKER,500,,5,0,0,FF648,Pasty Chicken Sausage Roll (90g),60,1,,34.32,0,0,,Frozen Food
+BP465,Chilli Chip Butty STICKER,500,,5,0,0,FF649,Chicken Tikka Pasties (150g),30,1,,16.05,0,0,,Frozen Food
+BP469,Pink Chaii STICKER,1000,,3,0,0,FF650,Cheese & Jalapeno Pasties (150g),30,1,,16.05,0,0,,Frozen Food
+DP168,Samosa Chaat Sticker,500,,5,0,0,FF677,Chicken & Sweetcorn Pasties (150g),30,1,,18.72,0,0,,Frozen Food
+DP170,Karachi Bun Kebab Sticker,500,,5,0,0,,,,Total:,0,,0,0,,Frozen Food
+DP171,Chilli and Lemon Chips Sticker,500,,5,0,0, Dry Food ,,,,,,,,,Frozen Food
+DP173,Tikka Naan Sticker,500,,5,0,0,Item Code,Product,Portion per pack/box,Containers/ pack per box,Order,Price,Order Value,Weight (Kg),,Frozen Food
+DP175,Pink Chaii Cake Sticker,500,,5,0,0,FPBC109,Limbu Pani (5L),90,1,,9.53,0,0,,Frozen Food
+DP176,Coffee Cake Sticker,500,,5,0,0,FPFC210,Pink Chaii Mix (50 per box),8,50,,70,0,0,,Frozen Food
+DP178,Halwa Puri Sticker,500,,5,0,0,FPFC201,Garam Choc (10 x 1 kg),40,10,,75,0,0,,Frozen Food
+DP169,Date Machine Sticker,2000,,10,0,0,DF409,Karak Chaii (25 per box),18,25,,68,0,0,,Frozen Food
+DP188,Delivery Sticker,500,,10,0,0,FPFC203,Karak Coffee (50 per box),9,50,,92,0,0,,Frozen Food
+DP190,Yogurt and Mint Sticker,500,,5.7,0,0,FPFC204,Karak Chaii Sugar free (50 per box),9,50,,70,0,0,,Frozen Food
+DP191,Mogo Sauce Sticker,500,,5.7,0,0,FPFC205,Chaii Latte (1kg),40,1,,10.39,0,0,,Frozen Food
+DP192,Chaiiwala Chutney Sticker,500,,5.7,0,0,DF427,Vegan Chaii Powder,50,1,,28.75,0,0,,Frozen Food
+DP198,English-ish Breakfast Sticker,500,,5,0,0,FPFC227,Monin Gingerbread Syrup (1L),100,1,,8.5,0,0,,Frozen Food
+DP199,Cream Cheese Paratha Sticker,500,,5,0,0,FPFC228,Monin Caramel Syrup (1L),100,1,,8.52,0,0,,Frozen Food
+DP200,Grilled Cheese Naan Sticker,500,,5,0,0,FPG306,Lemon Tea Syrup (1L),100,1,,11.5,0,0,,Frozen Food
+DP201,Desi Mac and cheese Sticker,500,,5,0,0,DF440,French Vanilla syrup (1L),100,1,,8.25,0,0,,Frozen Food
+DP202,Aloo Tikka Burger Sticker,500,,5,0,0,FPFC240,Blue Curacao Syrup (70cl),70,1,,6.67,0,0,,Frozen Food
+DP203,Samosa Burger Sticker,500,,5,0,0,FPFC239,Strawberry Syrup SF (1L),100,1,,6.18,0,0,,Frozen Food
+DP204,Loaded Fries Sticker,500,,5,0,0,DF479,Rooh Afza Syrup (12x800ml),26,1,,3.65,0,0,,Frozen Food
+DP205,Kheema & Roti Sticker,500,,5,0,0,DF480,Watermelon & Lime Syrup (1.5L),33,1,,12.5,0,0,,Frozen Food
+DP206,Pani Puri Sticker,500,,5,0,0,DF481,Tahitian Lime & Mint (1.5L),33,1,,12.5,0,0,,Frozen Food
+DP207,Chicken Tikka & Chips Sticker,500,,5,0,0,DF421,Speculouse Sauce (1kg),100,1,,7.92,0,0,,Frozen Food
+DP208,Pizza Paratha & Chips Sticker,500,,5,0,0,DF444,Raspberry Topping Sauce (1kg),100,1,,10,0,0,,Frozen Food
+DP209,Shakshuka Sticker,500,,5,0,0,DF442,Pistachio Sauce (1L),100,1,,8.95,0,0,,Frozen Food
+DP210,Cheese Chutney Toastie Sticker,500,,5,0,0,DF451,Luxury White Chocolate Sauce,50,1,,10,0,0,,Frozen Food
+DP211,Butter Chicken Rice Bowl Sticker,500,,5,0,0,BBA210,Milk Choc Topping Sauce,50,1,,10,0,0, ,Frozen Food
+DP212,Chana Masala Rice Bowl Sticker,500,,5,0,0,DF422,Frappe Powder (2kg),40,1,,23.28,0,0,,Frozen Food
+DP213,Crispy Fried Paratha Sticker,500,,5,0,0,DF470,Chicken Tikka Crisps x 24,24,1,,12,0,0,,Frozen Food
+DP214,Crispy Aloo Pakora Sticker,500,,5,0,0,DF456,Chilli & Lime Crisps x 24,24,1,,12,0,0,,Frozen Food
+DP219,Aloo Tikki Chaat Sticker,500,,5,0,0,DF457,Decaf Coffee Beans,75,1,,19.27,0,0,,Frozen Food
+DP220,Mixed Kebab Wrap Sticker,500,,5,0,0,DF450,Coffee Beans,75,1,,18.1,0,0,,Frozen Food
+DP221,Lamb Kheema & Cheese Wrap Sticker,500,,5,0,0,FPFC214,Cake Rusk (50 per box),50,1,,25.5,0,0,,Frozen Food
+DP222,Kebab Wala Wrap Sticker,500,,5,0,0,FPFC216,Bombay Mix (40x50g),40,1,,18.75,0,0,,Frozen Food
+DP223,Chicken Tikka Bombay Bowl Sticker,500,,5,0,0,FPFC218,Tandoori Peanuts (40x50g),40,1,,18.75,0,0,,Frozen Food
+DP224,Lamb Kheema Bombay Bowl Sticker,500,,5,0,0,FPFC215,Chilli Lemon Corn Nuts (40x50g),40,1,,18.75,0,0,,Frozen Food
+DP225,Butter Chicken & Slaw Toastie Sticker,500,,5,0,0,DF473,Madeira Loaf Cake (24),1,24,,17.16,0,0,,Frozen Food
+DP226,Cheese & Masala Beans Toastie Sticker,500,,5,0,0,DF472,Blueberry Muffin (20),1,20,,13.75,0,0,,Frozen Food
+DP227,Lamb Macon & Egg Wrap Sticker,500,,5,0,0,DF471,Belgian choclate Muffin (20),1,20,,18.5,0,0,,Frozen Food
+DP228,Spiced Chicken Sausage & Egg Wrap Sticker,500,,5,0,0,FPFC235,Zesty Fruit Granola Bar (24),1,24,,15.5,0,0,,Frozen Food
+DP244,Blank Cake Stickers,500,,4.2,0,0,FPFC232,Belgian Caramel Shortbread (24),1,24,,15.5,0,0,,Frozen Food
+DP250,Poppadom Nacho Sticker,500,,5,0,0,DF448,Chocolate Krispy (24),1,24,,15.5,0,0,,Frozen Food
+DP251,Nuggets & Chips Sticker,500,,5,0,0,FPFC223,Parle-G (144 per box),144,1,,32,0,0,,Frozen Food
+DP252,Masala Beans&Cheese Tostie&Chips Sticker,500,,5,0,0,FPFC229,Omelette Mix ,100,1,,30,0,0,,Frozen Food
+DP253,Tikka Biryaani Sticker,500,,5,0,0,DF430,Gunpowder Spice Mix (5x1kg),50,5,,80.93,0,0,,Frozen Food
+DP254,Bombay Twister Sticker,500,,5,0,0,DF433,Chaat Masala (10x500g) ,160,10,,94,0,0,,Frozen Food
+DP255,Chicken Tikka Melt Sticker,500,,5,0,0,FPG307,Falooda mix Rose (20 per pack),10,20,,24,0,0,,Frozen Food
+DP256,Vada Pav Sticker,500,,5,0,0,FPG308,Falooda mix Mango (20 per pack),10,20,,24,0,0,,Frozen Food
+DP235,3 Compartment Container,200,,19.76,0,0,FPG314,White Sugar Sachets (1000 per box),1000,1,,12,0,0,,Frozen Food
+DP236,3 Compartment Container Lid,200,,21.5,0,0,FPG315,Brown Sugar Sachets (1000 per box),1000,1,,12,0,0,,Frozen Food
+PP503,Printed Straws,2000,,36,0,0,FPG316,Salt Sachets (2000 per box),2000,1,,12,0,0,,Frozen Food
+PP504,Wooden Stirrer,10000,,27.87,0,0,FPG317,Pepper Sachets (2000 per box),2000,1,,12,0,0,,Frozen Food
+PP539,Wooden Knives,2000,,30.25,0,0,FPG302,Yogurt and Mint Sauce,42,6,,19.98,0,0,,Frozen Food
+PP538,Wooden Spoons,2000,,30.25,0,0,FPG311,Burger Relish,42,6,,18.87,0,0,,Frozen Food
+PP537,Wooden Forks,2000,,30.25,0,0,DF381,Tamarind Sauce,1,5,,17.71,0,0,,Frozen Food
+PP509,2oz Sauce Container,1000,,17.15,0,0,DF452,Onion Chutney,75,1,,5.62,0,0,,Frozen Food
+PP511,Cup Carrier (2cup),320,,28.52,0,0,DF459,Chick Peas,12,1,,6,0,0,,Frozen Food
+PP512,Cup Carrier (4cup),160,,28.52,0,0,DF477,Poppadom Pellets (13kg),260,1,,131.25,0,0,,Frozen Food
+PP514,Black Bin Bags,200,,13.81,0,0,DF478,Crispy Fried Onions (12X300G),360,12,,22.25,0,0,,Frozen Food
+PP515,Blue Roll,6,,5.79,0,0,DF431,Sofra Cheese,6,1,,15.57,0,0,,Frozen Food
+PP516,Hair nets,1000,,55,0,0,FPBC108,Masala Sauce for Chips/Sandwiches,12,12,,39.27,0,0,,Frozen Food
+PP518,Beard nets,1000,,42,0,0,DF388,Naan,5,12,,23.63,0,0,,Frozen Food
+PP520,Wheelie bin bags,100,,10,0,0,DF429,Paani,12,1,,30,0,0,,Frozen Food
+,,Total,0,,0,0,DF428,Puri,12,1,,30,0,0,,Frozen Food
+Drinks,,,,,,,DF395,Chaiiwala Honey,1,5,,19.69,0,0,,Frozen Food
+Item Code,Product,Quantity per pack,Order,Price,Order Value,Weight (Kg),DF423,Honey Tubs (1.36kg),1,1,,8.15,0,0,,Frozen Food
+FPG359,Zanti Cola 300ml ,24,,17.99,0,0,,,,Total:,0,,0,0,,Frozen Food
+FPG362,Zanit Zero 330ml,24,,17.99,0,0,Misc,,,,,,,,,Frozen Food
+FPG347,Karma Cola Sugar Free 300ml,24,,25,0,0,Item Code,Product,Quantity per pack,,Order,Price,Order Value,Weight (Kg),,Frozen Food
+FPG349,Orangeade 300ml,24,,25,0,0,Other027,Small Urn (25 cup),1,,,290,0,0,,Frozen Food
+FPG351,Lemoney Lemonade 300ml ,24,,25,0,0,Other028,Medium Urn (50 cup),1,,,330,0,0,,Frozen Food
+FPG352,Irn Bru 330ml,24,,17.49,0,0,Other029,Large Urn (100 cup),1,,,350,0,0,,Frozen Food
+FPG353,Rubicon Mango 500 ml,12,,10.69,0,0,Other030,Extra Large Urn (200 cup),1,,,395,0,0,,Frozen Food
+FPG354,Rubicon Passion 500ml,12,,10.69,0,0,Other015,Faucet Kit (Tap for Urn),1,,,30,0,0,,Frozen Food
+FPG355,RAW Orange and Mango 500ml,12,,10.99,0,0,Other016,Spout Kit (Screw for Urn),1,,,15,0,0,,Frozen Food
+FPG356,RAW Raspberry & Blueberry 500ml,12,,10.99,0,0,SE888,Urn Vent Caps,1,,,6,0,0,,Frozen Food
+FPG357,Simply Fruity Orange 330ml,12,,4.49,0,0,SE900,Urn Clip,1,,,16,0,0,,Frozen Food
+FPG358,Simply Fruity Blackcurrent Apple 330ml,12,,4.49,0,0,Other017,Small Urn Gasket (Rubber),1,,,7.7,0,0,,Frozen Food
+,,Total:,0,,0,0,Other018,Medium/Large Urn Gasket (Rubber),1,,,10.4,0,0,,Frozen Food
+,,,,,,,Other019,Extra Large Urn Gasket (Rubber),1,,,15.05,0,0,,Frozen Food
+Total Order Value:,,0,,,,,SE898,Coffee Machine Cleaner,1,,,108,0,0,,Frozen Food
+,,,,,,,BP441,Safet and Cleaning LOG,1,,,25,0,0,,Frozen Food
+Total Order Weight:,,0,,,,,BP471,Crib Sheets,1,,,35,0,0,,Frozen Food
+,,,,,,,SE896,Roband Grill Sheets (10 per box),10,,,80,0,0,,Frozen Food
+Total Number of Boxes:,,0,,,,,SE897,Till Rolls (80x76),1,,,16,0,0,,Frozen Food
+,,,,,,,BP414,Large Thali,1,,,6,0,0,,Frozen Food
+,,,,,,,BP418,Small Thali,1,,,5,0,0,,Frozen Food
+,,,,,,,BP415,Steel bowls,1,,,1.4,0,0,,Frozen Food
+,,,,,,,SE895,Steel Jugs (12 per pack),24,,,39,0,0,,Frozen Food
+,,,,,,,SE883,Large Milk Pans,1,,,32.95,0,0,,Frozen Food
+,,,,,,,SE901,Omelette Pan,1,,,12.5,0,0,,Frozen Food
+,,,,,,,Other008,5ltr Napoli containers,1,,,1,0,0,,Frozen Food
+,,,,,,,Other037,Monin 70cl Pump,1,,,5,0,0,,Frozen Food
+,,,,,,,Other037,Monin 1ltr Pump,1,,,5,0,0,,Frozen Food
+,,,,,,,SE887,Chaiiwala Pumps,1,,,3.5,0,0,,Frozen Food
+,,,,,,,Other009,3000ml Jugs for eggs and faloodas,1,,,3.75,0,0,,Frozen Food
+,,,,,,,NHSPP8,Sanatiser,1,,,20,0,0,,Frozen Food
+,,,,,,,PP524,Black Baskets,1,,,12,0,0,,Frozen Food
+,,,,,,,,,,Total:,0,,0,0,,Frozen Food
