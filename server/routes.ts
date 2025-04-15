@@ -532,9 +532,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get the current user's role
       const userRole = req.user.role;
+      const userStoreId = req.user.storeId;
       
-      // Get all permissions for this role
-      const permissions = await storage.getPermissionsByRole(userRole);
+      // Define standard permissions based on role
+      const permissions = {
+        // Common permissions for all roles
+        canViewDashboard: true,
+        
+        // Role-specific permissions
+        canAccessAllStores: userRole === 'admin' || userRole === 'regional',
+        canEditStockConfig: userRole === 'admin' || userRole === 'regional',
+        canEditStockLevels: true, // All authenticated users can edit stock levels for their store
+        canViewReports: userRole === 'admin' || userRole === 'regional',
+        canEditStoreDetails: userRole === 'admin',
+        canManageUsers: userRole === 'admin',
+        canCreateAnnouncements: userRole === 'admin' || userRole === 'regional',
+        hasStoreAccess: userRole === 'store' && userStoreId !== null,
+        canAccessEventOrders: true,
+        canAccessDeepCleaning: true,
+        canAccessJobLogs: true,
+        storeId: userStoreId
+      };
       
       // Return both the user and their permissions
       res.json({
@@ -542,6 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         permissions: permissions
       });
     } catch (error) {
+      console.error("Error retrieving user permissions:", error);
       res.status(500).json({ message: "Failed to retrieve user permissions" });
     }
   });
