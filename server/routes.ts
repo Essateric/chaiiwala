@@ -693,6 +693,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update stock level" });
     }
   });
+  
+  // Add a PATCH endpoint for updating stock levels (used by the store stock update page)
+  app.patch("/api/stock-levels/:storeId/:stockItemId", isAuthenticated, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const stockItemId = parseInt(req.params.stockItemId);
+      const { quantity } = req.body;
+      
+      // Check if user has permission to update this store's data
+      const userRole = req.user.role;
+      const userStoreId = req.user.storeId;
+      
+      if (userRole !== 'admin' && userRole !== 'regional' && userStoreId !== storeId) {
+        return res.status(403).json({ message: "Forbidden: You don't have permission to update this store's data" });
+      }
+      
+      // Use the user's ID as the updatedBy parameter
+      const updatedBy = req.user.id;
+      
+      const stockLevel = await storage.updateStockLevel(storeId, stockItemId, quantity, updatedBy);
+      res.status(200).json(stockLevel);
+    } catch (error) {
+      console.error("Error updating stock level:", error);
+      res.status(500).json({ message: "Failed to update stock level" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
