@@ -73,6 +73,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ['admin', 'regional'] 
     },
     { 
+      name: 'Update Store Stock', 
+      icon: PackageIcon, 
+      href: '/store-stock-update', 
+      active: currentPage === 'store-stock-update',
+      roles: ['store'] 
+    },
+    { 
       name: 'Deep Cleaning', 
       icon: ClipboardCheckIcon, 
       href: '/deep-cleaning', 
