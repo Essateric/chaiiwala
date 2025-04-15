@@ -16,7 +16,7 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { pool, db } from "./db";
+import { db } from "./db";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -1427,7 +1427,7 @@ import { DatabaseStorage } from "./db-storage";
 // Determine which storage implementation to use based on database availability
 let storage: IStorage;
 
-if (process.env.DATABASE_URL && pool && db) {
+if (process.env.DATABASE_URL && db) {
   console.log("Using DatabaseStorage for data persistence");
   storage = new DatabaseStorage();
 } else {
