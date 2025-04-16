@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardListIcon, PlusIcon, Loader2, X as XIcon, ImageIcon, CalendarIcon, ListIcon } from "lucide-react";
+import { ClipboardListIcon, PlusIcon, Loader2, X as XIcon, ImageIcon, CalendarIcon, ListIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
