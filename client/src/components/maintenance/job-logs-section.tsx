@@ -29,6 +29,8 @@ export default function JobLogsSection() {
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // For store managers, always keep the store ID fixed to their assigned store
   useEffect(() => {
@@ -63,10 +65,20 @@ export default function JobLogsSection() {
   } = useJobLogs(storeIdForQuery);
   
   // Filter job logs based on selected store
-  const jobLogs = React.useMemo(() => {
+  const filteredJobLogs = React.useMemo(() => {
     if (!selectedStoreId) return allJobLogs;
     return allJobLogs.filter(log => log.storeId === selectedStoreId);
   }, [allJobLogs, selectedStoreId]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredJobLogs.length / itemsPerPage);
+  
+  // Get current page items
+  const jobLogs = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredJobLogs.slice(startIndex, endIndex);
+  }, [filteredJobLogs, currentPage, itemsPerPage]);
   
   const form = useForm({
     resolver: zodResolver(insertJobLogSchema.extend({
