@@ -244,9 +244,20 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async updateChecklistTask(checklistId: number, taskId: number, completed: boolean): Promise<ChecklistTask | undefined> {
+  async updateChecklistTask(
+    checklistId: number, 
+    taskId: number, 
+    completed: boolean, 
+    completedData: { completedAt?: Date; completedBy?: string } = {}
+  ): Promise<ChecklistTask | undefined> {
+    // Combine the completed flag with any completedData
+    const updateData = { 
+      completed, 
+      ...completedData
+    };
+    
     const [task] = await db.update(checklistTasks)
-      .set({ completed })
+      .set(updateData)
       .where(
         and(
           eq(checklistTasks.id, taskId),

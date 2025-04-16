@@ -209,7 +209,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = parseInt(req.params.taskId);
       const { completed } = req.body;
       
-      const updatedTask = await storage.updateChecklistTask(checklistId, taskId, completed);
+      // If task is being marked as completed, record who completed it and when
+      const completedData = completed ? {
+        completedAt: new Date(),
+        completedBy: req.user?.username || 'Unknown user'
+      } : {};
+      
+      const updatedTask = await storage.updateChecklistTask(checklistId, taskId, completed, completedData);
       if (updatedTask) {
         res.json(updatedTask);
       } else {
