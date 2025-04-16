@@ -1,25 +1,50 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface StoreTasksProgressProps {
-  stores: Array<{ id: number; name: string }>;
+interface StoreWithProgress {
+  id: number;
+  name: string;
+  taskCompletion: number;
+}
+
+interface ChecklistTask {
+  id: number;
+  title: string;
+  completed: boolean;
+  checklistId: number;
+  completedAt?: string;
+  completedBy?: string;
 }
 
 interface Checklist {
   id: number;
   title: string;
+  category: string;
+  tasks: ChecklistTask[];
   storeId: number;
-  tasks: Array<{ id: number; title: string; completed: boolean }>;
+  description: string;
+  assignedTo: string;
+  dueDate: string | null;
 }
 
-export default function StoreTasksProgress({ stores }: StoreTasksProgressProps) {
-  const [selectedTab, setSelectedTab] = useState<string>(stores[0]?.id.toString() || "1");
+export function StoreTasksProgress() {
+  const [storeProgress, setStoreProgress] = useState<StoreWithProgress[]>([]);
 
-  // Fetch checklists for all stores
-  const { data: checklists = [], isLoading } = useQuery<Checklist[]>({
+  // Fetch stores
+  const { data: stores = [], isLoading: isLoadingStores } = useQuery<{ id: number; name: string; }[]>({
+    queryKey: ['/api/stores'],
+  });
+
+  // Fetch all checklists
+  const { data: checklists = [], isLoading: isLoadingChecklists } = useQuery<Checklist[]>({
     queryKey: ['/api/checklists'],
     queryFn: async () => {
       const res = await fetch('/api/checklists');
@@ -28,103 +53,101 @@ export default function StoreTasksProgress({ stores }: StoreTasksProgressProps) 
     }
   });
 
-  // Calculate completion percentage for a store's tasks
-  const calculateStoreCompletion = (storeId: number) => {
-    const storeChecklists = checklists.filter(cl => cl.storeId === storeId);
-    
-    // If no checklists, return 0
-    if (storeChecklists.length === 0) return 0;
-    
-    let totalTasks = 0;
-    let completedTasks = 0;
-    
-    storeChecklists.forEach(checklist => {
-      totalTasks += checklist.tasks.length;
-      completedTasks += checklist.tasks.filter(task => task.completed).length;
-    });
-    
-    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  // Calculate task completion percentages for each store
+  useEffect(() => {
+    if (stores.length > 0 && checklists.length > 0) {
+      const storeTasksMap = new Map<number, { total: number; completed: number }>();
+      
+      // Initialize maps for all stores
+      stores.forEach(store => {
+        storeTasksMap.set(store.id, { total: 0, completed: 0 });
+      });
+      
+      // Count tasks for each store
+      checklists.forEach(checklist => {
+        const storeData = storeTasksMap.get(checklist.storeId);
+        if (storeData) {
+          storeData.total += checklist.tasks.length;
+          storeData.completed += checklist.tasks.filter(task => task.completed).length;
+          storeTasksMap.set(checklist.storeId, storeData);
+        }
+      });
+      
+      // Calculate percentages
+      const progressData: StoreWithProgress[] = stores.map(store => {
+        const storeData = storeTasksMap.get(store.id) || { total: 0, completed: 0 };
+        const taskCompletion = storeData.total > 0 
+          ? Math.round((storeData.completed / storeData.total) * 100) 
+          : 0;
+          
+        return {
+          id: store.id,
+          name: store.name,
+          taskCompletion
+        };
+      });
+      
+      setStoreProgress(progressData);
+    }
+  }, [stores, checklists]);
+
+  // Get color class based on completion percentage
+  const getColorClass = (percentage: number) => {
+    if (percentage < 30) return "text-red-500";
+    if (percentage < 50) return "text-amber-500";
+    return "text-green-500";
   };
 
-  // Get color based on completion percentage
-  const getCompletionColor = (percentage: number) => {
-    if (percentage >= 100) return "bg-green-600";
-    if (percentage >= 50) return "bg-green-500";
-    if (percentage >= 30) return "bg-amber-500";
-    return "bg-red-500";
+  // Get background color class for progress bar
+  const getProgressColor = (percentage: number) => {
+    if (percentage < 30) return "bg-red-500";
+    if (percentage < 50) return "bg-amber-500";
+    return "bg-green-500";
   };
 
-  // Get text based on completion percentage
-  const getCompletionText = (percentage: number) => {
-    if (percentage >= 100) return "text-green-600";
-    if (percentage >= 50) return "text-green-500";
-    if (percentage >= 30) return "text-amber-500";
-    return "text-red-500";
-  };
+  if (isLoadingStores || isLoadingChecklists) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Task Completion by Store</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Store Task Completion</CardTitle>
+      <CardHeader>
+        <CardTitle className="text-lg">Task Completion by Store</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="h-48 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          </div>
-        ) : (
-          <>
-            <Tabs defaultValue={selectedTab} onValueChange={setSelectedTab} className="w-full">
-              <TabsList className="w-full mb-4 overflow-x-auto flex">
-                {stores.map(store => (
-                  <TabsTrigger 
-                    key={store.id} 
-                    value={store.id.toString()}
-                    className="flex-1"
-                  >
-                    {store.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              
-              {stores.map(store => {
-                const completion = calculateStoreCompletion(store.id);
-                
-                return (
-                  <TabsContent key={store.id} value={store.id.toString()} className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <span>Task Completion</span>
-                        <span className={`font-medium ${getCompletionText(completion)}`}>
-                          {completion}%
-                        </span>
-                      </div>
-                      <Progress 
-                        value={completion} 
-                        className="h-2"
-                        indicatorClassName={getCompletionColor(completion)}
-                      />
-                      
-                      <div className="pt-2 text-sm text-gray-500">
-                        {completion === 0 ? (
-                          <p>No tasks have been completed yet.</p>
-                        ) : completion < 30 ? (
-                          <p className="text-red-500 font-medium">Attention needed: Task completion is below 30%</p>
-                        ) : completion < 50 ? (
-                          <p className="text-amber-500 font-medium">In progress: Task completion is below 50%</p>
-                        ) : completion < 100 ? (
-                          <p className="text-green-500 font-medium">Good progress: Task completion is above 50%</p>
-                        ) : (
-                          <p className="text-green-600 font-medium">All tasks complete!</p>
-                        )}
-                      </div>
-                    </div>
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
-          </>
-        )}
+        <div className="space-y-4">
+          {storeProgress.map((store) => (
+            <div key={store.id} className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">{store.name}</span>
+                <span className={`font-bold ${getColorClass(store.taskCompletion)}`}>
+                  {store.taskCompletion}%
+                </span>
+              </div>
+              <Progress 
+                value={store.taskCompletion} 
+                className="h-2"
+                indicatorClassName={getProgressColor(store.taskCompletion)}
+              />
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

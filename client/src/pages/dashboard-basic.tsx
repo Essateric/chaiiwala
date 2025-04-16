@@ -5,7 +5,7 @@ import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockLevelPanel } from "@/components/dashboard/stock-level-panel";
-import StoreTasksProgress from "@/components/dashboard/store-tasks-progress";
+import { StoreTasksProgress } from "@/components/dashboard/store-tasks-progress";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
 import { 
   Dialog,
@@ -252,7 +252,7 @@ export default function DashboardBasic() {
               <ClipboardCheck className="h-5 w-5 mr-2 text-chai-gold" />
               <h3 className="text-lg font-bold text-white">Store Task Completion</h3>
             </div>
-            <StoreTasksProgress stores={stores} />
+            <StoreTasksProgress />
           </div>
         )}
         
