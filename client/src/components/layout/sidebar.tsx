@@ -36,33 +36,35 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log("Current page:", currentPage);
   
   // For maintenance role users, only show the maintenance page
-  const maintenanceOnlyNavItems = [
-    {
-      name: 'Maintenance Jobs',
-      icon: WrenchIcon,
-      href: '/maintenance',
-      active: currentPage === 'maintenance',
-      roles: ['maintenance']
-    }
-  ];
-  
-  // Regular navigation items for all other users
-  const standardNavItems = [
-    { 
-      name: 'Dashboard', 
-      icon: HomeIcon, 
-      href: '/', 
-      active: currentPage === 'dashboard',
-      roles: ['admin', 'regional', 'store', 'staff'] 
-    },
-    // New items placed immediately after dashboard
-    {
-      name: 'Maintenance',
-      icon: WrenchIcon,
-      href: '/maintenance',
-      active: currentPage === 'maintenance',
-      roles: ['admin', 'regional', 'store', 'maintenance']
-    },
+  // Define navigation items based on role
+  const navItems = user.role === 'maintenance' 
+    ? [
+        // Maintenance users only see maintenance section
+        {
+          name: 'Maintenance Jobs',
+          icon: WrenchIcon,
+          href: '/maintenance',
+          active: currentPage === 'maintenance',
+          roles: ['maintenance']
+        }
+      ]
+    : [
+        // Standard navigation items for all other roles
+        { 
+          name: 'Dashboard', 
+          icon: HomeIcon, 
+          href: '/', 
+          active: currentPage === 'dashboard',
+          roles: ['admin', 'regional', 'store', 'staff'] 
+        },
+        // Maintenance section for admin, regional, store
+        {
+          name: 'Maintenance',
+          icon: WrenchIcon,
+          href: '/maintenance',
+          active: currentPage === 'maintenance',
+          roles: ['admin', 'regional', 'store']
+        },
     {
       name: 'Event Orders',
       icon: CalendarDaysIcon,
@@ -178,8 +180,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Navigation - with scrollable area */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {/* Use different navigation items based on user role */}
-        {(user.role === 'maintenance' ? maintenanceOnlyNavItems : standardNavItems).map((item, index) => {
+        {/* Use navigation items based on role */}
+        {navItems.map((item, index) => {
           // Special handling for Stock Orders - restrict to admin, regional, and only 7 store managers with specific IDs
           if (item.name === 'Stock Orders') {
             const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations

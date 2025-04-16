@@ -106,7 +106,8 @@ function App() {
 
       {/* Dashboard routes - conditionally render based on user role and store ID */}
       <ProtectedRoute path="/dashboard" feature="dashboard">
-        {shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
+        {user?.role === 'maintenance' ? <MaintenancePage /> : 
+         shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
       </ProtectedRoute>
 
       <ProtectedRoute path="/" feature="dashboard">
