@@ -276,6 +276,7 @@ export default function StoreManagerDashboard() {
                           <Checkbox 
                             id={`task-${task.id}`}
                             checked={task.completed}
+                            disabled={task.completed}
                             onCheckedChange={(checked: boolean | "indeterminate") => 
                               handleTaskChange(checklist.id, task.id, checked === true)
                             }
@@ -462,6 +463,7 @@ export default function StoreManagerDashboard() {
                       <Checkbox 
                         id={`dialog-task-${task.id}`}
                         checked={task.completed}
+                        disabled={task.completed}
                         onCheckedChange={(checked: boolean | "indeterminate") => 
                           handleTaskChange(selectedChecklist.id, task.id, checked === true)
                         }
