@@ -14,6 +14,8 @@ interface ChecklistTask {
   id: string;
   title: string;
   completed: boolean;
+  completedAt?: string; // ISO date string for when the task was completed
+  completedBy?: string; // Username of the person who completed the task
 }
 
 interface ChecklistItemProps {
@@ -82,18 +84,29 @@ export default function ChecklistItem({
                 <Checkbox 
                   id={`task-${id}-${task.id}`}
                   checked={task.completed}
+                  disabled={task.completed}
                   onCheckedChange={(checked) => handleTaskToggle(task.id, !!checked)}
                   className="mt-1 h-4 w-4 text-chai-gold rounded border-gray-300 focus:ring-chai-gold"
                 />
-                <label 
-                  htmlFor={`task-${id}-${task.id}`}
-                  className={cn(
-                    "ml-3 text-sm font-medium cursor-pointer",
-                    task.completed ? "text-gray-500 line-through" : "text-gray-900"
+                <div className="ml-3 flex flex-col w-full">
+                  <label 
+                    htmlFor={`task-${id}-${task.id}`}
+                    className={cn(
+                      "text-sm font-medium",
+                      task.completed ? "text-gray-500 line-through cursor-default" : "text-gray-900 cursor-pointer"
+                    )}
+                    title={task.completed && task.completedAt ? 
+                      `Completed by ${task.completedBy || 'unknown'} on ${new Date(task.completedAt).toLocaleString()}` : 
+                      "Click to mark as completed"}
+                  >
+                    {task.title}
+                  </label>
+                  {task.completed && task.completedAt && (
+                    <span className="text-xs text-gray-500 mt-1">
+                      Completed by {task.completedBy} on {new Date(task.completedAt).toLocaleString()}
+                    </span>
                   )}
-                >
-                  {task.title}
-                </label>
+                </div>
               </div>
             ))}
           </div>

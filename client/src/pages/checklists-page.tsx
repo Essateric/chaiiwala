@@ -30,6 +30,8 @@ interface ChecklistTask {
   id: string;
   title: string;
   completed: boolean;
+  completedAt?: string; // ISO date string for when the task was completed
+  completedBy?: string; // Username of the person who completed the task
 }
 
 interface Checklist {
