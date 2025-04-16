@@ -76,6 +76,8 @@ export const checklistTasks = pgTable("checklist_tasks", {
   checklistId: integer("checklist_id").notNull(),
   title: text("title").notNull(),
   completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completed_at"), // Timestamp when the task was completed
+  completedBy: text("completed_by"), // Username of person who completed the task
 });
 
 // Staff Schedule Table

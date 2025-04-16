@@ -287,6 +287,9 @@ export default function StoreManagerDashboard() {
                               "ml-2 text-sm", 
                               task.completed && "line-through text-gray-400"
                             )}
+                            title={task.completed && task.completedAt ? 
+                              `Completed by ${task.completedBy || 'unknown'} on ${new Date(task.completedAt).toLocaleString()}` : 
+                              "Click to mark as completed"}
                           >
                             {task.title}
                           </label>
