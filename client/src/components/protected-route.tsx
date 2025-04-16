@@ -34,7 +34,7 @@ export function ProtectedRoute({ path, feature, children }: ProtectedRouteProps)
 
   // Map feature access to roles
   const featureAccess: Record<string, string[]> = {
-    'dashboard': ['admin', 'regional', 'store', 'staff'],
+    'dashboard': ['admin', 'regional', 'store', 'staff', 'maintenance'],
     'inventory': ['admin', 'regional', 'store', 'staff'],
     'stock_management': ['admin', 'regional'],
     'tasks': ['admin', 'regional', 'store', 'staff'],
@@ -42,7 +42,7 @@ export function ProtectedRoute({ path, feature, children }: ProtectedRouteProps)
     'announcements': ['admin', 'regional', 'store'],
     'user_management': ['admin'],
     'settings': ['admin', 'regional', 'store'],
-    'maintenance': ['admin', 'regional', 'store'],
+    'maintenance': ['admin', 'regional', 'store', 'maintenance'], // Added maintenance role
     'deep_cleaning': ['admin', 'regional', 'store'],
     'event_orders': ['admin', 'regional', 'store'],
     'stock_orders': ['admin', 'regional'],

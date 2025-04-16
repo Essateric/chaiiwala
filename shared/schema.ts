@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const roleEnum = pgEnum('role', ['admin', 'regional', 'store', 'staff']);
+export const roleEnum = pgEnum('role', ['admin', 'regional', 'store', 'staff', 'maintenance']);
 export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'completed']);
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high']);
 export const inventoryStatusEnum = pgEnum('inventory_status', ['in_stock', 'low_stock', 'out_of_stock', 'on_order']);

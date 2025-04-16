@@ -38,11 +38,12 @@ export default function JobLogsSection() {
   }, [user?.role, user?.storeId]);
   
   // Check if user can create maintenance logs
-  // Only admin or users with maintenance permission
+  // Only admin, regional, store, or maintenance role
   const canCreateLogs = 
     user?.role === "admin" || 
     user?.role === "regional" ||
-    user?.role === "store";
+    user?.role === "store" ||
+    user?.role === "maintenance";
   
   // Get all stores
   const { stores, isLoading: isLoadingStores } = useStores();
@@ -137,7 +138,7 @@ export default function JobLogsSection() {
             Track and manage maintenance job logs for all equipment and facilities
           </CardDescription>
         </div>
-        {(user?.role === "admin" || user?.role === "regional") && (
+        {(user?.role === "admin" || user?.role === "regional" || user?.role === "maintenance") && (
           <Select 
             value={selectedStoreId?.toString() || "all"} 
             onValueChange={(value) => {
@@ -202,7 +203,7 @@ export default function JobLogsSection() {
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    {(user?.role === "admin" || user?.role === "regional") && (
+                    {(user?.role === "admin" || user?.role === "regional" || user?.role === "maintenance") && (
                       <FormField
                         control={form.control}
                         name="storeId"
