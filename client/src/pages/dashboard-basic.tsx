@@ -5,6 +5,7 @@ import { getQueryFn } from "@/lib/queryClient";
 import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { StockLevelPanel } from "@/components/dashboard/stock-level-panel";
+import StoreTasksProgress from "@/components/dashboard/store-tasks-progress";
 import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
 import { 
   Dialog,
@@ -28,7 +29,8 @@ import {
   AlertTriangle,
   Sparkles,
   Package,
-  X
+  X,
+  ClipboardCheck
 } from 'lucide-react';
 
 // Store interface for typing
@@ -242,6 +244,17 @@ export default function DashboardBasic() {
             </div>
           </div>
         </div>
+        
+        {/* Task Completion Progress for regional managers and admins */}
+        {(user?.role === 'admin' || user?.role === 'regional') && (
+          <div className="mt-6">
+            <div className="flex items-center mb-4">
+              <ClipboardCheck className="h-5 w-5 mr-2 text-chai-gold" />
+              <h3 className="text-lg font-bold text-white">Store Task Completion</h3>
+            </div>
+            <StoreTasksProgress stores={stores} />
+          </div>
+        )}
         
         {/* Additional bottom margin */}
         <div className="mb-6"></div>
