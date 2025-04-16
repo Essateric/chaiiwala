@@ -35,7 +35,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log("Current user role:", user.role);
   console.log("Current page:", currentPage);
   
-  const navItems = [
+  // For maintenance role users, only show the maintenance page
+  const maintenanceOnlyNavItems = [
+    {
+      name: 'Maintenance Jobs',
+      icon: WrenchIcon,
+      href: '/maintenance',
+      active: currentPage === 'maintenance',
+      roles: ['maintenance']
+    }
+  ];
+  
+  // Regular navigation items for all other users
+  const standardNavItems = [
     { 
       name: 'Dashboard', 
       icon: HomeIcon, 
@@ -49,7 +61,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: WrenchIcon,
       href: '/maintenance',
       active: currentPage === 'maintenance',
-      roles: ['admin', 'regional', 'store']
+      roles: ['admin', 'regional', 'store', 'maintenance']
     },
     {
       name: 'Event Orders',
@@ -166,7 +178,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Navigation - with scrollable area */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {navItems.map((item, index) => {
+        {/* Use different navigation items based on user role */}
+        {(user.role === 'maintenance' ? maintenanceOnlyNavItems : standardNavItems).map((item, index) => {
           // Special handling for Stock Orders - restrict to admin, regional, and only 7 store managers with specific IDs
           if (item.name === 'Stock Orders') {
             const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations

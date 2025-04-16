@@ -30,7 +30,12 @@ function App() {
     if (!isLoading) {
       setIsRouteLoading(false);
     }
-  }, [isLoading]);
+    
+    // If user has maintenance role, redirect them to maintenance page
+    if (user && user.role === 'maintenance' && window.location.pathname === '/') {
+      window.location.href = '/maintenance';
+    }
+  }, [isLoading, user]);
 
   // Show loading screen while routes are being determined
   if (isRouteLoading) {
@@ -105,7 +110,8 @@ function App() {
       </ProtectedRoute>
 
       <ProtectedRoute path="/" feature="dashboard">
-        {shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
+        {user?.role === 'maintenance' ? <MaintenancePage /> : 
+         shouldUseSpecialDashboard ? <StoreManagerDashboard /> : <DashboardBasic />}
       </ProtectedRoute>
 
       {/* 404 route */}
