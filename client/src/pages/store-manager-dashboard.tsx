@@ -39,6 +39,8 @@ interface ChecklistTask {
   title: string;
   completed: boolean;
   checklistId: number;
+  completedAt?: string; // ISO date string for when the task was completed
+  completedBy?: string; // Username of the person who completed the task
 }
 
 interface Checklist {
@@ -472,15 +474,26 @@ export default function StoreManagerDashboard() {
                         }
                         className="mt-0.5"
                       />
-                      <label 
-                        htmlFor={`dialog-task-${task.id}`}
-                        className={cn(
-                          "ml-2 text-sm", 
-                          task.completed && "line-through text-gray-400"
+                      <div className="flex flex-col w-full">
+                        <label 
+                          htmlFor={`dialog-task-${task.id}`}
+                          className={cn(
+                            "ml-2 text-sm", 
+                            task.completed && "line-through text-gray-400"
+                          )}
+                          title={task.completed && task.completedAt ? 
+                            `Completed by ${task.completedBy || 'unknown'} on ${new Date(task.completedAt).toLocaleString()}` : 
+                            "Click to mark as completed"}
+                        >
+                          {task.title}
+                        </label>
+                        {task.completed && task.completedAt && (
+                          <span className="ml-2 text-xs text-gray-500 mt-1">
+                            Completed by: {task.completedBy}<br/>
+                            on {new Date(task.completedAt).toLocaleString()}
+                          </span>
                         )}
-                      >
-                        {task.title}
-                      </label>
+                      </div>
                     </div>
                   ))}
                 </div>
