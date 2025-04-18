@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Bell, X, ExclamationCircle, MessageCircle, Check, Loader2 } from "lucide-react";
-import { useNavigate } from "wouter";
+import { Bell, X, AlertTriangle, MessageCircle, Check, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -15,7 +15,7 @@ import { format } from "date-fns";
 
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const { 
     notifications, 
     unreadCount, 
@@ -42,12 +42,13 @@ export function NotificationsPopover() {
   };
 
   // Get notification icon based on type
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
+  const getNotificationIcon = (sourceType: string) => {
+    switch (sourceType) {
       case 'mention':
+      case 'comment':
         return <MessageCircle className="h-4 w-4 text-blue-500" />;
       case 'alert':
-        return <ExclamationCircle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
@@ -99,11 +100,11 @@ export function NotificationsPopover() {
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex-shrink-0 pt-1">
-                    {getNotificationIcon(notification.type)}
+                    {getNotificationIcon(notification.sourceType)}
                   </div>
                   <div className="flex-1 space-y-1">
                     <p className={cn("text-sm", !notification.read && "font-medium")}>
-                      {notification.content}
+                      {notification.title || notification.message}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(notification.createdAt), "MMM d, h:mm a")}
