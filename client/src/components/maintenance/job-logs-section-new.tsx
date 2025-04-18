@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardListIcon, PlusIcon, Loader2, X as XIcon, ImageIcon, CalendarIcon, ListIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardListIcon, PlusIcon, Loader2, X as XIcon, ImageIcon, CalendarIcon, ListIcon, ChevronLeft, ChevronRight, AtSign } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertJobLogSchema } from "@shared/schema";
@@ -21,6 +22,8 @@ import { useStores } from "@/hooks/use-stores";
 import { FileUpload } from "@/components/ui/file-upload";
 import { z } from "zod";
 import JobLogsCalendar from "./job-logs-calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 export default function JobLogsSection() {
   const { user } = useAuth();
@@ -30,6 +33,8 @@ export default function JobLogsSection() {
   );
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedJobLog, setSelectedJobLog] = useState<number | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const itemsPerPage = 10;
   
   // For store managers, always keep the store ID fixed to their assigned store
@@ -80,35 +85,48 @@ export default function JobLogsSection() {
     return filteredJobLogs.slice(startIndex, endIndex);
   }, [filteredJobLogs, currentPage, itemsPerPage]);
   
-  // Reset to first page when store selection changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedStoreId]);
-  
   const form = useForm({
     resolver: zodResolver(insertJobLogSchema.extend({
       storeId: z.number(),
+      title: z.string().min(3, "Title must be at least 3 characters"),
+      category: z.enum(["electrical", "plumbing", "building", "other"]),
       logDate: z.string(),
       logTime: z.string(),
       description: z.string().min(5, "Description must be at least 5 characters"),
       loggedBy: z.string().min(2, "Name must be at least 2 characters"),
       flag: z.enum(["normal", "long_standing", "urgent"]),
-      completionDate: z.string().nullable().optional(),
       attachments: z.array(z.string()).default([]),
       comments: z.string().nullable().optional(),
     })),
     defaultValues: {
       storeId: user?.storeId ?? 1,
+      title: "",
+      category: "other" as const,
       logDate: format(new Date(), "yyyy-MM-dd"),
       logTime: format(new Date(), "HH:mm"),
       description: "",
       loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
       flag: "normal" as const,
-      completionDate: null,
       attachments: [],
       comments: null,
     },
   });
+  
+  function handleImageUpload(imageUrl: string) {
+    const currentAttachments = form.getValues("attachments") || [];
+    form.setValue("attachments", [...currentAttachments, imageUrl]);
+    setUploadedImages([...uploadedImages, imageUrl]);
+  }
+
+  function handleRemoveImage(index: number) {
+    const currentAttachments = [...form.getValues("attachments")];
+    currentAttachments.splice(index, 1);
+    form.setValue("attachments", currentAttachments);
+    
+    const newUploadedImages = [...uploadedImages];
+    newUploadedImages.splice(index, 1);
+    setUploadedImages(newUploadedImages);
+  }
   
   async function onSubmit(values: any) {
     try {
@@ -121,20 +139,37 @@ export default function JobLogsSection() {
       // Reset the form for next use
       form.reset({
         storeId: values.storeId,
+        title: "",
+        category: "other" as const,
         logDate: format(new Date(), "yyyy-MM-dd"),
         logTime: format(new Date(), "HH:mm"),
         description: "",
         loggedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || user?.username || "",
         flag: "normal" as const,
-        completionDate: null,
         attachments: [],
         comments: null,
       });
+      setUploadedImages([]);
     } catch (error) {
       console.error("Error submitting job log:", error);
     }
   }
 
+  // Function to render job category badge
+  const getCategoryBadge = (category: string) => {
+    switch (category) {
+      case "electrical":
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Electrical</Badge>;
+      case "plumbing":
+        return <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Plumbing</Badge>;
+      case "building":
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Building</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">Other</Badge>;
+    }
+  };
+
+  // Function to render priority/flag badge
   const getFlagBadgeClass = (flag: string) => {
     switch (flag) {
       case "urgent":
@@ -144,6 +179,94 @@ export default function JobLogsSection() {
       default:
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
     }
+  };
+
+  // Job log detail dialog
+  const JobLogDetails = ({ jobLog }: { jobLog: any }) => {
+    const [comment, setComment] = useState("");
+    const commentInputRef = useRef<HTMLTextAreaElement>(null);
+    const [mentionedUsers, setMentionedUsers] = useState<number[]>([]);
+    const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
+    const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+    
+    // Mention handling logic would be implemented here
+    
+    return (
+      <Dialog open={!!jobLog} onOpenChange={(open) => !open && setSelectedJobLog(null)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {jobLog.title}
+              {getCategoryBadge(jobLog.category)}
+            </DialogTitle>
+            <DialogDescription>
+              Created by {jobLog.loggedBy} on {jobLog.logDate} at {jobLog.logTime}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Description</h3>
+              <p className="text-sm text-muted-foreground">{jobLog.description}</p>
+            </div>
+            
+            {jobLog.attachments && jobLog.attachments.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Attachments</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {jobLog.attachments.map((url: string, index: number) => (
+                    <div key={index} className="relative group">
+                      <img 
+                        src={url} 
+                        alt={`Attachment ${index + 1}`} 
+                        className="rounded-md object-cover w-full h-40"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                        <a 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="bg-white rounded-full p-2"
+                        >
+                          <ImageIcon className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Comments</h3>
+              <div className="space-y-4 mb-4 max-h-60 overflow-y-auto bg-muted/50 p-3 rounded-md">
+                {/* Comments would be displayed here */}
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  No comments yet
+                </div>
+              </div>
+              
+              <div className="relative">
+                <Textarea 
+                  ref={commentInputRef}
+                  placeholder="Add a comment... Use @ to mention someone"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="min-h-24"
+                />
+                <Button 
+                  size="sm" 
+                  className="mt-2" 
+                  disabled={!comment.trim()}
+                >
+                  Add Comment
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
   };
 
   return (
@@ -211,7 +334,7 @@ export default function JobLogsSection() {
                 </Button>
               </DialogTrigger>
               
-              <DialogContent className="sm:max-w-[550px]">
+              <DialogContent className="sm:max-w-[650px]">
                 <DialogHeader>
                   <DialogTitle>Create New Job Log</DialogTitle>
                   <DialogDescription>
@@ -252,6 +375,50 @@ export default function JobLogsSection() {
                       />
                     )}
                     
+                    {/* New fields: Title and Category */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Title</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Brief title of the issue" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="electrical">Electrical</SelectItem>
+                                <SelectItem value="plumbing">Plumbing</SelectItem>
+                                <SelectItem value="building">Building</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -296,26 +463,7 @@ export default function JobLogsSection() {
                         )}
                       />
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="completionDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>To be completed by</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="date" 
-                              value={field.value || ''} 
-                              onChange={(e) => field.onChange(e.target.value || null)}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Set a target date for this maintenance task to be completed
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    
                     <FormField
                       control={form.control}
                       name="description"
@@ -323,12 +471,55 @@ export default function JobLogsSection() {
                         <FormItem>
                           <FormLabel>Description</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="Describe the maintenance issue" {...field} />
+                            <Textarea placeholder="Describe the maintenance issue in detail" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    
+                    {/* Image Upload */}
+                    <FormField
+                      control={form.control}
+                      name="attachments"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Images</FormLabel>
+                          <FormControl>
+                            <div className="space-y-4">
+                              <FileUpload 
+                                onUploadComplete={handleImageUpload}
+                                placeholder="Upload images of the issue"
+                                buttonText="Upload Image"
+                              />
+                              
+                              {uploadedImages.length > 0 && (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                                  {uploadedImages.map((url, index) => (
+                                    <div key={index} className="relative group">
+                                      <img 
+                                        src={url} 
+                                        alt={`Uploaded ${index + 1}`} 
+                                        className="h-24 w-full object-cover rounded-md"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveImage(index)}
+                                        className="absolute top-1 right-1 bg-black/50 rounded-full p-1 text-white hover:bg-black/80 transition"
+                                      >
+                                        <XIcon className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -374,24 +565,11 @@ export default function JobLogsSection() {
                         )}
                       />
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="comments"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Comments (Optional)</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Add any additional comments or context" {...field} value={field.value || ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                     
                     <DialogFooter>
                       <Button type="submit" disabled={isCreating}>
                         {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create Job Log
+                        Submit Job Log
                       </Button>
                     </DialogFooter>
                   </form>
@@ -401,139 +579,106 @@ export default function JobLogsSection() {
           )}
         </div>
         
-        {/* View Mode Content */}
-        {viewMode === "calendar" ? (
-          <JobLogsCalendar 
-            jobLogs={filteredJobLogs} 
-            stores={stores} 
-            isLoading={isLoading || isLoadingStores} 
-          />
-        ) : (
-          isLoading ? (
-            <div className="w-full flex justify-center py-6">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredJobLogs.length === 0 ? (
-            <Alert>
-              <ClipboardListIcon className="h-4 w-4 mr-2" />
-              <AlertDescription>
-                No job logs found. Click "Log New Job" to create your first job log.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="hidden md:table-cell">Logged By</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden sm:table-cell w-[100px]">Store</TableHead>
-                    <TableHead className="w-[80px] text-center">Image</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {jobLogs.map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell>
-                        <span className="hidden sm:inline">
-                          {format(new Date(`${job.logDate}T${job.logTime}`), "EEE do MMM yyyy HH:mm", { locale: enUS })}
-                        </span>
-                        <span className="sm:hidden">
-                          {format(new Date(`${job.logDate}T${job.logTime}`), "dd/MM/yy HH:mm")}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{job.description}</div>
-                        {job.completionDate && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Due by: {format(new Date(job.completionDate), "d MMM yyyy")}
-                          </div>
-                        )}
-                        {job.comments && <div className="text-xs mt-1">{job.comments}</div>}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">{job.loggedBy}</TableCell>
-                      <TableCell>
-                        <span className={`text-xs rounded-full px-2 py-1 ${getFlagBadgeClass(job.flag)}`}>
-                          {job.flag === "urgent" ? "Urgent" : job.flag === "long_standing" ? "Long-standing" : "Normal"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {stores.find((store) => store.id === job.storeId)?.name || "Unknown"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {job.attachments && job.attachments.length > 0 ? (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="p-0 h-auto">
-                                <ImageIcon className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-lg">
-                              <DialogHeader>
-                                <DialogTitle>Job Images</DialogTitle>
-                                <DialogDescription>
-                                  Photos attached to job log
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {job.attachments.map((image, index) => (
-                                  <div key={index} className="relative rounded-md overflow-hidden border">
-                                    <img 
-                                      src={image} 
-                                      alt={`Job attachment ${index + 1}`} 
-                                      className="w-full h-auto object-contain max-h-[300px]"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No images</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-                    <span className="font-medium">
-                      {Math.min(currentPage * itemsPerPage, filteredJobLogs.length)}
-                    </span>{" "}
-                    of <span className="font-medium">{filteredJobLogs.length}</span> entries
-                  </div>
-                  <div className="flex items-center space-x-2">
+        {viewMode === "list" ? (
+          <>
+            {isLoading ? (
+              <div className="flex justify-center items-center min-h-[200px]">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : jobLogs.length === 0 ? (
+              <Alert className="my-4">
+                <AlertDescription>
+                  No job logs found. 
+                  {canCreateLogs && " Click 'Log New Job' to create a new maintenance request."}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div>
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[180px]">Date & Time</TableHead>
+                        <TableHead>Title / Category</TableHead>
+                        <TableHead>Store</TableHead>
+                        <TableHead>Logged By</TableHead>
+                        <TableHead className="w-[100px]">Priority</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {jobLogs.map((log) => {
+                        const storeName = stores.find(s => s.id === log.storeId)?.name || `Store ${log.storeId}`;
+                        return (
+                          <TableRow 
+                            key={log.id} 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setSelectedJobLog(log.id)}
+                          >
+                            <TableCell className="font-medium">
+                              {log.logDate}<br />
+                              <span className="text-xs text-muted-foreground">{log.logTime}</span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{log.title || 'No title'}</div>
+                              {getCategoryBadge(log.category || 'other')}
+                            </TableCell>
+                            <TableCell>{storeName}</TableCell>
+                            <TableCell>{log.loggedBy}</TableCell>
+                            <TableCell>
+                              <Badge className={getFlagBadgeClass(log.flag)}>
+                                {log.flag === "long_standing" ? "Long-standing" : 
+                                  log.flag.charAt(0).toUpperCase() + log.flag.slice(1)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-end space-x-2 py-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
+                      <span className="sr-only">Previous Page</span>
                     </Button>
-                    <div className="text-sm">
+                    <div className="text-sm text-muted-foreground">
                       Page {currentPage} of {totalPages}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
                     >
                       <ChevronRight className="h-4 w-4" />
+                      <span className="sr-only">Next Page</span>
                     </Button>
                   </div>
-                </div>
-              )}
-            </div>
-          )
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <JobLogsCalendar 
+            jobLogs={filteredJobLogs}
+            isLoading={isLoading}
+            onClick={(id) => setSelectedJobLog(id)}
+          />
+        )}
+        
+        {/* Job log detail dialog */}
+        {selectedJobLog !== null && (
+          <JobLogDetails 
+            jobLog={filteredJobLogs.find(log => log.id === selectedJobLog)} 
+          />
         )}
       </CardContent>
     </Card>

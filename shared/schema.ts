@@ -110,16 +110,6 @@ export const jobCategoryEnum = pgEnum('job_category', [
   'other'
 ]);
 
-// Job Log Comments Table
-export const jobLogComments = pgTable("job_log_comments", {
-  id: serial("id").primaryKey(),
-  jobLogId: integer("job_log_id").notNull().references(() => jobLogs.id, { onDelete: 'cascade' }),
-  comment: text("comment").notNull(),
-  commentedBy: integer("commented_by").notNull(), // User ID who made the comment
-  commentedAt: timestamp("commented_at").notNull().defaultNow(),
-  mentionedUsers: integer("mentioned_users").array(), // Array of user IDs mentioned in the comment
-});
-
 // Job Logs Table
 export const jobLogs = pgTable("job_logs", {
   id: serial("id").primaryKey(),
@@ -136,6 +126,35 @@ export const jobLogs = pgTable("job_logs", {
   comments: text("comments"), // Additional comments (legacy field, using jobLogComments for new app)
   flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
+});
+
+// Job Log Comments Table
+export const jobLogComments = pgTable("job_log_comments", {
+  id: serial("id").primaryKey(),
+  jobLogId: integer("job_log_id").notNull().references(() => jobLogs.id, { onDelete: 'cascade' }),
+  comment: text("comment").notNull(),
+  commentedBy: integer("commented_by").notNull(), // User ID who made the comment
+  commentedAt: timestamp("commented_at").notNull().defaultNow(),
+  mentionedUsers: integer("mentioned_users").array(), // Array of user IDs mentioned in the comment
+});
+
+// Maintenance Categories Table
+export const maintenanceCategories = pgTable("maintenance_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // Category name
+  description: text("description"), // Optional description
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Maintenance Subcategories Table
+export const maintenanceSubcategories = pgTable("maintenance_subcategories", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => maintenanceCategories.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(), // Subcategory name
+  description: text("description"), // Optional description
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Manager Details Table
@@ -228,6 +247,8 @@ export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: tru
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
 export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
 export const insertJobLogCommentSchema = createInsertSchema(jobLogComments).omit({ id: true, commentedAt: true });
+export const insertMaintenanceCategorySchema = createInsertSchema(maintenanceCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMaintenanceSubcategorySchema = createInsertSchema(maintenanceSubcategories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
@@ -262,6 +283,15 @@ export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 
 export type JobLog = typeof jobLogs.$inferSelect;
 export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
+
+export type JobLogComment = typeof jobLogComments.$inferSelect;
+export type InsertJobLogComment = z.infer<typeof insertJobLogCommentSchema>;
+
+export type MaintenanceCategory = typeof maintenanceCategories.$inferSelect;
+export type InsertMaintenanceCategory = z.infer<typeof insertMaintenanceCategorySchema>;
+
+export type MaintenanceSubcategory = typeof maintenanceSubcategories.$inferSelect;
+export type InsertMaintenanceSubcategory = z.infer<typeof insertMaintenanceSubcategorySchema>;
 
 export type ManagerDetails = typeof managerDetails.$inferSelect;
 export type InsertManagerDetails = z.infer<typeof insertManagerDetailsSchema>;
