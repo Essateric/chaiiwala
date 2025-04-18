@@ -62,7 +62,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     if (!Array.isArray(jobLogs)) return [];
     
     return jobLogs
-      .filter(job => !selectedStoreId || job.storeId === selectedStoreId)
+      .filter(job => (!selectedStoreId || job.storeId === selectedStoreId) && job.logDate && job.logTime)
       .map(job => {
         try {
           // Create start date from logDate and logTime
