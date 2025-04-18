@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Search, ChevronDown, Menu } from "lucide-react";
+import { Search, ChevronDown, Menu } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import chaiiwalaLogo from "@assets/chaiiwala.png";
+import { NotificationsPopover } from "./notifications";
 
 interface TopBarProps {
   title: string;
@@ -66,54 +67,7 @@ export default function TopBar({ title, onMenuClick, username, role }: TopBarPro
           
           
           {/* Notifications */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              className="relative"
-              onClick={() => setShowNotifications(!showNotifications)}
-            >
-              <Bell className="h-6 w-6 text-gray-500 hover:text-chai-gold" />
-              {notificationCount > 0 && (
-                <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                  {notificationCount}
-                </span>
-              )}
-            </Button>
-            
-            {showNotifications && (
-              <div 
-                className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50"
-                onBlur={() => setShowNotifications(false)}
-              >
-                <div className="px-4 py-2 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  <a href="#" className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-red-500">
-                    <p className="text-sm font-medium text-gray-900">Low stock alert: Chai Masala</p>
-                    <p className="text-xs text-gray-600">Oxford Road location • 10 minutes ago</p>
-                  </a>
-                  <a href="#" className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-orange-500">
-                    <p className="text-sm font-medium text-gray-900">Task due today: Weekly inventory check</p>
-                    <p className="text-xs text-gray-600">Cheetham Hill location • 1 hour ago</p>
-                  </a>
-                  <a 
-                    onClick={() => navigate("/announcements")} 
-                    className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-chai-gold cursor-pointer"
-                  >
-                    <p className="text-sm font-medium text-gray-900">New announcement from Head Office</p>
-                    <p className="text-xs text-gray-600">Company-wide • 3 hours ago</p>
-                  </a>
-                </div>
-                <a 
-                  onClick={() => navigate("/announcements")} 
-                  className="block text-center px-4 py-2 text-sm text-chai-gold font-medium border-t border-gray-200 cursor-pointer"
-                >
-                  View all notifications
-                </a>
-              </div>
-            )}
-          </div>
+          <NotificationsPopover />
           {/* Logout Button */}
           <Button 
             variant="outline" 
