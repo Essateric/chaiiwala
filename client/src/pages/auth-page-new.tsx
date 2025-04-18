@@ -37,7 +37,6 @@ const registerSchema = z.object({
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
   name: z.string().min(3, "Name must be at least 3 characters"),
   email: z.string().email("Please enter a valid email address"),
-  title: z.string().optional(),
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["admin", "regional", "store", "staff"]).default("staff"),
@@ -138,7 +137,6 @@ export default function AuthPageNew() {
       lastName: "",
       name: "",
       email: "",
-      title: "",
       username: "",
       password: "",
       role: "staff"
@@ -324,22 +322,7 @@ export default function AuthPageNew() {
                       )}
                     />
                     
-                    <FormField
-                      control={registerForm.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Job Title</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Your job title (optional)" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
                     
                     <FormField
                       control={registerForm.control}
