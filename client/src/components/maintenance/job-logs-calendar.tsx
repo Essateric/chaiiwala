@@ -59,6 +59,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Helper function to create mock job events for testing
   const createSimpleEvents = () => {
+    // First check if stores is available and has items
+    if (!stores || !Array.isArray(stores) || stores.length === 0) {
+      console.log('No stores available for generating events');
+      return [];
+    }
+    
     // Create events for the next 7 days
     const events = [];
     const today = new Date();
@@ -79,8 +85,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         const end = new Date(start);
         end.setHours(end.getHours() + 1);
         
-        const storeId = Math.floor(Math.random() * 5) + 1;
-        const storeName = stores.find(s => s.id === storeId)?.name || 'Unknown Store';
+        // Safely get a valid store
+        const randomStoreIndex = Math.floor(Math.random() * stores.length);
+        const randomStore = stores[randomStoreIndex];
+        const storeId = randomStore?.id || 1;
+        const storeName = randomStore?.name || 'Unknown Store';
         
         const flagTypes = ['normal', 'urgent', 'long_standing'] as const;
         const flag = flagTypes[Math.floor(Math.random() * flagTypes.length)];
