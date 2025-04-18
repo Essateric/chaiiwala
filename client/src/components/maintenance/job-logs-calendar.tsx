@@ -508,31 +508,43 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             
             {/* Calendar */}
             <div className={isMaintenanceStaff ? "w-3/4" : "w-full"} ref={calendarRef}>
-              <Calendar
-                localizer={localizer}
-                events={calendarEvents}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: '100%' }}
-                eventPropGetter={eventStyleGetter}
-                components={{
-                  toolbar: (props) => <CustomToolbar {...props} />,
-                  event: EventComponent
-                }}
-                tooltipAccessor={(event) => {
-                  try {
-                    const eventObj = event as CalendarEvent;
-                    return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
-                  } catch (error) {
-                    console.error("Error generating tooltip", error);
-                    return "Error displaying details";
-                  }
-                }}
-                popup
-                views={['month', 'week', 'day']}
-                selectable={true}
-                onSelectSlot={handleDropOnCalendar}
-              />
+              {calendarEvents.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md">
+                  <CalendarX className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium mb-2">No jobs scheduled</p>
+                  <p className="text-sm text-muted-foreground text-center">
+                    {isMaintenanceStaff 
+                      ? "Drag a job from the left panel to schedule it on the calendar" 
+                      : "No maintenance jobs are currently scheduled"}
+                  </p>
+                </div>
+              ) : (
+                <Calendar
+                  localizer={localizer}
+                  events={calendarEvents}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: '100%' }}
+                  eventPropGetter={eventStyleGetter}
+                  components={{
+                    toolbar: (props) => <CustomToolbar {...props} />,
+                    event: EventComponent
+                  }}
+                  tooltipAccessor={(event) => {
+                    try {
+                      const eventObj = event as CalendarEvent;
+                      return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
+                    } catch (error) {
+                      console.error("Error generating tooltip", error);
+                      return "Error displaying details";
+                    }
+                  }}
+                  popup
+                  views={['month', 'week', 'day']}
+                  selectable={isMaintenanceStaff}
+                  onSelectSlot={handleDropOnCalendar}
+                />
+              )}
             </div>
             
             {/* Drag indicator */}
