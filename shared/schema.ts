@@ -227,6 +227,18 @@ export const permissions = pgTable("permissions", {
   accessLevel: accessLevelEnum("access_level").notNull().default('Shop Limited Access'),
 });
 
+// User Notifications Table
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(), // User receiving the notification
+  title: text("title").notNull(), // Notification title
+  message: text("message").notNull(), // Notification message
+  sourceType: text("source_type").notNull(), // Type of notification (e.g., "job_log", "announcement")
+  sourceId: integer("source_id").notNull(), // ID of the source (e.g., job log ID, announcement ID)
+  read: boolean("read").notNull().default(false), // Whether the notification has been read
+  createdAt: timestamp("created_at").notNull().defaultNow(), // When the notification was created
+});
+
 // Session table (used by connect-pg-simple)
 // This must match the table structure expected by connect-pg-simple
 export const session = pgTable("session", {
@@ -254,6 +266,7 @@ export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id
 export const insertStockCategorySchema = createInsertSchema(stockCategories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStoreStockLevelSchema = createInsertSchema(storeStockLevels).omit({ id: true, lastUpdated: true });
 export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true });
+export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({ id: true, createdAt: true, read: true });
 
 // Type Exports
 export type User = typeof users.$inferSelect;
@@ -311,3 +324,6 @@ export type StoreStockLevel = typeof storeStockLevels.$inferSelect;
 export type InsertStoreStockLevel = z.infer<typeof insertStoreStockLevelSchema>;
 
 export type Session = typeof session.$inferSelect;
+
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
