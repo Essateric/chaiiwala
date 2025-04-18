@@ -58,50 +58,60 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   );
   
   // Convert job logs to calendar events
-  const calendarEvents = useMemo((): CalendarEvent[] => {
-    if (!Array.isArray(jobLogs)) return [];
+  const calendarEvents = useMemo(() => {
+    if (!Array.isArray(jobLogs)) {
+      console.log('jobLogs is not an array');
+      return [];
+    }
     
-    const filteredJobs = jobLogs.filter(job => 
-      (!selectedStoreId || job.storeId === selectedStoreId) && 
-      job.logDate && 
-      job.logTime
-    );
+    // Log all jobs with dates
+    console.log('All job logs:', jobLogs.length);
     
-    console.log('Filtered jobs for calendar:', filteredJobs.length);
+    // Filter jobs that have both logDate and logTime
+    const scheduledJobs = jobLogs.filter(job => {
+      const hasDate = Boolean(job.logDate);
+      const hasTime = Boolean(job.logTime);
+      return hasDate && hasTime && (!selectedStoreId || job.storeId === selectedStoreId);
+    });
     
-    return filteredJobs.map(job => {
+    console.log('Scheduled jobs count:', scheduledJobs.length);
+    
+    if (scheduledJobs.length > 0) {
+      console.log('First scheduled job:', JSON.stringify(scheduledJobs[0]));
+    }
+    
+    // Format events for the calendar
+    return scheduledJobs.map(job => {
       try {
-        // Create start date from logDate and logTime
-        let startDate;
-        try {
-          startDate = new Date(`${job.logDate}T${job.logTime}`);
-          // Check if date is valid
-          if (isNaN(startDate.getTime())) {
-            console.error('Invalid date created:', job.logDate, job.logTime);
-            throw new Error('Invalid date');
-          }
-        } catch (dateError) {
-          console.error('Error creating date:', dateError);
-          // Fallback to current date
-          startDate = new Date();
-          console.log('Using fallback date for job:', job.id);
+        // Parse date manually to avoid timezone issues
+        const dateParts = job.logDate.split('-');
+        const timeParts = job.logTime.split(':');
+        
+        if (dateParts.length !== 3 || timeParts.length !== 2) {
+          throw new Error(`Invalid date format: ${job.logDate} ${job.logTime}`);
         }
         
-        // Create end date - set to 1 hour after start for display purposes
-        const endDate = new Date(startDate);
-        endDate.setHours(endDate.getHours() + 1);
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+        const day = parseInt(dateParts[2]);
+        const hours = parseInt(timeParts[0]);
+        const minutes = parseInt(timeParts[1]);
         
-        // Find store name with defensive check
-        let storeName = 'Unknown Store';
-        if (Array.isArray(stores)) {
-          storeName = stores.find(store => store && store.id === job.storeId)?.name || 'Unknown Store';
-        }
+        // Create start date and end date (1 hour later)
+        const start = new Date(year, month, day, hours, minutes);
+        const end = new Date(year, month, day, hours + 1, minutes);
+        
+        console.log(`Created event for job ${job.id}: ${start.toISOString()} - ${end.toISOString()}`);
+        
+        // Find store name
+        const store = stores.find(s => s.id === job.storeId);
+        const storeName = store ? store.name : 'Unknown Store';
         
         return {
           id: job.id,
           title: job.description || 'No description',
-          start: startDate,
-          end: endDate,
+          start,
+          end,
           storeId: job.storeId,
           storeName,
           flag: job.flag || 'normal',
@@ -109,13 +119,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           loggedBy: job.loggedBy || 'Unknown'
         };
       } catch (error) {
-        console.error("Error processing job log:", job, error);
-        return null; // This will be filtered out below
+        console.error(`Error converting job ${job.id} to calendar event:`, error);
+        return null;
       }
-    })
-    .filter((event): event is CalendarEvent => event !== null);
+    }).filter(Boolean) as CalendarEvent[];
   }, [jobLogs, selectedStoreId, stores]);
-  
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
     let backgroundColor;
