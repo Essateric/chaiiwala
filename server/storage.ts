@@ -30,6 +30,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
   getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]>;
   getStaffByStore(storeId: number): Promise<{ id: number; name: string; role: string; }[]>;
 
