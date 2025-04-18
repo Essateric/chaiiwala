@@ -16,17 +16,20 @@ import {
   insertScheduleSchema,
   insertAnnouncementSchema,
   insertJobLogSchema,
+  insertJobLogCommentSchema,
   insertEventOrderSchema,
   insertPermissionSchema,
   insertStockCategorySchema,
   insertMaintenanceCategorySchema,
   insertMaintenanceSubcategorySchema,
+  insertUserNotificationSchema,
   taskStatusEnum,
   priorityEnum,
   inventoryStatusEnum,
   jobFlagEnum,
   eventStatusEnum,
-  accessLevelEnum
+  accessLevelEnum,
+  InsertJobLogComment
 } from "@shared/schema";
 
 // Helper middleware to check if user is authenticated
@@ -387,6 +390,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Job log comments
+  app.get("/api/joblogs/:jobLogId/comments", isAuthenticated, async (req, res) => {
+    try {
+      const jobLogId = parseInt(req.params.jobLogId);
+      const comments = await storage.getJobLogComments(jobLogId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch job log comments" });
+    }
+  });
+
+  app.post("/api/joblogs/:jobLogId/comments", isAuthenticated, async (req, res) => {
+    try {
+      const jobLogId = parseInt(req.params.jobLogId);
+      const { comment, mentionedUsers } = req.body;
+      
+      if (!comment) {
+        return res.status(400).json({ message: "Comment text is required" });
+      }
+      
+      // Create the comment with the current user as the commenter
+      const commentData: InsertJobLogComment = {
+        jobLogId,
+        comment,
+        commentedBy: req.user!.id,
+        mentionedUsers: mentionedUsers || []
+      };
+      
+      const newComment = await storage.createJobLogComment(commentData);
+      res.status(201).json(newComment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create job log comment" });
+    }
+  });
+  
+  // User notifications
+  app.get("/api/notifications", isAuthenticated, async (req, res) => {
+    try {
+      const notifications = await storage.getUserNotifications(req.user!.id);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+  
+  app.patch("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const notification = await storage.markNotificationAsRead(id);
+      if (notification) {
+        res.json(notification);
+      } else {
+        res.status(404).json({ message: "Notification not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+  
+  app.delete("/api/notifications/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteNotification(id);
+      if (success) {
+        res.status(204).send();
+      } else {
+        res.status(404).json({ message: "Notification not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+  
   // Upload image for job log
   app.post("/api/upload/joblog-image", isAuthenticated, async (req: Request, res) => {
     try {
