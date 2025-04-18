@@ -12,7 +12,9 @@ import {
   StockConfig, InsertStockConfig, stockConfig,
   StockCategory, InsertStockCategory, stockCategories,
   StoreStockLevel, InsertStoreStockLevel, storeStockLevels,
-  Permission, InsertPermission, permissions
+  Permission, InsertPermission, permissions,
+  MaintenanceCategory, InsertMaintenanceCategory, maintenanceCategories,
+  MaintenanceSubcategory, InsertMaintenanceSubcategory, maintenanceSubcategories
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -763,6 +765,91 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error seeding database:", error);
     }
+  }
+  
+  // Maintenance Categories methods
+  async getAllMaintenanceCategories(): Promise<MaintenanceCategory[]> {
+    return await db.select().from(maintenanceCategories);
+  }
+  
+  async getMaintenanceCategory(id: number): Promise<MaintenanceCategory | undefined> {
+    const [category] = await db.select()
+      .from(maintenanceCategories)
+      .where(eq(maintenanceCategories.id, id));
+    return category;
+  }
+  
+  async createMaintenanceCategory(insertCategory: InsertMaintenanceCategory): Promise<MaintenanceCategory> {
+    const [category] = await db.insert(maintenanceCategories)
+      .values({
+        ...insertCategory,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+    return category;
+  }
+  
+  async updateMaintenanceCategory(id: number, data: Partial<MaintenanceCategory>): Promise<MaintenanceCategory | undefined> {
+    const [updatedCategory] = await db.update(maintenanceCategories)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(maintenanceCategories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+  
+  async deleteMaintenanceCategory(id: number): Promise<void> {
+    // This will cascade delete subcategories due to foreign key constraint
+    await db.delete(maintenanceCategories)
+      .where(eq(maintenanceCategories.id, id));
+  }
+  
+  // Maintenance Subcategories methods
+  async getAllMaintenanceSubcategories(): Promise<MaintenanceSubcategory[]> {
+    return await db.select().from(maintenanceSubcategories);
+  }
+  
+  async getMaintenanceSubcategoryById(id: number): Promise<MaintenanceSubcategory | undefined> {
+    const [subcategory] = await db.select()
+      .from(maintenanceSubcategories)
+      .where(eq(maintenanceSubcategories.id, id));
+    return subcategory;
+  }
+  
+  async getMaintenanceSubcategoriesByCategoryId(categoryId: number): Promise<MaintenanceSubcategory[]> {
+    return await db.select()
+      .from(maintenanceSubcategories)
+      .where(eq(maintenanceSubcategories.categoryId, categoryId));
+  }
+  
+  async createMaintenanceSubcategory(insertSubcategory: InsertMaintenanceSubcategory): Promise<MaintenanceSubcategory> {
+    const [subcategory] = await db.insert(maintenanceSubcategories)
+      .values({
+        ...insertSubcategory,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+    return subcategory;
+  }
+  
+  async updateMaintenanceSubcategory(id: number, data: Partial<MaintenanceSubcategory>): Promise<MaintenanceSubcategory | undefined> {
+    const [updatedSubcategory] = await db.update(maintenanceSubcategories)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(maintenanceSubcategories.id, id))
+      .returning();
+    return updatedSubcategory;
+  }
+  
+  async deleteMaintenanceSubcategory(id: number): Promise<void> {
+    await db.delete(maintenanceSubcategories)
+      .where(eq(maintenanceSubcategories.id, id));
   }
 }
 
