@@ -178,8 +178,8 @@ export default function MaintenanceCategorySettings() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/maintenance/categories/${id}`);
-      return await response.json();
+      await apiRequest("DELETE", `/api/maintenance/categories/${id}`);
+      return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/categories"] });
@@ -223,7 +223,7 @@ export default function MaintenanceCategorySettings() {
 
   const updateSubcategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof subcategorySchema> }) => {
-      const response = await apiRequest("PUT", `/api/maintenance/subcategories/${id}`, data);
+      const response = await apiRequest("PATCH", `/api/maintenance/subcategories/${id}`, data);
       return await response.json();
     },
     onSuccess: () => {
@@ -246,8 +246,8 @@ export default function MaintenanceCategorySettings() {
 
   const deleteSubcategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/maintenance/subcategories/${id}`);
-      return await response.json();
+      await apiRequest("DELETE", `/api/maintenance/subcategories/${id}`);
+      return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance/subcategories"] });
