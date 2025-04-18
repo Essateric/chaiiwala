@@ -631,7 +631,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Essa", 
           name: "Shabnam Essa", 
           email: "shabnam@chaiiwala.com", 
-          title: "CEO", 
           role: "admin", 
           permissions: ["all_access", "admin_panel", "reports"],
           storeId: null
@@ -645,7 +644,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Aftab", 
           name: "Usman Aftab", 
           email: "usman.aftab@chaiiwala.co.uk", 
-          title: "Regional Director", 
           role: "regional", 
           permissions: ["view_all_stores", "inventory_management", "staff_scheduling", "reporting", "task_management", "all_features"],
           storeId: null
@@ -658,8 +656,7 @@ export class DatabaseStorage implements IStorage {
           firstName: "Jubayed", 
           lastName: "Chowdhury", 
           name: "Jubayed Chowdhury", 
-          email: "jubayed@chaiiwala.com", 
-          title: "Store Manager", 
+          email: "jubayed@chaiiwala.com",
           role: "store", 
           storeId: 5, 
           permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
@@ -673,7 +670,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "User", 
           name: "Admin User", 
           email: "admin@chaiiwala.com",
-          title: "System Administrator",
           role: "admin", 
           permissions: ["all_access"],
           storeId: null
@@ -685,7 +681,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Khan", 
           name: "Fatima Khan", 
           email: "fatima@chaiiwala.com",
-          title: "Regional Manager",
           role: "regional", 
           permissions: ["view_all_stores", "inventory_management"],
           storeId: null
@@ -697,7 +692,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Khan", 
           name: "Ahmed Khan", 
           email: "ahmed@chaiiwala.com",
-          title: "Store Manager",
           role: "store", 
           storeId: 1, 
           permissions: ["manage_store"] 
@@ -709,7 +703,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Smith", 
           name: "Sarah Smith", 
           email: "sarah@chaiiwala.com",
-          title: "Store Manager",
           role: "store", 
           storeId: 2, 
           permissions: ["manage_store"] 
@@ -721,7 +714,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Ali", 
           name: "Mohammed Ali", 
           email: "mohammed@chaiiwala.com",
-          title: "Store Associate",
           role: "staff", 
           storeId: 1, 
           permissions: ["basic_access"] 
@@ -733,7 +725,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Patel", 
           name: "Jessica Patel", 
           email: "jessica@chaiiwala.com",
-          title: "Store Associate",
           role: "staff", 
           storeId: 2, 
           permissions: ["basic_access"] 
@@ -746,7 +737,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Khan", 
           name: "Imran Khan", 
           email: "imran@chaiiwala.com",
-          title: "Store Manager",
           role: "store", 
           storeId: 8, // Wilmslow Road
           permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
@@ -758,7 +748,6 @@ export class DatabaseStorage implements IStorage {
           lastName: "Ali", 
           name: "Zahra Ali", 
           email: "zahra@chaiiwala.com",
-          title: "Store Manager",
           role: "store", 
           storeId: 9, // Deansgate
           permissions: ["manage_store", "view_inventory", "staff_scheduling"] 
