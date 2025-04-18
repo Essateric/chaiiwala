@@ -1,12 +1,14 @@
-import { useState, useMemo } from 'react';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { Calendar, dateFnsLocalizer, SlotInfo } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { JobLog } from '@shared/schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useMutation } from '@tanstack/react-query';
 import { 
   Select, 
   SelectContent, 
@@ -207,6 +209,124 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Check if we have valid job logs and stores data
   const hasValidData = Array.isArray(jobLogs) && jobLogs.length > 0 && Array.isArray(stores);
   
+  // List of pending jobs (only shown to maintenance staff)
+  const [pendingJobs, setPendingJobs] = useState<JobLog[]>(() => {
+    // Initialize with job logs that haven't been scheduled yet
+    // (those without logDate or logTime)
+    if (!Array.isArray(jobLogs)) return [];
+    return jobLogs.filter(job => !job.logDate || !job.logTime);
+  });
+  
+  // State to track dragged job
+  const [draggedJob, setDraggedJob] = useState<JobLog | null>(null);
+  
+  // Reference to the calendar element
+  const calendarRef = useRef<HTMLDivElement>(null);
+  
+  // Is user maintenance staff?
+  const isMaintenanceStaff = user?.role === 'maintenance';
+  
+  // Handle drag start
+  const handleDragStart = (job: JobLog) => {
+    setDraggedJob(job);
+  };
+  
+  // Handle drag end
+  const handleDragEnd = () => {
+    setDraggedJob(null);
+  };
+  
+  // Create a mutation for updating job logs
+  const [updateJobLog, { isPending: isUpdating }] = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<JobLog> }) => {
+      const res = await fetch(`/api/joblogs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to update job log');
+      }
+      
+      return await res.json();
+    },
+    onSuccess: () => {
+      // This would be a good place to show a toast notification
+      console.log('Job log updated successfully');
+    },
+    onError: (error) => {
+      console.error('Error updating job log:', error);
+    }
+  });
+  
+  // Handle drop on calendar
+  const handleDropOnCalendar = (slotInfo: SlotInfo) => {
+    if (!draggedJob) return;
+    
+    // Format date and time from the drop position
+    const logDate = format(slotInfo.start, 'yyyy-MM-dd');
+    const logTime = format(slotInfo.start, 'HH:mm');
+    
+    // Update the job log with the new date and time
+    updateJobLog({
+      id: draggedJob.id,
+      data: {
+        logDate,
+        logTime
+      }
+    });
+    
+    // Update the pending jobs list
+    const updatedPendingJobs = pendingJobs.filter(job => job.id !== draggedJob.id);
+    setPendingJobs(updatedPendingJobs);
+    
+    // Clear the dragged job
+    setDraggedJob(null);
+  };
+  
+  // This function would be used to handle the calendar's drop event
+  const handleOnDropFromOutside = useCallback(
+    ({ start }: { start: Date }) => {
+      if (draggedJob) {
+        // Format date and time from the drop position
+        const logDate = format(start, 'yyyy-MM-dd');
+        const logTime = format(start, 'HH:mm');
+        
+        // Update the job log with the new date and time
+        updateJobLog({
+          id: draggedJob.id,
+          data: {
+            logDate,
+            logTime
+          }
+        });
+        
+        // Update pending jobs list
+        const updatedPendingJobs = pendingJobs.filter(job => job.id !== draggedJob.id);
+        setPendingJobs(updatedPendingJobs);
+        
+        // Clear dragged job
+        setDraggedJob(null);
+      }
+    },
+    [draggedJob, pendingJobs, updateJobLog]
+  );
+  
+  // Render drag indicator if job is being dragged
+  const renderDragIndicator = () => {
+    if (!draggedJob) return null;
+    
+    return (
+      <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+        <div className="bg-primary-foreground shadow-lg rounded-md p-4 max-w-md">
+          <p>Drop on calendar to schedule:</p>
+          <p className="font-bold">{draggedJob.description}</p>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <Card className="overflow-hidden mt-4">
       <CardHeader className="pb-2">
@@ -221,30 +341,88 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             </div>
           </div>
         ) : (
-          <div style={{ height: 600 }}>
-            <Calendar
-              localizer={localizer}
-              events={calendarEvents}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: '100%' }}
-              eventPropGetter={eventStyleGetter}
-              components={{
-                toolbar: (props) => <CustomToolbar {...props} />,
-                event: EventComponent
-              }}
-              tooltipAccessor={(event) => {
-                try {
-                  const eventObj = event as CalendarEvent;
-                  return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
-                } catch (error) {
-                  console.error("Error generating tooltip", error);
-                  return "Error displaying details";
-                }
-              }}
-              popup
-              views={['month', 'week', 'day']}
-            />
+          <div className="flex" style={{ height: 600 }}>
+            {/* Left panel with draggable job cards - only visible for maintenance staff */}
+            {isMaintenanceStaff && (
+              <div className="w-1/4 pr-4 border-r">
+                <h3 className="text-sm font-semibold mb-2">Pending Jobs</h3>
+                <p className="text-xs text-muted-foreground mb-2">Drag a job to the calendar to schedule it</p>
+                
+                <ScrollArea className="h-[550px]">
+                  <div className="space-y-2">
+                    {pendingJobs.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No pending jobs</p>
+                    ) : (
+                      pendingJobs.map(job => {
+                        // Determine badge color based on flag
+                        let badgeVariant: "default" | "destructive" | "outline" | "secondary" = "default";
+                        switch (job.flag) {
+                          case 'urgent':
+                            badgeVariant = "destructive";
+                            break;
+                          case 'long_standing':
+                            badgeVariant = "secondary";
+                            break;
+                        }
+                        
+                        // Get store name
+                        const storeName = stores.find(store => store.id === job.storeId)?.name || 'Unknown Store';
+                        
+                        return (
+                          <div
+                            key={job.id}
+                            draggable
+                            onDragStart={() => handleDragStart(job)}
+                            onDragEnd={handleDragEnd}
+                            className="bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow"
+                          >
+                            <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
+                            <div className="flex items-center justify-between text-xs">
+                              <Badge variant={badgeVariant} className="text-[10px] py-0">
+                                {job.flag === 'urgent' ? 'Urgent' : job.flag === 'long_standing' ? 'Long Standing' : 'Normal'}
+                              </Badge>
+                              <span className="text-muted-foreground">{storeName}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+            
+            {/* Calendar */}
+            <div className={isMaintenanceStaff ? "w-3/4" : "w-full"} ref={calendarRef}>
+              <Calendar
+                localizer={localizer}
+                events={calendarEvents}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: '100%' }}
+                eventPropGetter={eventStyleGetter}
+                components={{
+                  toolbar: (props) => <CustomToolbar {...props} />,
+                  event: EventComponent
+                }}
+                tooltipAccessor={(event) => {
+                  try {
+                    const eventObj = event as CalendarEvent;
+                    return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
+                  } catch (error) {
+                    console.error("Error generating tooltip", error);
+                    return "Error displaying details";
+                  }
+                }}
+                popup
+                views={['month', 'week', 'day']}
+                selectable={true}
+                onSelectSlot={handleDropOnCalendar}
+              />
+            </div>
+            
+            {/* Drag indicator */}
+            {renderDragIndicator()}
           </div>
         )}
       </CardContent>
