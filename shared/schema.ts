@@ -102,18 +102,38 @@ export const announcements = pgTable("announcements", {
   likes: integer("likes").notNull().default(0),
 });
 
+// Maintenance Job Categories
+export const jobCategoryEnum = pgEnum('job_category', [
+  'electrical',
+  'plumbing',
+  'building',
+  'other'
+]);
+
+// Job Log Comments Table
+export const jobLogComments = pgTable("job_log_comments", {
+  id: serial("id").primaryKey(),
+  jobLogId: integer("job_log_id").notNull().references(() => jobLogs.id, { onDelete: 'cascade' }),
+  comment: text("comment").notNull(),
+  commentedBy: integer("commented_by").notNull(), // User ID who made the comment
+  commentedAt: timestamp("commented_at").notNull().defaultNow(),
+  mentionedUsers: integer("mentioned_users").array(), // Array of user IDs mentioned in the comment
+});
+
 // Job Logs Table
 export const jobLogs = pgTable("job_logs", {
   id: serial("id").primaryKey(),
+  title: text("title").notNull(), // Title of the maintenance job
+  category: jobCategoryEnum("category").notNull().default('other'), // Category of the job
   logDate: text("log_date").notNull(), // Date of the job log in YYYY-MM-DD format
   logTime: text("log_time").notNull(), // Time of the job log in HH:MM format
   loggedBy: text("logged_by").notNull(), // Name of person who logged the job
   storeId: integer("store_id").notNull(), // Store where the job is logged
   description: text("description").notNull(), // Description of the job
-  completionDate: text("completion_date"), // Date by which the job should be completed
+  completionDate: text("completion_date"), // Date by which the job should be completed (will be removed from forms)
   attachment: text("attachment"), // Legacy field - single attachment URL or path
   attachments: text("attachments").array(), // URLs or paths to any uploaded attachments (new format)
-  comments: text("comments"), // Additional comments
+  comments: text("comments"), // Additional comments (legacy field, using jobLogComments for new app)
   flag: jobFlagEnum("flag").notNull().default('normal'), // Flag for job status (normal, long_standing, urgent)
   createdAt: timestamp("created_at").notNull().defaultNow(), // Timestamp when the job was logged
 });
@@ -207,6 +227,7 @@ export const insertChecklistTaskSchema = createInsertSchema(checklistTasks).omit
 export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, date: true, likes: true });
 export const insertJobLogSchema = createInsertSchema(jobLogs).omit({ id: true, createdAt: true });
+export const insertJobLogCommentSchema = createInsertSchema(jobLogComments).omit({ id: true, commentedAt: true });
 export const insertManagerDetailsSchema = createInsertSchema(managerDetails).omit({ id: true });
 export const insertEventOrderSchema = createInsertSchema(eventOrders).omit({ id: true, createdAt: true });
 export const insertStockConfigSchema = createInsertSchema(stockConfig).omit({ id: true, createdAt: true, updatedAt: true });
