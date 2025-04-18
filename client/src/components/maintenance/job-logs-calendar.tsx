@@ -215,7 +215,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     // Initialize with job logs that haven't been scheduled yet
     // (those without logDate or logTime)
     if (!Array.isArray(jobLogs)) return [];
-    return jobLogs.filter(job => !job.logDate || !job.logTime);
+    
+    console.log('All jobLogs:', JSON.stringify(jobLogs));
+    const filtered = jobLogs.filter(job => !job.logDate || !job.logTime);
+    console.log('Filtered pending jobs:', JSON.stringify(filtered));
+    
+    return filtered;
   });
   
   // State to track dragged job
@@ -226,6 +231,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Is user maintenance staff?
   const isMaintenanceStaff = user?.role === 'maintenance';
+  console.log('User role:', user?.role, 'isMaintenanceStaff:', isMaintenanceStaff);
   
   // Handle drag start
   const handleDragStart = (job: JobLog) => {
