@@ -3,10 +3,10 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
-// Use a simpler approach - no ErrorEvent or WebSocket patching
-// Just configure neon to use ws package and handle connection issues with retry
-
+// Configure Neon to use WebSockets
 neonConfig.webSocketConstructor = ws;
+// Disable patching - this is the key to fixing the WebSocket error with Neon
+neonConfig.patchWebSocketPrototype = false;
 
 // Variables to be exported
 let pool: Pool | null = null;
@@ -21,9 +21,9 @@ const createPool = () => {
   
   return new Pool({ 
     connectionString: process.env.DATABASE_URL,
-    max: 20,
+    max: 10, // Reduced max connections to avoid overloading
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 5000, // Increased timeout for more resilience
   });
 };
 
