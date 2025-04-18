@@ -14,7 +14,8 @@ import {
   Permission, InsertPermission,
   StoreStockLevel,
   MaintenanceCategory, InsertMaintenanceCategory,
-  MaintenanceSubcategory, InsertMaintenanceSubcategory
+  MaintenanceSubcategory, InsertMaintenanceSubcategory,
+  UserNotification, InsertUserNotification
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -35,9 +36,9 @@ export interface IStorage {
   getStaffByStore(storeId: number): Promise<{ id: number; name: string; role: string; }[]>;
   
   // Notification methods
-  getUserNotifications(userId: number): Promise<any[]>; 
-  createNotification(notification: any): Promise<any>;
-  markNotificationAsRead(id: number): Promise<any>;
+  getUserNotifications(userId: number): Promise<UserNotification[]>; 
+  createNotification(notification: InsertUserNotification): Promise<UserNotification>;
+  markNotificationAsRead(id: number): Promise<UserNotification | undefined>;
   deleteNotification(id: number): Promise<boolean>;
 
   // Store methods
@@ -147,6 +148,7 @@ export class MemStorage implements IStorage {
   private eventOrders: Map<number, EventOrder>;
   private stockConfigs: Map<number, StockConfig>;
   private permissions: Map<number, Permission>;
+  private userNotifications: Map<number, UserNotification>;
   
   private userId: number;
   private storeId: number;
@@ -160,6 +162,7 @@ export class MemStorage implements IStorage {
   private eventOrderId: number;
   private stockConfigId: number;
   private permissionId: number;
+  private notificationId: number;
 
   constructor() {
     // Initialize session store
@@ -180,6 +183,7 @@ export class MemStorage implements IStorage {
     this.eventOrders = new Map();
     this.stockConfigs = new Map();
     this.permissions = new Map();
+    this.userNotifications = new Map();
 
     // Initialize IDs
     this.userId = 1;
@@ -194,6 +198,7 @@ export class MemStorage implements IStorage {
     this.eventOrderId = 1;
     this.stockConfigId = 1;
     this.permissionId = 1;
+    this.notificationId = 1;
 
     // Seed data
     this.seedInitialData();
@@ -227,6 +232,18 @@ export class MemStorage implements IStorage {
     
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...data
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   async getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]> {
@@ -541,6 +558,41 @@ export class MemStorage implements IStorage {
     
     this.eventOrders.set(id, updatedEventOrder);
     return updatedEventOrder;
+  }
+  
+  // Notification methods
+  async getUserNotifications(userId: number): Promise<UserNotification[]> {
+    return Array.from(this.userNotifications.values())
+      .filter(notification => notification.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  
+  async createNotification(notification: InsertUserNotification): Promise<UserNotification> {
+    const id = this.notificationId++;
+    const newNotification: UserNotification = {
+      ...notification,
+      id,
+      createdAt: new Date(),
+      read: false
+    };
+    this.userNotifications.set(id, newNotification);
+    return newNotification;
+  }
+  
+  async markNotificationAsRead(id: number): Promise<UserNotification | undefined> {
+    const notification = this.userNotifications.get(id);
+    if (!notification) return undefined;
+    
+    const updatedNotification: UserNotification = {
+      ...notification,
+      read: true
+    };
+    this.userNotifications.set(id, updatedNotification);
+    return updatedNotification;
+  }
+  
+  async deleteNotification(id: number): Promise<boolean> {
+    return this.userNotifications.delete(id);
   }
 
   // Stock Configuration methods
