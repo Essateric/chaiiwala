@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
   Select, 
   SelectContent, 
@@ -237,22 +238,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   };
   
   // Create a mutation for updating job logs
-  const [updateJobLog, { isPending: isUpdating }] = useMutation({
+  const updateJobLogMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<JobLog> }) => {
-      const res = await fetch(`/api/joblogs/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to update job log');
-      }
-      
-      return await res.json();
+      return apiRequest('PATCH', `/api/joblogs/${id}`, data);
     },
     onSuccess: () => {
-      // This would be a good place to show a toast notification
+      // Invalidate the joblogs query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
       console.log('Job log updated successfully');
     },
     onError: (error) => {
@@ -269,7 +261,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     const logTime = format(slotInfo.start, 'HH:mm');
     
     // Update the job log with the new date and time
-    updateJobLog({
+    updateJobLogMutation.mutate({
       id: draggedJob.id,
       data: {
         logDate,
@@ -294,7 +286,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         const logTime = format(start, 'HH:mm');
         
         // Update the job log with the new date and time
-        updateJobLog({
+        updateJobLogMutation.mutate({
           id: draggedJob.id,
           data: {
             logDate,
@@ -310,7 +302,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         setDraggedJob(null);
       }
     },
-    [draggedJob, pendingJobs, updateJobLog]
+    [draggedJob, pendingJobs, updateJobLogMutation]
   );
   
   // Render drag indicator if job is being dragged
