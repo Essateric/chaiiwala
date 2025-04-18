@@ -24,6 +24,8 @@ import { z } from "zod";
 import JobLogsCalendar from "./job-logs-calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 export default function JobLogsSection() {
   const { user } = useAuth();
@@ -186,10 +188,128 @@ export default function JobLogsSection() {
     const [comment, setComment] = useState("");
     const commentInputRef = useRef<HTMLTextAreaElement>(null);
     const [mentionedUsers, setMentionedUsers] = useState<number[]>([]);
-    const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
-    const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const [userSearchTerm, setUserSearchTerm] = useState("");
+    const [cursorPosition, setCursorPosition] = useState(0);
+    const { toast } = useToast();
     
-    // Mention handling logic would be implemented here
+    // Fetch comments for this job log
+    const { data: comments = [], isLoading: isLoadingComments, refetch: refetchComments } = useQuery<any[]>({
+      queryKey: [`/api/joblogs/${jobLog.id}/comments`],
+      enabled: !!jobLog.id,
+    });
+    
+    // Fetch all staff for mentions
+    const { data: staffList = [] } = useQuery<{ id: number; name: string; role: string; }[]>({
+      queryKey: ['/api/staff'],
+      enabled: !!jobLog.id,
+    });
+    
+    // Add comment mutation
+    const addCommentMutation = useMutation({
+      mutationFn: async (commentData: { comment: string, mentionedUsers: number[] }) => {
+        const response = await fetch(`/api/joblogs/${jobLog.id}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(commentData),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to add comment');
+        }
+        
+        return response.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Comment added",
+          description: "Your comment has been added successfully",
+        });
+        setComment("");
+        setMentionedUsers([]);
+        refetchComments();
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to add comment: " + error.message,
+          variant: "destructive",
+        });
+      }
+    });
+    
+    // Handle @ mentions
+    const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setComment(value);
+      
+      // Handle @ mentions
+      if (value.includes('@')) {
+        const lastAtIndex = value.lastIndexOf('@');
+        const cursorPos = e.target.selectionStart;
+        
+        if (cursorPos > lastAtIndex) {
+          const searchTerm = value.substring(lastAtIndex + 1, cursorPos).trim();
+          setUserSearchTerm(searchTerm);
+          setShowUserMenu(true);
+          setCursorPosition(cursorPos);
+        } else {
+          setShowUserMenu(false);
+        }
+      } else {
+        setShowUserMenu(false);
+      }
+    };
+    
+    // Handle user selection from mention menu
+    const handleUserSelect = (userId: number, userName: string) => {
+      const beforeAt = comment.substring(0, comment.lastIndexOf('@'));
+      const afterCursor = comment.substring(cursorPosition);
+      const newComment = `${beforeAt}@${userName} ${afterCursor}`;
+      
+      setComment(newComment);
+      setShowUserMenu(false);
+      
+      // Add user to mentioned users if not already included
+      if (!mentionedUsers.includes(userId)) {
+        setMentionedUsers([...mentionedUsers, userId]);
+      }
+      
+      // Focus the textarea and set cursor position after the inserted name
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+        const newCursorPos = beforeAt.length + userName.length + 2; // +2 for @ and space
+        setTimeout(() => {
+          if (commentInputRef.current) {
+            commentInputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          }
+        }, 0);
+      }
+    };
+    
+    // Submit comment
+    const handleSubmitComment = () => {
+      if (!comment.trim()) return;
+      
+      addCommentMutation.mutate({
+        comment,
+        mentionedUsers
+      });
+    };
+    
+    // Format comment date
+    const formatCommentDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    };
     
     return (
       <Dialog open={!!jobLog} onOpenChange={(open) => !open && setSelectedJobLog(null)}>
@@ -240,10 +360,36 @@ export default function JobLogsSection() {
             <div>
               <h3 className="text-sm font-medium mb-2">Comments</h3>
               <div className="space-y-4 mb-4 max-h-60 overflow-y-auto bg-muted/50 p-3 rounded-md">
-                {/* Comments would be displayed here */}
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  No comments yet
-                </div>
+                {isLoadingComments ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : comments.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">
+                    No comments yet
+                  </div>
+                ) : (
+                  comments.map((comment: any) => {
+                    const commenter = staffList.find(staff => staff.id === comment.commentedBy);
+                    return (
+                      <div key={comment.id} className="bg-background rounded p-3 shadow-sm">
+                        <div className="flex justify-between items-start mb-1">
+                          <div className="font-medium">{commenter?.name || 'Unknown User'}</div>
+                          <div className="text-xs text-muted-foreground">{formatCommentDate(comment.commentedAt)}</div>
+                        </div>
+                        <div className="text-sm">
+                          {comment.comment.split(' ').map((word: string, i: number) => {
+                            // Highlight mentions with @ symbol
+                            if (word.startsWith('@')) {
+                              return <span key={i} className="text-primary font-medium">{word} </span>;
+                            }
+                            return <span key={i}>{word} </span>;
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
               
               <div className="relative">
@@ -251,15 +397,43 @@ export default function JobLogsSection() {
                   ref={commentInputRef}
                   placeholder="Add a comment... Use @ to mention someone"
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
+                  onChange={handleCommentChange}
                   className="min-h-24"
                 />
+                
+                {showUserMenu && (
+                  <div className="absolute z-10 w-full max-h-40 overflow-y-auto mt-1 bg-background border rounded-md shadow-md">
+                    {staffList
+                      .filter(staff => 
+                        staff.name.toLowerCase().includes(userSearchTerm.toLowerCase())
+                      )
+                      .map(staff => (
+                        <div
+                          key={staff.id}
+                          className="px-3 py-2 hover:bg-muted cursor-pointer"
+                          onClick={() => handleUserSelect(staff.id, staff.name)}
+                        >
+                          <div className="font-medium">{staff.name}</div>
+                          <div className="text-xs text-muted-foreground">{staff.role}</div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                
                 <Button 
                   size="sm" 
                   className="mt-2" 
-                  disabled={!comment.trim()}
+                  disabled={!comment.trim() || addCommentMutation.isPending}
+                  onClick={handleSubmitComment}
                 >
-                  Add Comment
+                  {addCommentMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    "Add Comment"
+                  )}
                 </Button>
               </div>
             </div>
