@@ -6,10 +6,13 @@ import { enUS } from 'date-fns/locale';
 import { JobLog } from '@shared/schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { CalendarX, Loader2 } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -49,6 +52,7 @@ interface JobLogsCalendarProps {
 
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
@@ -283,6 +287,34 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     setDraggedJob(null);
   };
   
+  // Mutation to reset job dates (clear logDate and logTime)
+  const resetJobMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest('PATCH', `/api/joblogs/${id}`, {
+        logDate: null,
+        logTime: null
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+      // Add the reset job to the pending jobs list
+      setPendingJobs(prev => [...prev, data]);
+      toast({
+        title: "Job reset",
+        description: "The job has been reset and is now available for scheduling.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error resetting job:', error);
+      toast({
+        title: "Failed to reset job",
+        description: "Could not reset the job. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
   // This function would be used to handle the calendar's drop event
   const handleOnDropFromOutside = useCallback(
     ({ start }: { start: Date }) => {
@@ -325,10 +357,59 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     );
   };
   
+  // Get a random job to reset for testing
+  const getRandomJob = () => {
+    if (!Array.isArray(jobLogs) || jobLogs.length === 0) return null;
+    
+    // Filter jobs that have a logDate and logTime (scheduled jobs)
+    const scheduledJobs = jobLogs.filter(job => job.logDate && job.logTime);
+    if (scheduledJobs.length === 0) return null;
+    
+    // Return a random job from the scheduled jobs
+    return scheduledJobs[Math.floor(Math.random() * scheduledJobs.length)];
+  };
+  
+  // Handle resetting a job for testing
+  const handleResetJob = () => {
+    const jobToReset = getRandomJob();
+    if (!jobToReset) {
+      toast({
+        title: "No jobs available",
+        description: "There are no scheduled jobs to reset.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    resetJobMutation.mutate(jobToReset.id);
+  };
+
   return (
     <Card className="overflow-hidden mt-4">
       <CardHeader className="pb-2">
-        <CardTitle>Job Logs Calendar</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle>Job Logs Calendar</CardTitle>
+          {isMaintenanceStaff && pendingJobs.length === 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleResetJob}
+              disabled={resetJobMutation.isPending}
+            >
+              {resetJobMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <CalendarX className="mr-2 h-4 w-4" />
+                  Reset a job for testing
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {!hasValidData ? (
@@ -349,7 +430,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 <ScrollArea className="h-[550px]">
                   <div className="space-y-2">
                     {pendingJobs.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No pending jobs</p>
+                      <div className="text-center py-4">
+                        <p className="text-sm text-muted-foreground mb-2">No pending jobs</p>
+                        <p className="text-xs text-muted-foreground">Click "Reset a job for testing" to create a pending job</p>
+                      </div>
                     ) : (
                       pendingJobs.map(job => {
                         // Determine badge color based on flag
