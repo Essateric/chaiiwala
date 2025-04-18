@@ -377,8 +377,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // Special endpoint to create unscheduled job logs (for testing drag-and-drop feature)
+  app.post("/api/joblogs/unscheduled", isAuthenticated, hasRole(["admin", "maintenance"]), async (req, res) => {
+    try {
+      // Create an unscheduled job log (omit logDate and logTime)
+      const jobLogData = {
+        title: "Unscheduled Maintenance",
+        category: "electrical" as const,
+        storeId: 1,
+        description: "This is an unscheduled maintenance job for testing drag and drop",
+        loggedBy: req.user?.username || "system",
+        flag: "urgent" as const,
+        completionDate: null
+      };
+      
+      const jobLog = await storage.createJobLog(jobLogData);
+      res.status(201).json(jobLog);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create unscheduled job log", error: String(error) });
+    }
+  });
 
-  app.patch("/api/joblogs/:id", isAuthenticated, hasRole(["admin", "regional", "store"]), async (req, res) => {
+  app.patch("/api/joblogs/:id", isAuthenticated, hasRole(["admin", "regional", "store", "maintenance"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const updatedJobLog = await storage.updateJobLog(id, req.body);
