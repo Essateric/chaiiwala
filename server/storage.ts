@@ -12,7 +12,9 @@ import {
   StockConfig, InsertStockConfig,
   StockCategory, InsertStockCategory,
   Permission, InsertPermission,
-  StoreStockLevel
+  StoreStockLevel,
+  MaintenanceCategory, InsertMaintenanceCategory,
+  MaintenanceSubcategory, InsertMaintenanceSubcategory
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -106,6 +108,21 @@ export interface IStorage {
   createPermission(permission: InsertPermission): Promise<Permission>;
   updatePermission(id: number, data: Partial<Permission>): Promise<Permission | undefined>;
   deletePermission(id: number): Promise<void>;
+  
+  // Maintenance Categories methods
+  getAllMaintenanceCategories(): Promise<MaintenanceCategory[]>;
+  getMaintenanceCategory(id: number): Promise<MaintenanceCategory | undefined>;
+  createMaintenanceCategory(category: InsertMaintenanceCategory): Promise<MaintenanceCategory>;
+  updateMaintenanceCategory(id: number, data: Partial<MaintenanceCategory>): Promise<MaintenanceCategory | undefined>;
+  deleteMaintenanceCategory(id: number): Promise<void>;
+  
+  // Maintenance Subcategories methods
+  getAllMaintenanceSubcategories(): Promise<MaintenanceSubcategory[]>;
+  getMaintenanceSubcategoryById(id: number): Promise<MaintenanceSubcategory | undefined>;
+  getMaintenanceSubcategoriesByCategoryId(categoryId: number): Promise<MaintenanceSubcategory[]>;
+  createMaintenanceSubcategory(subcategory: InsertMaintenanceSubcategory): Promise<MaintenanceSubcategory>;
+  updateMaintenanceSubcategory(id: number, data: Partial<MaintenanceSubcategory>): Promise<MaintenanceSubcategory | undefined>;
+  deleteMaintenanceSubcategory(id: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
