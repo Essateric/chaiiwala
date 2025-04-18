@@ -33,6 +33,12 @@ export interface IStorage {
   updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
   getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]>;
   getStaffByStore(storeId: number): Promise<{ id: number; name: string; role: string; }[]>;
+  
+  // Notification methods
+  getUserNotifications(userId: number): Promise<any[]>; 
+  createNotification(notification: any): Promise<any>;
+  markNotificationAsRead(id: number): Promise<any>;
+  deleteNotification(id: number): Promise<boolean>;
 
   // Store methods
   getAllStores(): Promise<Store[]>;
