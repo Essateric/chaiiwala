@@ -19,6 +19,8 @@ import {
   insertEventOrderSchema,
   insertPermissionSchema,
   insertStockCategorySchema,
+  insertMaintenanceCategorySchema,
+  insertMaintenanceSubcategorySchema,
   taskStatusEnum,
   priorityEnum,
   inventoryStatusEnum,
@@ -742,6 +744,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating stock level:", error);
       res.status(500).json({ message: "Failed to update stock level" });
+    }
+  });
+  
+  // Maintenance Categories
+  app.get("/api/maintenance/categories", isAuthenticated, async (req, res) => {
+    try {
+      const categories = await storage.getAllMaintenanceCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch maintenance categories" });
+    }
+  });
+  
+  app.get("/api/maintenance/categories/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getMaintenanceCategory(id);
+      if (category) {
+        res.json(category);
+      } else {
+        res.status(404).json({ message: "Maintenance category not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch maintenance category" });
+    }
+  });
+  
+  app.post("/api/maintenance/categories", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const categoryData = insertMaintenanceCategorySchema.parse(req.body);
+      const category = await storage.createMaintenanceCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create maintenance category" });
+      }
+    }
+  });
+  
+  app.patch("/api/maintenance/categories/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedCategory = await storage.updateMaintenanceCategory(id, req.body);
+      if (updatedCategory) {
+        res.json(updatedCategory);
+      } else {
+        res.status(404).json({ message: "Maintenance category not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update maintenance category" });
+    }
+  });
+  
+  app.delete("/api/maintenance/categories/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMaintenanceCategory(id);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete maintenance category" });
+    }
+  });
+  
+  // Maintenance Subcategories
+  app.get("/api/maintenance/subcategories", isAuthenticated, async (req, res) => {
+    try {
+      const subcategories = await storage.getAllMaintenanceSubcategories();
+      res.json(subcategories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch maintenance subcategories" });
+    }
+  });
+  
+  app.get("/api/maintenance/subcategories/category/:categoryId", isAuthenticated, async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      const subcategories = await storage.getMaintenanceSubcategoriesByCategoryId(categoryId);
+      res.json(subcategories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch subcategories for category" });
+    }
+  });
+  
+  app.get("/api/maintenance/subcategories/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const subcategory = await storage.getMaintenanceSubcategoryById(id);
+      if (subcategory) {
+        res.json(subcategory);
+      } else {
+        res.status(404).json({ message: "Maintenance subcategory not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch maintenance subcategory" });
+    }
+  });
+  
+  app.post("/api/maintenance/subcategories", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const subcategoryData = insertMaintenanceSubcategorySchema.parse(req.body);
+      const subcategory = await storage.createMaintenanceSubcategory(subcategoryData);
+      res.status(201).json(subcategory);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Validation error", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create maintenance subcategory" });
+      }
+    }
+  });
+  
+  app.patch("/api/maintenance/subcategories/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedSubcategory = await storage.updateMaintenanceSubcategory(id, req.body);
+      if (updatedSubcategory) {
+        res.json(updatedSubcategory);
+      } else {
+        res.status(404).json({ message: "Maintenance subcategory not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update maintenance subcategory" });
+    }
+  });
+  
+  app.delete("/api/maintenance/subcategories/:id", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMaintenanceSubcategory(id);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete maintenance subcategory" });
     }
   });
 

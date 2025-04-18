@@ -155,7 +155,7 @@ export default function MaintenanceCategorySettings() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof categorySchema> }) => {
-      const response = await apiRequest("PUT", `/api/maintenance/categories/${id}`, data);
+      const response = await apiRequest("PATCH", `/api/maintenance/categories/${id}`, data);
       return await response.json();
     },
     onSuccess: () => {
