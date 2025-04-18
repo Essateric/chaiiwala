@@ -51,6 +51,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
+  // User management routes
+  app.patch("/api/users/:id", isAuthenticated, hasRole(["admin", "regional"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.updateUser(userId, req.body);
+      
+      if (user) {
+        console.log(`Updated user ${userId}:`, req.body);
+        res.json({ success: true, user });
+      } else {
+        res.status(404).json({ message: "User not found" });
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // Auth test endpoint for debugging Netlify deployments
   app.get("/api/auth-test", (req, res) => {
     res.json({
