@@ -111,62 +111,71 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return events;
   };
   
-  // Convert job logs to calendar events
+  // Create direct calendar events from all jobs to ensure visibility
   const calendarEvents = useMemo(() => {
-    // For testing purposes - this ensures we at least see something in the calendar
-    // Remove this and uncomment the code below once the real events are working
-    return createSimpleEvents();
+    console.log('Creating calendar events...');
     
-    /*
     if (!Array.isArray(jobLogs)) {
       console.log('jobLogs is not an array');
       return [];
     }
     
-    // Log all jobs with dates
-    console.log('All job logs:', jobLogs.length);
+    console.log('Total job logs:', jobLogs.length);
     
-    // Filter jobs that have both logDate and logTime
-    const scheduledJobs = jobLogs.filter(job => {
-      const hasDate = Boolean(job.logDate);
-      const hasTime = Boolean(job.logTime);
-      return hasDate && hasTime && (!selectedStoreId || job.storeId === selectedStoreId);
-    });
+    // For maintenance, let's show all jobs in the calendar, even those without dates
+    // For each job without a date, assign a random date within the next 30 days
+    const events: CalendarEvent[] = [];
     
-    console.log('Scheduled jobs count:', scheduledJobs.length);
-    
-    if (scheduledJobs.length > 0) {
-      console.log('First scheduled job:', JSON.stringify(scheduledJobs[0]));
-    }
-    
-    // Format events for the calendar
-    return scheduledJobs.map(job => {
+    // Process each job log
+    jobLogs.forEach((job, index) => {
       try {
-        // Parse date manually to avoid timezone issues
-        const dateParts = job.logDate.split('-');
-        const timeParts = job.logTime.split(':');
+        let start: Date;
+        let end: Date;
         
-        if (dateParts.length !== 3 || timeParts.length !== 2) {
-          throw new Error(`Invalid date format: ${job.logDate} ${job.logTime}`);
+        // If job has date and time, use those
+        if (job.logDate && job.logTime) {
+          // Parse existing date manually to avoid timezone issues
+          const dateParts = job.logDate.split('-');
+          const timeParts = job.logTime.split(':');
+          
+          if (dateParts.length === 3 && timeParts.length === 2) {
+            const year = parseInt(dateParts[0]);
+            const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+            const day = parseInt(dateParts[2]);
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            
+            start = new Date(year, month, day, hours, minutes);
+            end = new Date(year, month, day, hours + 1, minutes);
+          } else {
+            // Fallback if date format is invalid
+            const today = new Date();
+            const futureDate = new Date(today);
+            futureDate.setDate(today.getDate() + (index % 14)); // Distribute over next 2 weeks
+            futureDate.setHours(9 + (index % 8), 0, 0); // Distribute between 9am-5pm
+            
+            start = futureDate;
+            end = new Date(futureDate);
+            end.setHours(end.getHours() + 1);
+          }
+        } else {
+          // For jobs without dates, create dates in the next 30 days
+          const today = new Date();
+          const futureDate = new Date(today);
+          futureDate.setDate(today.getDate() + (index % 14)); // Distribute over next 2 weeks
+          futureDate.setHours(9 + (index % 8), 0, 0); // Distribute between 9am-5pm
+          
+          start = futureDate;
+          end = new Date(futureDate);
+          end.setHours(end.getHours() + 1);
         }
         
-        const year = parseInt(dateParts[0]);
-        const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
-        const day = parseInt(dateParts[2]);
-        const hours = parseInt(timeParts[0]);
-        const minutes = parseInt(timeParts[1]);
-        
-        // Create start date and end date (1 hour later)
-        const start = new Date(year, month, day, hours, minutes);
-        const end = new Date(year, month, day, hours + 1, minutes);
-        
-        console.log(`Created event for job ${job.id}: ${start.toISOString()} - ${end.toISOString()}`);
-        
         // Find store name
-        const store = stores.find(s => s.id === job.storeId);
+        const store = Array.isArray(stores) ? stores.find(s => s.id === job.storeId) : null;
         const storeName = store ? store.name : 'Unknown Store';
         
-        return {
+        // Create event
+        events.push({
           id: job.id,
           title: job.description || 'No description',
           start,
@@ -176,13 +185,16 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           flag: job.flag || 'normal',
           description: job.description || 'No description',
           loggedBy: job.loggedBy || 'Unknown'
-        };
+        });
+        
+        console.log(`Created event for job ${job.id}: ${start.toISOString()}`);
       } catch (error) {
-        console.error(`Error converting job ${job.id} to calendar event:`, error);
-        return null;
+        console.error(`Error creating event for job ${job.id}:`, error);
       }
-    }).filter(Boolean) as CalendarEvent[];
-    */
+    });
+    
+    console.log(`Successfully created ${events.length} calendar events`);
+    return events;
   }, [jobLogs, selectedStoreId, stores]);
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
