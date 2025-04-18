@@ -8,13 +8,16 @@ import {
   Schedule, InsertSchedule, schedules,
   Announcement, InsertAnnouncement, announcements,
   JobLog, InsertJobLog, jobLogs,
+  JobLogComment, InsertJobLogComment, jobLogComments,
   EventOrder, InsertEventOrder, eventOrders,
   StockConfig, InsertStockConfig, stockConfig,
   StockCategory, InsertStockCategory, stockCategories,
   StoreStockLevel, InsertStoreStockLevel, storeStockLevels,
   Permission, InsertPermission, permissions,
   MaintenanceCategory, InsertMaintenanceCategory, maintenanceCategories,
-  MaintenanceSubcategory, InsertMaintenanceSubcategory, maintenanceSubcategories
+  MaintenanceSubcategory, InsertMaintenanceSubcategory, maintenanceSubcategories,
+  UserNotification, InsertUserNotification, userNotifications,
+  insertUserNotificationSchema
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -386,6 +389,70 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updatedJobLog;
+  }
+  
+  // Job Log Comments methods
+  async getJobLogComments(jobLogId: number): Promise<JobLogComment[]> {
+    return await db.select()
+      .from(jobLogComments)
+      .where(eq(jobLogComments.jobLogId, jobLogId))
+      .orderBy(asc(jobLogComments.commentedAt));
+  }
+  
+  async createJobLogComment(insertComment: InsertJobLogComment): Promise<JobLogComment> {
+    const [comment] = await db.insert(jobLogComments)
+      .values({
+        ...insertComment,
+        commentedAt: new Date()
+      })
+      .returning();
+    
+    // Create notifications for mentioned users
+    if (comment.mentionedUsers && comment.mentionedUsers.length > 0) {
+      for (const userId of comment.mentionedUsers) {
+        await this.createNotification({
+          userId,
+          title: "You were mentioned in a comment",
+          message: "Someone mentioned you in a maintenance job log comment",
+          sourceType: "job_log_comment",
+          sourceId: comment.id
+        });
+      }
+    }
+    
+    return comment;
+  }
+  
+  // Notification methods
+  async getUserNotifications(userId: number): Promise<UserNotification[]> {
+    return await db.select()
+      .from(userNotifications)
+      .where(eq(userNotifications.userId, userId))
+      .orderBy(desc(userNotifications.createdAt));
+  }
+  
+  async createNotification(notification: InsertUserNotification): Promise<UserNotification> {
+    const [newNotification] = await db.insert(userNotifications)
+      .values(notification)
+      .returning();
+    
+    return newNotification;
+  }
+  
+  async markNotificationAsRead(id: number): Promise<UserNotification | undefined> {
+    const [notification] = await db.update(userNotifications)
+      .set({ read: true })
+      .where(eq(userNotifications.id, id))
+      .returning();
+    
+    return notification;
+  }
+  
+  async deleteNotification(id: number): Promise<boolean> {
+    const result = await db.delete(userNotifications)
+      .where(eq(userNotifications.id, id));
+    
+    return !!result;
   }
   
   // Stock Categories methods
