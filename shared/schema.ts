@@ -20,7 +20,6 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   name: text("name").notNull(), // Keeping this for backward compatibility
   email: text("email").notNull(),
-  title: text("title"), // Job title
   role: roleEnum("role").notNull().default('staff'), // Role for permissions
   permissions: text("permissions").array(), // Array of specific permissions
   storeId: integer("store_id"),
