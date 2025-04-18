@@ -381,20 +381,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Special endpoint to create unscheduled job logs (for testing drag-and-drop feature)
   app.post("/api/joblogs/unscheduled", isAuthenticated, hasRole(["admin", "maintenance"]), async (req, res) => {
     try {
-      // Create an unscheduled job log (omit logDate and logTime)
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      const storeId = req.body.storeId || req.user.storeId || 1;
+      
+      // Create an unscheduled job log following the required schema
+      // but excluding the logDate and logTime fields
       const jobLogData = {
         title: "Unscheduled Maintenance",
         category: "electrical" as const,
-        storeId: 1,
+        storeId: storeId,
         description: "This is an unscheduled maintenance job for testing drag and drop",
-        loggedBy: req.user?.username || "system",
+        loggedBy: req.user.username,
         flag: "urgent" as const,
-        completionDate: null
+        completionDate: null,
+        comments: "Created for drag-and-drop testing",
+        attachment: null,
+        attachments: []
       };
       
+      // Insert directly without validation since we're creating a special test record
       const jobLog = await storage.createJobLog(jobLogData);
       res.status(201).json(jobLog);
     } catch (error) {
+      console.error("Error creating unscheduled job log:", error);
       res.status(500).json({ message: "Failed to create unscheduled job log", error: String(error) });
     }
   });
