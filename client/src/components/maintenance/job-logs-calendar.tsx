@@ -61,40 +61,59 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   const calendarEvents = useMemo((): CalendarEvent[] => {
     if (!Array.isArray(jobLogs)) return [];
     
-    return jobLogs
-      .filter(job => (!selectedStoreId || job.storeId === selectedStoreId) && job.logDate && job.logTime)
-      .map(job => {
+    const filteredJobs = jobLogs.filter(job => 
+      (!selectedStoreId || job.storeId === selectedStoreId) && 
+      job.logDate && 
+      job.logTime
+    );
+    
+    console.log('Filtered jobs for calendar:', filteredJobs.length);
+    
+    return filteredJobs.map(job => {
+      try {
+        // Create start date from logDate and logTime
+        let startDate;
         try {
-          // Create start date from logDate and logTime
-          const startDate = new Date(`${job.logDate}T${job.logTime}`);
-          
-          // Create end date - set to 1 hour after start for display purposes
-          const endDate = new Date(startDate);
-          endDate.setHours(endDate.getHours() + 1);
-          
-          // Find store name with defensive check
-          let storeName = 'Unknown Store';
-          if (Array.isArray(stores)) {
-            storeName = stores.find(store => store && store.id === job.storeId)?.name || 'Unknown Store';
+          startDate = new Date(`${job.logDate}T${job.logTime}`);
+          // Check if date is valid
+          if (isNaN(startDate.getTime())) {
+            console.error('Invalid date created:', job.logDate, job.logTime);
+            throw new Error('Invalid date');
           }
-          
-          return {
-            id: job.id,
-            title: job.description || 'No description',
-            start: startDate,
-            end: endDate,
-            storeId: job.storeId,
-            storeName,
-            flag: job.flag,
-            description: job.description || 'No description',
-            loggedBy: job.loggedBy || 'Unknown'
-          };
-        } catch (error) {
-          console.error("Error processing job log:", job, error);
-          return null; // This will be filtered out below
+        } catch (dateError) {
+          console.error('Error creating date:', dateError);
+          // Fallback to current date
+          startDate = new Date();
+          console.log('Using fallback date for job:', job.id);
         }
-      })
-      .filter((event): event is CalendarEvent => event !== null);
+        
+        // Create end date - set to 1 hour after start for display purposes
+        const endDate = new Date(startDate);
+        endDate.setHours(endDate.getHours() + 1);
+        
+        // Find store name with defensive check
+        let storeName = 'Unknown Store';
+        if (Array.isArray(stores)) {
+          storeName = stores.find(store => store && store.id === job.storeId)?.name || 'Unknown Store';
+        }
+        
+        return {
+          id: job.id,
+          title: job.description || 'No description',
+          start: startDate,
+          end: endDate,
+          storeId: job.storeId,
+          storeName,
+          flag: job.flag || 'normal',
+          description: job.description || 'No description',
+          loggedBy: job.loggedBy || 'Unknown'
+        };
+      } catch (error) {
+        console.error("Error processing job log:", job, error);
+        return null; // This will be filtered out below
+      }
+    })
+    .filter((event): event is CalendarEvent => event !== null);
   }, [jobLogs, selectedStoreId, stores]);
   
   // Define custom event styling based on job flag
