@@ -1,0 +1,286 @@
+import React, { useEffect, useState } from "react";
+import { db } from "../firebase";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+import toast from "react-hot-toast";
+
+export default function ManageStaff() {
+  const [staff, setStaff] = useState([]);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    services: [],
+    weeklyHours: {
+      Monday: { start: "", end: "", off: false },
+      Tuesday: { start: "", end: "", off: false },
+      Wednesday: { start: "", end: "", off: false },
+      Thursday: { start: "", end: "", off: false },
+      Friday: { start: "", end: "", off: false },
+      Saturday: { start: "", end: "", off: false },
+      Sunday: { start: "", end: "", off: false },
+    },
+  });
+  const [editingId, setEditingId] = useState(null);
+  const [servicesList, setServicesList] = useState([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    const staffSnap = await getDocs(collection(db, "staff"));
+    setStaff(staffSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+
+    const servicesSnap = await getDocs(collection(db, "services"));
+    setServicesList(
+      servicesSnap.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+        category: doc.data().category,
+      }))
+    );
+  }
+
+  function handleChange(e) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  function updateHours(day, key, value) {
+    setForm({
+      ...form,
+      weeklyHours: {
+        ...form.weeklyHours,
+        [day]: {
+          ...form.weeklyHours[day],
+          [key]: value,
+        },
+      },
+    });
+  }
+
+  function toggleDayOff(day) {
+    const prev = form.weeklyHours[day];
+    updateHours(day, "off", !prev.off);
+    if (!prev.off) {
+      updateHours(day, "start", "");
+      updateHours(day, "end", "");
+    }
+  }
+
+  function handleServiceToggle(service) {
+    const exists = form.services.find((s) => s.name === service.name);
+    if (exists) {
+      setForm({
+        ...form,
+        services: form.services.filter((s) => s.name !== service.name),
+      });
+    } else {
+      setForm({
+        ...form,
+        services: [...form.services, { ...service, price: 0, duration: 0 }],
+      });
+    }
+  }
+
+  function updateServiceValue(name, field, value) {
+    setForm({
+      ...form,
+      services: form.services.map((s) =>
+        s.name === name ? { ...s, [field]: value } : s
+      ),
+    });
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const incomplete = form.services.some(
+      (s) => !s.price || !s.duration || isNaN(s.price) || isNaN(s.duration)
+    );
+    if (incomplete) {
+      toast.error("Please complete price and duration for all selected services.");
+      return;
+    }
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, "staff", editingId), form);
+        toast.success("Staff updated");
+      } else {
+        await addDoc(collection(db, "staff"), form);
+        toast.success("Staff added");
+      }
+      setForm({
+        name: "",
+        email: "",
+        services: [],
+        weeklyHours: {
+          Monday: { start: "", end: "", off: false },
+          Tuesday: { start: "", end: "", off: false },
+          Wednesday: { start: "", end: "", off: false },
+          Thursday: { start: "", end: "", off: false },
+          Friday: { start: "", end: "", off: false },
+          Saturday: { start: "", end: "", off: false },
+          Sunday: { start: "", end: "", off: false },
+        },
+      });
+      setEditingId(null);
+      fetchData();
+    } catch (err) {
+      toast.error("Error saving staff");
+    }
+  }
+
+  async function handleDelete(id) {
+    await deleteDoc(doc(db, "staff", id));
+    toast.success("Staff deleted");
+    fetchData();
+  }
+
+  function handleEdit(member) {
+    setForm(member);
+    setEditingId(member.id);
+  }
+
+  return (
+    <div className="p-6">
+      <h2 className="text-2xl font-bold text-bronze mb-4">Staff Management</h2>
+
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-4 rounded shadow-md">
+        <input
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          placeholder="Name"
+          className="w-full border p-2"
+        />
+        <input
+          name="email"
+          value={form.email}
+          onChange={handleChange}
+          placeholder="Email"
+          className="w-full border p-2"
+        />
+
+        <div className="border p-2 rounded">
+          <h4 className="font-semibold text-bronze mb-2">Weekly Hours</h4>
+          {Object.entries(form.weeklyHours).map(([day, times]) => (
+            <div key={day} className="flex items-center gap-2 mb-2">
+              <label className="w-20 capitalize text-bronze">{day}</label>
+              <input
+                type="time"
+                value={times.start}
+                onChange={(e) => updateHours(day, "start", e.target.value)}
+                disabled={times.off}
+                className="border p-1"
+              />
+              <span>to</span>
+              <input
+                type="time"
+                value={times.end}
+                onChange={(e) => updateHours(day, "end", e.target.value)}
+                disabled={times.off}
+                className="border p-1"
+              />
+              <button
+                type="button"
+                onClick={() => toggleDayOff(day)}
+                className={`ml-2 px-2 py-1 text-sm rounded ${
+                  times.off ? "bg-red-200 text-red-700" : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                {times.off ? "Off" : "Set Off"}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="border p-2 rounded">
+          <h4 className="font-semibold text-bronze mb-2">Services</h4>
+          {servicesList.map((service) => (
+            <div key={service.id} className="flex justify-between items-center mb-2">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!form.services.find((s) => s.name === service.name)}
+                  onChange={() => handleServiceToggle(service)}
+                />
+                <span className="ml-2">{service.name} ({service.category})</span>
+              </label>
+              {form.services.find((s) => s.name === service.name) && (
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="£"
+                    value={
+                      form.services.find((s) => s.name === service.name)?.price || ""
+                    }
+                    onChange={(e) =>
+                      updateServiceValue(service.name, "price", Number(e.target.value))
+                    }
+                    className="w-16 border p-1"
+                  />
+                  <input
+                    type="number"
+                    placeholder="min"
+                    value={
+                      form.services.find((s) => s.name === service.name)?.duration || ""
+                    }
+                    onChange={(e) =>
+                      updateServiceValue(service.name, "duration", Number(e.target.value))
+                    }
+                    className="w-16 border p-1"
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button className="bg-bronze text-white px-4 py-2 rounded">
+          {editingId ? "Update" : "Add Staff"}
+        </button>
+      </form>
+
+      <div className="mt-6">
+        <h3 className="text-lg font-bold text-bronze mb-2">Current Staff</h3>
+        {staff.map((member) => (
+          <div
+            key={member.id}
+            className="border p-4 rounded mb-2 bg-white flex justify-between"
+          >
+            <div>
+              <p className="font-bold text-bronze">{member.name}</p>
+              <p className="text-sm text-gray-700">{member.email}</p>
+              <ul className="text-sm mt-2">
+                {member.services?.map((s, i) => (
+                  <li key={i}>
+                    • {s.name} - £{s.price} ({s.duration} mins)
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="text-blue-500 underline"
+                onClick={() => handleEdit(member)}
+              >
+                Edit
+              </button>
+              <button
+                className="text-red-500 underline"
+                onClick={() => handleDelete(member.id)}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
