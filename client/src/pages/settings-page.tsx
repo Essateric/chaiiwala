@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import MaintenanceCategorySettings from "@/components/settings/maintenance-category-settings";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -105,6 +106,9 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           {canAccessAdvancedSettings && (
             <TabsTrigger value="integration">Integrations</TabsTrigger>
+          )}
+          {canAccessAdvancedSettings && (
+            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           )}
           {user?.role === 'admin' && (
             <TabsTrigger value="system">System</TabsTrigger>
@@ -338,6 +342,13 @@ export default function SettingsPage() {
                 </Button>
               </CardFooter>
             </Card>
+          </TabsContent>
+        )}
+
+        {/* Maintenance Categories Tab - Only for admin and regional managers */}
+        {canAccessAdvancedSettings && (
+          <TabsContent value="maintenance">
+            <MaintenanceCategorySettings />
           </TabsContent>
         )}
         
