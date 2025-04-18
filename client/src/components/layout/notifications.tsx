@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bell, X, AlertTriangle, MessageCircle, Check, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { UserNotification } from "@shared/schema";
 import {
   Popover,
   PopoverContent,
@@ -26,7 +27,7 @@ export function NotificationsPopover() {
   } = useNotifications();
 
   // Function to handle notification click
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: UserNotification) => {
     // Mark notification as read
     if (!notification.read) {
       markAsRead(notification.id);
@@ -35,9 +36,9 @@ export function NotificationsPopover() {
     // Close the popover
     setOpen(false);
     
-    // Navigate to the link if provided
-    if (notification.link) {
-      navigate(notification.link);
+    // Determine where to navigate based on the notification type
+    if (notification.sourceType === 'mention') {
+      navigate(`/maintenance?joblog=${notification.sourceId}`);
     }
   };
 

@@ -420,8 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const commentData: InsertJobLogComment = {
         jobLogId: jobLogId,
         comment: comment.trim(),
-        commentedBy: req.user.id,
-        commentedAt: new Date()
+        commentedBy: req.user.id
       };
       
       const newComment = await storage.createJobLogComment(commentData);
@@ -435,11 +434,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Don't create notification for the commenter themselves
             if (userId !== req.user.id) {
               await storage.createNotification({
-                userId: userId,
-                type: 'mention',
-                content: `You were mentioned in a comment on "${jobLog.title}"`,
-                link: `/maintenance?joblog=${jobLogId}&comment=${newComment.id}`,
-                createdAt: new Date(),
+                userId: parseInt(userId),
+                title: `You were mentioned in a comment`,
+                message: `${req.user.name} mentioned you in a comment on "${jobLog.title}"`,
+                sourceType: 'mention',
+                sourceId: jobLogId,
                 read: false
               });
             }

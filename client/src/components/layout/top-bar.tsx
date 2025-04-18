@@ -21,8 +21,6 @@ interface TopBarProps {
 }
 
 export default function TopBar({ title, onMenuClick, username, role }: TopBarProps) {
-  const [notificationCount, setNotificationCount] = useState(3);
-  const [showNotifications, setShowNotifications] = useState(false);
   const { logoutMutation } = useAuth();
   const [, navigate] = useLocation();
 
