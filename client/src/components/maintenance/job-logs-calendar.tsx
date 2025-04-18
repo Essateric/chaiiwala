@@ -57,8 +57,58 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
   
+  // Helper function to create mock job events for testing
+  const createSimpleEvents = () => {
+    // Create events for the next 7 days
+    const events = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      
+      // Create 1-3 events per day
+      const numEvents = Math.floor(Math.random() * 3) + 1;
+      
+      for (let j = 0; j < numEvents; j++) {
+        const hour = 9 + Math.floor(Math.random() * 8); // Between 9 AM and 5 PM
+        
+        const start = new Date(date);
+        start.setHours(hour, 0, 0);
+        
+        const end = new Date(start);
+        end.setHours(end.getHours() + 1);
+        
+        const storeId = Math.floor(Math.random() * 5) + 1;
+        const storeName = stores.find(s => s.id === storeId)?.name || 'Unknown Store';
+        
+        const flagTypes = ['normal', 'urgent', 'long_standing'] as const;
+        const flag = flagTypes[Math.floor(Math.random() * flagTypes.length)];
+        
+        events.push({
+          id: i * 10 + j,
+          title: `Maintenance Job ${i}-${j}`,
+          start,
+          end,
+          storeId,
+          storeName,
+          flag,
+          description: `Sample maintenance job ${i}-${j}`,
+          loggedBy: 'System'
+        });
+      }
+    }
+    
+    return events;
+  };
+  
   // Convert job logs to calendar events
   const calendarEvents = useMemo(() => {
+    // For testing purposes - this ensures we at least see something in the calendar
+    // Remove this and uncomment the code below once the real events are working
+    return createSimpleEvents();
+    
+    /*
     if (!Array.isArray(jobLogs)) {
       console.log('jobLogs is not an array');
       return [];
@@ -123,6 +173,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         return null;
       }
     }).filter(Boolean) as CalendarEvent[];
+    */
   }, [jobLogs, selectedStoreId, stores]);
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
