@@ -83,6 +83,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async getAllStaff(): Promise<{ id: number; name: string; role: string; color: string; storeId?: number; }[]> {
     const staffColors = ["#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF6"];
     
