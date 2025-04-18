@@ -28,7 +28,10 @@ export default function JobLogsSection() {
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  // Default to calendar view for maintenance staff, list view for others
+  const [viewMode, setViewMode] = useState<"list" | "calendar">(
+    user?.role === "maintenance" ? "calendar" : "list"
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
