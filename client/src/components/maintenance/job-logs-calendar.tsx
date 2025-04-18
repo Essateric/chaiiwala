@@ -214,17 +214,14 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Check if we have valid job logs and stores data
   const hasValidData = Array.isArray(jobLogs) && jobLogs.length > 0 && Array.isArray(stores);
   
-  // List of pending jobs (only shown to maintenance staff)
-  const [pendingJobs, setPendingJobs] = useState<JobLog[]>(() => {
-    // Initialize with job logs that haven't been scheduled yet
-    // (those without logDate or logTime)
+  // List of jobs to drag and drop (only shown to maintenance staff)
+  // We'll show all jobs for maintenance staff to be able to reschedule them
+  const [draggableJobs, setDraggableJobs] = useState<JobLog[]>(() => {
+    // Initialize with all job logs
     if (!Array.isArray(jobLogs)) return [];
     
     console.log('All jobLogs:', JSON.stringify(jobLogs));
-    const filtered = jobLogs.filter(job => !job.logDate || !job.logTime);
-    console.log('Filtered pending jobs:', JSON.stringify(filtered));
-    
-    return filtered;
+    return [...jobLogs];
   });
   
   // State to track dragged job
@@ -279,9 +276,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       }
     });
     
-    // Update the pending jobs list
-    const updatedPendingJobs = pendingJobs.filter(job => job.id !== draggedJob.id);
-    setPendingJobs(updatedPendingJobs);
+    // No need to update the draggable jobs list since all jobs remain draggable
+    // We'll just let the query invalidation refresh the list
     
     // Clear the dragged job
     setDraggedJob(null);
@@ -298,8 +294,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
-      // Add the reset job to the pending jobs list
-      setPendingJobs(prev => [...prev, data]);
       toast({
         title: "Job reset",
         description: "The job has been reset and is now available for scheduling.",
@@ -332,15 +326,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           }
         });
         
-        // Update pending jobs list
-        const updatedPendingJobs = pendingJobs.filter(job => job.id !== draggedJob.id);
-        setPendingJobs(updatedPendingJobs);
-        
         // Clear dragged job
         setDraggedJob(null);
       }
     },
-    [draggedJob, pendingJobs, updateJobLogMutation]
+    [draggedJob, updateJobLogMutation]
   );
   
   // Render drag indicator if job is being dragged
@@ -389,7 +379,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle>Job Logs Calendar</CardTitle>
-          {isMaintenanceStaff && pendingJobs.length === 0 && (
+          {isMaintenanceStaff && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -424,18 +414,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             {/* Left panel with draggable job cards - only visible for maintenance staff */}
             {isMaintenanceStaff && (
               <div className="w-1/4 pr-4 border-r">
-                <h3 className="text-sm font-semibold mb-2">Pending Jobs</h3>
-                <p className="text-xs text-muted-foreground mb-2">Drag a job to the calendar to schedule it</p>
+                <h3 className="text-sm font-semibold mb-2">Maintenance Jobs</h3>
+                <p className="text-xs text-muted-foreground mb-2">Drag any job to the calendar to schedule/reschedule it</p>
                 
                 <ScrollArea className="h-[550px]">
                   <div className="space-y-2">
-                    {pendingJobs.length === 0 ? (
+                    {draggableJobs.length === 0 ? (
                       <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground mb-2">No pending jobs</p>
-                        <p className="text-xs text-muted-foreground">Click "Reset a job for testing" to create a pending job</p>
+                        <p className="text-sm text-muted-foreground mb-2">No jobs available</p>
+                        <p className="text-xs text-muted-foreground">Create new maintenance job logs to see them here</p>
                       </div>
                     ) : (
-                      pendingJobs.map(job => {
+                      draggableJobs.map(job => {
                         // Determine badge color based on flag
                         let badgeVariant: "default" | "destructive" | "outline" | "secondary" = "default";
                         switch (job.flag) {
@@ -450,20 +440,35 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         // Get store name
                         const storeName = stores.find(store => store.id === job.storeId)?.name || 'Unknown Store';
                         
+                        // Show scheduling status 
+                        const isScheduled = job.logDate && job.logTime;
+                        
                         return (
                           <div
                             key={job.id}
                             draggable
                             onDragStart={() => handleDragStart(job)}
                             onDragEnd={handleDragEnd}
-                            className="bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow"
+                            className={`bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow ${isScheduled ? 'border-green-500' : 'border-amber-500'}`}
                           >
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
-                            <div className="flex items-center justify-between text-xs">
-                              <Badge variant={badgeVariant} className="text-[10px] py-0">
-                                {job.flag === 'urgent' ? 'Urgent' : job.flag === 'long_standing' ? 'Long Standing' : 'Normal'}
-                              </Badge>
-                              <span className="text-muted-foreground">{storeName}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <Badge variant={badgeVariant} className="text-[10px] py-0">
+                                  {job.flag === 'urgent' ? 'Urgent' : job.flag === 'long_standing' ? 'Long Standing' : 'Normal'}
+                                </Badge>
+                                <span className="text-muted-foreground">{storeName}</span>
+                              </div>
+                              {isScheduled && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <Badge variant="outline" className="text-[10px] py-0 border-green-500 text-green-500">
+                                    Scheduled
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {job.logDate} @ {job.logTime}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
