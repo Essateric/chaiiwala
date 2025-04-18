@@ -351,6 +351,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const jobLogs = await storage.getJobLogsByStore(storeId);
     res.json(jobLogs);
   });
+  
+  // Job log comments and notifications are defined later in the file
 
   app.get("/api/joblogs/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
@@ -406,22 +408,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobLogId = parseInt(req.params.jobLogId);
       const { comment, mentionedUsers } = req.body;
       
-      if (!comment) {
+      if (!comment || !comment.trim()) {
         return res.status(400).json({ message: "Comment text is required" });
       }
       
-      // Create the comment with the current user as the commenter
+      // Check if req.user is available (should be due to isAuthenticated middleware)
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
       const commentData: InsertJobLogComment = {
-        jobLogId,
-        comment,
-        commentedBy: req.user!.id,
-        mentionedUsers: mentionedUsers || []
+        jobLogId: jobLogId,
+        comment: comment.trim(),
+        commentedBy: req.user.id,
+        commentedAt: new Date()
       };
       
       const newComment = await storage.createJobLogComment(commentData);
+      
+      // Process notifications for mentioned users if any
+      if (mentionedUsers && mentionedUsers.length > 0) {
+        const jobLog = await storage.getJobLog(jobLogId);
+        
+        if (jobLog) {
+          for (const userId of mentionedUsers) {
+            // Don't create notification for the commenter themselves
+            if (userId !== req.user.id) {
+              await storage.createNotification({
+                userId: userId,
+                type: 'mention',
+                content: `You were mentioned in a comment on "${jobLog.title}"`,
+                link: `/maintenance?joblog=${jobLogId}&comment=${newComment.id}`,
+                createdAt: new Date(),
+                read: false
+              });
+            }
+          }
+        }
+      }
+      
       res.status(201).json(newComment);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create job log comment" });
+      console.error("Error adding job log comment:", error);
+      res.status(500).json({ message: "Failed to add comment" });
     }
   });
   
