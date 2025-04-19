@@ -373,6 +373,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       // Invalidate the joblogs query to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
       console.log('Job log updated successfully');
+      // Force component refresh
+      setCurrentDate(new Date(currentDate)); 
     },
     onError: (error) => {
       console.error('Error updating job log:', error);
@@ -414,6 +416,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         
         // Force refresh calendar events
         queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+        
+        // Force refresh the calendar display
+        setTimeout(() => {
+          setCurrentDate(new Date(slotInfo.start));
+        }, 300);
       }
     });
     
@@ -443,6 +450,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         title: "Job reset",
         description: "The job has been reset and is now available for scheduling.",
       });
+      // Force refresh the calendar display
+      setTimeout(() => {
+        setCurrentDate(new Date(currentDate));
+      }, 300);
     },
     onError: (error) => {
       console.error('Error resetting job:', error);
