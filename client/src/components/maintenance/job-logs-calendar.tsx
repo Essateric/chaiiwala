@@ -78,26 +78,49 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return () => clearInterval(intervalId);
   }, []);
   
-  // Force calendar refresh after job updates
+  // Function to manually refresh job logs and calendar
+  const refreshCalendar = useCallback(() => {
+    console.log("Manual calendar refresh initiated");
+    return fetch('/api/joblogs')
+      .then(res => res.json())
+      .then(data => {
+        // If we have valid data, update the draggable jobs and force a calendar refresh
+        if (Array.isArray(data)) {
+          setDraggableJobs(data);
+          // Create a new date object to force React to detect the change
+          setCurrentDate(new Date());
+          console.log("✅ Calendar refreshed with", data.length, "jobs");
+          toast({
+            title: "Calendar refreshed",
+            description: `Successfully loaded ${data.length} jobs from server`,
+          });
+          return data;
+        }
+        return null;
+      })
+      .catch(err => {
+        console.error("❌ Error refreshing job logs:", err);
+        toast({
+          title: "Refresh failed",
+          description: "Could not refresh calendar data. Please try again.",
+          variant: "destructive"
+        });
+        return null;
+      });
+  }, [toast]);
+  
+  // Setup automatic refresh
   useEffect(() => {
+    // Initial refresh
+    refreshCalendar();
+    
     // Set up an interval to refresh the job logs
     const intervalId = setInterval(() => {
-      // Re-query the job logs directly from the server
-      fetch('/api/joblogs')
-        .then(res => res.json())
-        .then(data => {
-          // If we have valid data, force update to current date to refresh calendar
-          if (Array.isArray(data) && data.length > 0) {
-            setDraggableJobs(data);
-            setCurrentDate(new Date(currentDate));
-            console.log("Refreshed job logs directly from server:", data.length);
-          }
-        })
-        .catch(err => console.error("Error refreshing job logs:", err));
-    }, 1000); // Check every second
+      refreshCalendar();
+    }, 5000); // Check every 5 seconds to avoid hammering the server
     
     return () => clearInterval(intervalId);
-  }, []);
+  }, [refreshCalendar]);
   
   // Create events from job logs - force dependency on the currentDate
   const calendarEvents = useMemo(() => {
@@ -236,6 +259,15 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
               onClick={() => onNavigate('NEXT')}
             >
               <ChevronRight className="h-4 w-4" />
+            </Button>
+            {/* Manual refresh button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={refreshCalendar}
+              title="Manual refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -411,8 +443,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       // Invalidate the joblogs query to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
       console.log('Job log updated successfully');
-      // Force component refresh
-      setCurrentDate(new Date(currentDate)); 
+      
+      // Use our direct refresh function to immediately update the calendar
+      refreshCalendar().then(() => {
+        console.log('Calendar refreshed after job update');
+      });
     },
     onError: (error) => {
       console.error('Error updating job log:', error);
@@ -455,10 +490,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         // Force refresh calendar events
         queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
         
-        // Force refresh the calendar display
-        setTimeout(() => {
+        // Use our direct refresh function to immediately update the calendar with latest data
+        refreshCalendar().then(() => {
+          // After refresh, navigate to the date where the job was scheduled
           setCurrentDate(new Date(slotInfo.start));
-        }, 300);
+        });
       }
     });
     
@@ -488,10 +524,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         title: "Job reset",
         description: "The job has been reset and is now available for scheduling.",
       });
-      // Force refresh the calendar display
-      setTimeout(() => {
-        setCurrentDate(new Date(currentDate));
-      }, 300);
+      
+      // Use our direct refresh function
+      refreshCalendar().then(() => {
+        console.log('Calendar refreshed after job reset');
+      });
     },
     onError: (error) => {
       console.error('Error resetting job:', error);
