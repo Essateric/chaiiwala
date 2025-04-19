@@ -7,9 +7,11 @@ export function useJobLogs(storeId?: number) {
   const { toast } = useToast();
 
   // Fetch all job logs
-  const { data: jobLogs = [], isLoading, error } = useQuery<JobLog[]>({
+  const { data: jobLogs = [], isLoading, error, refetch } = useQuery<JobLog[]>({
     queryKey: storeId ? ["/api/joblogs", storeId] : ["/api/joblogs"],
     // Remove the custom queryFn to use the default one with on401 handling
+    refetchInterval: 2000, // Refetch every 2 seconds
+    staleTime: 0, // Consider data always stale
   });
 
   // Create a new job log
@@ -79,5 +81,6 @@ export function useJobLogs(storeId?: number) {
     createJobLog,
     updateJobLog,
     isCreating,
+    refetch
   };
 }
