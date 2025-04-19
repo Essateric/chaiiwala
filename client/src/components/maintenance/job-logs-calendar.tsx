@@ -78,14 +78,38 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return () => clearInterval(intervalId);
   }, []);
   
-  // Create events from job logs
+  // Force calendar refresh when job logs change
+  useEffect(() => {
+    // This will trigger the calendarEvents useMemo to run again
+    setCurrentDate(new Date(currentDate));
+    console.log("Jobs updated, triggering calendar refresh");
+    
+    // Update draggable jobs list from current job logs
+    if (Array.isArray(jobLogs)) {
+      setDraggableJobs([...jobLogs]);
+    }
+  }, [jobLogs]);
+  
+  // Create events from job logs - force dependency on the currentDate
   const calendarEvents = useMemo(() => {
     if (!Array.isArray(jobLogs) || jobLogs.length === 0) {
+      console.log("No job logs available");
       return [];
     }
     
+    // Force log the current date to show we're triggering a refresh
+    console.log("Calendar refreshing with currentDate:", currentDate.toISOString());
+    
     // Filter to only include job logs that have a scheduled date and time
     const scheduledJobs = jobLogs.filter(job => job.logDate && job.logTime);
+    
+    if (scheduledJobs.length === 0) {
+      console.log("No scheduled jobs found");
+      return [];
+    }
+    
+    // Log the scheduled jobs to help with debugging
+    console.log("Scheduled jobs:", scheduledJobs.map(job => `${job.id}: ${job.logDate} ${job.logTime}`));
     
     // Convert job logs to calendar events
     const events: CalendarEvent[] = scheduledJobs.map(job => {
@@ -791,6 +815,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           
                           // Force refresh data
                           queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+                          
+                          // Force refresh the calendar display immediately
+                          setCurrentDate(new Date(currentDate));
                         }
                       });
                       
