@@ -577,11 +577,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     event: EventComponent
                   }}
                   
-                  // Add drop functionality
-                  onDropFromOutside={handleOnDropFromOutside}
-                  
-                  // Enable drag and drop
-                  draggableAccessor={() => true}
+                  // Drag and drop functionality handled through onSelectSlot
+                  // These props removed due to compatibility issues with the Calendar component
                   
                   // Add tooltip for events
                   tooltipAccessor={(event) => {
