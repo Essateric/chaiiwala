@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
-import { Calendar, dateFnsLocalizer, SlotInfo } from 'react-big-calendar';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
 import { enUS } from 'date-fns/locale';
@@ -64,61 +64,19 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
   const [currentDate, setCurrentDate] = useState<Date>(new Date(2025, 3, 15));
-  const [currentView, setCurrentView] = useState<string>(user?.role === 'maintenance' ? "day" : "month");
+  const [currentView, setCurrentView] = useState<View>(user?.role === 'maintenance' ? "day" : "month");
   
-  // Helper function to create mock job events for testing
-  const createSimpleEvents = () => {
-    // First check if stores is available and has items
-    if (!stores || !Array.isArray(stores) || stores.length === 0) {
-      console.log('No stores available for generating events');
-      return [];
-    }
+  // State to hold current time for the "time now" indicator
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  
+  // Update current time every minute
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // update every minute
     
-    // Create events for the next 7 days
-    const events = [];
-    const today = new Date();
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + i);
-      
-      // Create 1-3 events per day
-      const numEvents = Math.floor(Math.random() * 3) + 1;
-      
-      for (let j = 0; j < numEvents; j++) {
-        const hour = 9 + Math.floor(Math.random() * 8); // Between 9 AM and 5 PM
-        
-        const start = new Date(date);
-        start.setHours(hour, 0, 0);
-        
-        const end = new Date(start);
-        end.setHours(end.getHours() + 1);
-        
-        // Safely get a valid store
-        const randomStoreIndex = Math.floor(Math.random() * stores.length);
-        const randomStore = stores[randomStoreIndex];
-        const storeId = randomStore?.id || 1;
-        const storeName = randomStore?.name || 'Unknown Store';
-        
-        const flagTypes = ['normal', 'urgent', 'long_standing'] as const;
-        const flag = flagTypes[Math.floor(Math.random() * flagTypes.length)];
-        
-        events.push({
-          id: i * 10 + j,
-          title: `Maintenance Job ${i}-${j}`,
-          start,
-          end,
-          storeId,
-          storeName,
-          flag,
-          description: `Sample maintenance job ${i}-${j}`,
-          loggedBy: 'System'
-        });
-      }
-    }
-    
-    return events;
-  };
+    return () => clearInterval(intervalId);
+  }, []);
   
   // Create hardcoded events to debug calendar display issues
   const calendarEvents = useMemo(() => {
@@ -162,6 +120,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     console.log("Created fixed test events for calendar display:", events.length);
     return events;
   }, []);
+
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
     let backgroundColor;
@@ -293,6 +252,41 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
               </Select>
             </div>
           )}
+        </div>
+      </div>
+    );
+  };
+  
+  // Time Now Indicator component to show current time line
+  const TimeNowIndicator = () => {
+    // Only show in day or week view
+    if (currentView === 'month') return null;
+    
+    // Calculate the position based on time
+    const hours = currentTime.getHours();
+    const minutes = currentTime.getMinutes();
+    const totalMinutes = (hours * 60) + minutes;
+    
+    // Calendar day typically runs from 7am to 7pm (12 hours = 720 minutes)
+    // Assuming calendar starts at 7AM and ends at 7PM
+    const startHour = 7; // 7am
+    const endHour = 19; // 7pm
+    const totalCalendarMinutes = (endHour - startHour) * 60;
+    
+    // Calculate percentage through the day
+    const percentage = Math.min(
+      Math.max(0, (totalMinutes - (startHour * 60)) / totalCalendarMinutes * 100),
+      100
+    );
+    
+    // If outside of business hours, don't show
+    if (hours < startHour || hours >= endHour) return null;
+    
+    return (
+      <div className="time-now-container" style={{ position: 'absolute', width: '100%', zIndex: 10 }}>
+        <div className="time-now-indicator" style={{ top: `${percentage}%` }} />
+        <div className="time-now-label" style={{ top: `${percentage}%` }}>
+          {format(currentTime, 'h:mm a')}
         </div>
       </div>
     );
@@ -439,19 +433,24 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     console.log(`Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
     
-    // Show a toast to indicate the action
-    toast({
-      title: "Job scheduled",
-      description: `Job scheduled for ${logDate} at ${logTime}`,
-      className: "toast-drag-indicator",
-    });
-    
     // Update the job log with the new date and time
     updateJobLogMutation.mutate({
       id: draggedJob.id,
       data: {
         logDate,
         logTime
+      }
+    }, {
+      onSuccess: () => {
+        // Show a toast to indicate the action
+        toast({
+          title: "Job scheduled",
+          description: `Job scheduled for ${logDate} at ${logTime}`,
+          className: "toast-drag-indicator",
+        });
+        
+        // Force refresh calendar events
+        queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
       }
     });
     
@@ -491,30 +490,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       });
     }
   });
-  
-  // This function would be used to handle the calendar's drop event
-  const handleOnDropFromOutside = useCallback(
-    ({ start }: { start: Date }) => {
-      if (draggedJob) {
-        // Format date and time from the drop position
-        const logDate = format(start, 'yyyy-MM-dd');
-        const logTime = format(start, 'HH:mm');
-        
-        // Update the job log with the new date and time
-        updateJobLogMutation.mutate({
-          id: draggedJob.id,
-          data: {
-            logDate,
-            logTime
-          }
-        });
-        
-        // Clear dragged job
-        setDraggedJob(null);
-      }
-    },
-    [draggedJob, updateJobLogMutation]
-  );
   
   // Render drag indicator if job is being dragged
   const renderDragIndicator = () => {
@@ -616,10 +591,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             </div>
           </div>
         ) : (
-          <div className="flex" style={{ height: 600 }}>
+          <div className="flex calendar-container" style={{ height: 600 }}>
             {/* Left panel with draggable job cards - only visible for maintenance staff */}
             {isMaintenance && (
-              <div className="w-1/4 pr-4 border-r">
+              <div className="w-1/4 pr-4 border-r calendar-sidebar">
                 <h3 className="text-sm font-semibold mb-2">Maintenance Jobs</h3>
                 <p className="text-xs text-muted-foreground mb-2">Drag any job to the calendar to schedule/reschedule it</p>
                 
@@ -707,7 +682,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             
             {/* Calendar */}
             <div 
-              className={isMaintenance ? "w-3/4 relative" : "w-full relative"} 
+              className={isMaintenance ? "w-3/4 relative calendar-main" : "w-full relative calendar-main"} 
               ref={calendarRef}
               onDragEnter={(e) => {
                 if (isMaintenance) {
@@ -758,17 +733,22 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   
                   console.log(`Direct drop: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                   
-                  toast({
-                    title: "Job scheduled",
-                    description: `Job scheduled for today at ${logTime}`,
-                    className: "toast-drag-indicator",
-                  });
-                  
                   updateJobLogMutation.mutate({
                     id: jobId,
                     data: {
                       logDate,
                       logTime
+                    }
+                  }, {
+                    onSuccess: () => {
+                      toast({
+                        title: "Job scheduled",
+                        description: `Job scheduled for today at ${logTime}`,
+                        className: "toast-drag-indicator",
+                      });
+                      
+                      // Force refresh data
+                      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
                     }
                   });
                 } else {
@@ -782,7 +762,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 
                 // Clear the dragged job
                 setDraggedJob(null);
-              }}>
+              }}
+            >
               {calendarEvents.length === 0 ? (
                 <div 
                   className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md"
@@ -813,16 +794,21 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       
                       console.log(`Empty calendar drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
                       
-                      toast({
-                        title: "Job scheduled",
-                        description: `Job scheduled for tomorrow at 9:00 AM`,
-                      });
-                      
                       updateJobLogMutation.mutate({
                         id: draggedJob.id,
                         data: {
                           logDate,
                           logTime
+                        }
+                      }, {
+                        onSuccess: () => {
+                          toast({
+                            title: "Job scheduled",
+                            description: `Job scheduled for tomorrow at 9:00 AM`,
+                          });
+                          
+                          // Force refresh data
+                          queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
                         }
                       });
                       
@@ -839,54 +825,51 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   </p>
                 </div>
               ) : (
-                <Calendar
-                  localizer={localizer}
-                  events={calendarEvents}
-                  startAccessor="start"
-                  endAccessor="end"
-                  style={{ height: '100%' }}
-                  eventPropGetter={eventStyleGetter}
-                  defaultView={isMaintenance ? "day" : "month"}
-                  views={['month', 'week', 'day']}
-                  date={currentDate}
-                  view={currentView}
-                  onView={(view) => {
-                    console.log('Calendar view changed to:', view);
-                    setCurrentView(view);
-                  }}
-                  onNavigate={(date) => {
-                    console.log('Calendar navigated to:', date);
-                    setCurrentDate(date);
-                  }}
-                  
-                  // Add back the drag-and-drop functionality
-                  selectable={isMaintenance}
-                  onSelectSlot={(slotInfo) => {
-                    console.log("Slot selected:", slotInfo);
-                    handleDropOnCalendar(slotInfo);
-                  }}
-                  
-                  // Add back the custom components
-                  components={{
-                    toolbar: (props) => <CustomToolbar {...props} />,
-                    event: EventComponent
-                  }}
-                  
-                  // Drag and drop functionality handled through onSelectSlot
-                  // These props removed due to compatibility issues with the Calendar component
-                  
-                  // Add tooltip for events
-                  tooltipAccessor={(event) => {
-                    try {
-                      const eventObj = event as CalendarEvent;
-                      return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
-                    } catch (error) {
-                      console.error("Error generating tooltip", error);
-                      return "Error displaying details";
-                    }
-                  }}
-                  popup
-                />
+                <div className="relative h-full">
+                  <Calendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    style={{ height: '100%' }}
+                    eventPropGetter={eventStyleGetter}
+                    defaultView={isMaintenance ? "day" : "month"}
+                    views={['month', 'week', 'day']}
+                    date={currentDate}
+                    view={currentView}
+                    onView={(view) => {
+                      console.log('Calendar view changed to:', view);
+                      setCurrentView(view);
+                    }}
+                    onNavigate={(date) => {
+                      console.log('Calendar navigated to:', date);
+                      setCurrentDate(date);
+                    }}
+                    min={new Date(0, 0, 0, 7, 0)} // Start at 7am
+                    max={new Date(0, 0, 0, 19, 0)} // End at 7pm
+                    selectable={isMaintenance}
+                    onSelectSlot={(slotInfo) => {
+                      console.log("Slot selected:", slotInfo);
+                      handleDropOnCalendar(slotInfo);
+                    }}
+                    components={{
+                      toolbar: (props) => <CustomToolbar {...props} />,
+                      event: EventComponent
+                    }}
+                    tooltipAccessor={(event) => {
+                      try {
+                        const eventObj = event as CalendarEvent;
+                        return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
+                      } catch (error) {
+                        console.error("Error generating tooltip", error);
+                        return "Error displaying details";
+                      }
+                    }}
+                    popup
+                  />
+                  {/* Add time now indicator */}
+                  {(currentView === 'day' || currentView === 'week') && <TimeNowIndicator />}
+                </div>
               )}
             </div>
             

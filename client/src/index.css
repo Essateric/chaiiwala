@@ -23,10 +23,56 @@
 .rbc-calendar {
   border-radius: 0.5rem;
   overflow: hidden;
+  position: relative;
 }
 
 .rbc-event {
   border-radius: 4px;
+}
+
+/* Time now indicator line */
+.time-now-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #ef4444; /* red */
+  z-index: 10;
+  pointer-events: none;
+}
+
+.time-now-label {
+  position: absolute;
+  left: 0;
+  padding: 2px 4px;
+  background-color: #ef4444;
+  color: white;
+  font-size: 10px;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  z-index: 11;
+  pointer-events: none;
+}
+
+/* Mobile responsiveness for calendar */
+@media (max-width: 640px) {
+  .calendar-container {
+    flex-direction: column !important;
+  }
+  
+  .calendar-sidebar {
+    width: 100% !important;
+    padding-right: 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid hsl(var(--border)) !important;
+    margin-bottom: 1rem !important;
+    max-height: 200px !important;
+  }
+  
+  .calendar-main {
+    width: 100% !important;
+    height: 400px !important;
+  }
 }
 
 /* Toast styling for drag operations */
