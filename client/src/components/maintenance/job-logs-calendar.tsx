@@ -321,11 +321,22 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drop on calendar
   const handleDropOnCalendar = (slotInfo: SlotInfo) => {
-    if (!draggedJob) return;
+    if (!draggedJob) {
+      console.log("No job being dragged when drop occurred");
+      return;
+    }
     
     // Format date and time from the drop position
     const logDate = format(slotInfo.start, 'yyyy-MM-dd');
     const logTime = format(slotInfo.start, 'HH:mm');
+    
+    console.log(`Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+    
+    // Show a toast to indicate the action
+    toast({
+      title: "Scheduling job...",
+      description: `Scheduling job for ${logDate} at ${logTime}`,
+    });
     
     // Update the job log with the new date and time
     updateJobLogMutation.mutate({
@@ -335,9 +346,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         logTime
       }
     });
-    
-    // No need to update the draggable jobs list since all jobs remain draggable
-    // We'll just let the query invalidation refresh the list
     
     // Clear the dragged job
     setDraggedJob(null);
@@ -506,10 +514,15 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         return (
                           <div
                             key={job.id}
-                            draggable
-                            onDragStart={() => handleDragStart(job)}
+                            draggable="true"
+                            onDragStart={(e) => {
+                              console.log("Drag started for job:", job.id);
+                              e.dataTransfer.setData("text/plain", job.id.toString());
+                              e.dataTransfer.effectAllowed = "move";
+                              handleDragStart(job);
+                            }}
                             onDragEnd={handleDragEnd}
-                            className={`bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow ${isScheduled ? 'border-green-500' : 'border-amber-500'}`}
+                            className={`bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow ${isScheduled ? 'border-green-500' : 'border-amber-500'} active:scale-95`}
                           >
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
                             <div className="flex flex-col gap-1">
@@ -540,9 +553,89 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             )}
             
             {/* Calendar */}
-            <div className={isMaintenanceStaff ? "w-3/4" : "w-full"} ref={calendarRef}>
+            <div 
+              className={isMaintenanceStaff ? "w-3/4 relative" : "w-full relative"} 
+              ref={calendarRef}
+              onDragOver={(e) => {
+                // Allow drops on the calendar container
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                console.log("Drop event on calendar container:", e);
+                e.preventDefault();
+                
+                if (draggedJob) {
+                  // Use current date/time if dropped directly on container
+                  const now = new Date();
+                  const logDate = format(now, 'yyyy-MM-dd');
+                  const logTime = format(now, 'HH:mm');
+                  
+                  console.log(`Direct drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+                  
+                  toast({
+                    title: "Job scheduled",
+                    description: `Job scheduled for ${logDate} at ${logTime}`,
+                  });
+                  
+                  updateJobLogMutation.mutate({
+                    id: draggedJob.id,
+                    data: {
+                      logDate,
+                      logTime
+                    }
+                  });
+                  
+                  setDraggedJob(null);
+                }
+              }}>
               {calendarEvents.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md">
+                <div 
+                  className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md"
+                  onDragOver={(e) => {
+                    if (isMaintenanceStaff) {
+                      e.preventDefault();
+                      e.currentTarget.classList.add("border-primary", "bg-primary/5");
+                      e.dataTransfer.dropEffect = "copy";
+                    }
+                  }}
+                  onDragLeave={(e) => {
+                    if (isMaintenanceStaff) {
+                      e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (isMaintenanceStaff && draggedJob) {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+                      
+                      // Schedule for tomorrow at 9 AM by default
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      tomorrow.setHours(9, 0, 0, 0);
+                      
+                      const logDate = format(tomorrow, 'yyyy-MM-dd');
+                      const logTime = '09:00';
+                      
+                      console.log(`Empty calendar drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+                      
+                      toast({
+                        title: "Job scheduled",
+                        description: `Job scheduled for tomorrow at 9:00 AM`,
+                      });
+                      
+                      updateJobLogMutation.mutate({
+                        id: draggedJob.id,
+                        data: {
+                          logDate,
+                          logTime
+                        }
+                      });
+                      
+                      setDraggedJob(null);
+                    }
+                  }}
+                >
                   <CalendarX className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-lg font-medium mb-2">No jobs scheduled</p>
                   <p className="text-sm text-muted-foreground text-center">
