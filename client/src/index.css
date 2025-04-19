@@ -2,6 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for drag and drop */
+.drag-over {
+  border: 2px dashed #ffc107 !important;
+  background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+/* Styling for draggable job cards */
+[draggable="true"] {
+  cursor: grab;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+[draggable="true"]:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+/* Calendar specific styles */
+.rbc-calendar {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.rbc-event {
+  border-radius: 4px;
+}
+
+/* Toast styling for drag operations */
+.toast-drag-indicator {
+  border-left: 4px solid #ffc107;
+}
+
+/* Visual indicator for calendar during drag */
+.calendar-drop-target {
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.5);
+}
+
+/* Pulse animation for drop targets */
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
+}
+
+.pulse-animation {
+  animation: pulse-border 2s infinite;
+}
+
 :root {
   /* Chaiiwala brand colors */
   --chai-gold: #D4AF37;

@@ -296,12 +296,37 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drag start
   const handleDragStart = (job: JobLog) => {
+    console.log(`Starting drag for job ${job.id}: ${job.description}`);
     setDraggedJob(job);
+    
+    // Add visual feedback - highlight the calendar
+    const calendarEl = calendarRef.current;
+    if (calendarEl) {
+      calendarEl.classList.add('border-primary', 'border-2');
+    }
+    
+    // Show toast for better UX
+    toast({
+      title: "Dragging job",
+      description: "Drop on the calendar to schedule this job",
+      duration: 3000,
+    });
   };
   
   // Handle drag end
   const handleDragEnd = () => {
-    setDraggedJob(null);
+    console.log("Drag ended");
+    
+    // Remove visual feedback
+    const calendarEl = calendarRef.current;
+    if (calendarEl) {
+      calendarEl.classList.remove('border-primary', 'border-2');
+    }
+    
+    // Keep draggedJob state for a small delay to allow drop handling
+    setTimeout(() => {
+      setDraggedJob(null);
+    }, 100);
   };
   
   // Create a mutation for updating job logs
@@ -321,8 +346,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drop on calendar
   const handleDropOnCalendar = (slotInfo: SlotInfo) => {
+    console.log("Calendar slot selected with info:", slotInfo);
+
+    // Only process this as a drop if there's a job being dragged
     if (!draggedJob) {
-      console.log("No job being dragged when drop occurred");
+      // If not dragging, this is just a normal click/selection, do nothing special
+      console.log("No job being dragged when slot selected");
       return;
     }
     
@@ -330,12 +359,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     const logDate = format(slotInfo.start, 'yyyy-MM-dd');
     const logTime = format(slotInfo.start, 'HH:mm');
     
-    console.log(`Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+    console.log(`Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
     
     // Show a toast to indicate the action
     toast({
-      title: "Scheduling job...",
-      description: `Scheduling job for ${logDate} at ${logTime}`,
+      title: "Job scheduled",
+      description: `Job scheduled for ${logDate} at ${logTime}`,
+      className: "toast-drag-indicator",
     });
     
     // Update the job log with the new date and time
@@ -349,6 +379,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     // Clear the dragged job
     setDraggedJob(null);
+    
+    // Remove any visual feedback
+    const calendarEl = calendarRef.current;
+    if (calendarEl) {
+      calendarEl.classList.remove('calendar-drop-target', 'pulse-animation');
+      calendarEl.classList.remove('border-primary', 'border-2');
+    }
   };
   
   // Mutation to reset job dates (clear logDate and logTime)
@@ -405,11 +442,34 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   const renderDragIndicator = () => {
     if (!draggedJob) return null;
     
+    // Determine badge color based on flag
+    let badgeColor = "#3b82f6"; // Default blue
+    switch (draggedJob.flag) {
+      case 'urgent':
+        badgeColor = "#ef4444"; // Red
+        break;
+      case 'long_standing':
+        badgeColor = "#eab308"; // Yellow
+        break;
+    }
+    
+    // Get store name
+    const storeName = stores.find(store => store.id === draggedJob.storeId)?.name || 'Unknown Store';
+    
     return (
       <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-        <div className="bg-primary-foreground shadow-lg rounded-md p-4 max-w-md">
-          <p>Drop on calendar to schedule:</p>
-          <p className="font-bold">{draggedJob.description}</p>
+        <div className="bg-background border border-input shadow-lg rounded-md p-4 max-w-md animate-pulse">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: badgeColor }} />
+            <p className="text-sm font-medium">Dragging {draggedJob.flag === 'urgent' ? 'urgent' : draggedJob.flag === 'long_standing' ? 'long-standing' : 'normal'} job</p>
+          </div>
+          <p className="font-bold mb-1">{draggedJob.description}</p>
+          <p className="text-xs text-muted-foreground mb-2">From: {storeName}</p>
+          <div className="bg-muted text-xs p-2 rounded">
+            <p>Drop anywhere on the calendar to schedule this job</p>
+            <p>• Drop on a specific date to schedule for that date</p>
+            <p>• Drop on the empty area for default scheduling</p>
+          </div>
         </div>
       </div>
     );
@@ -517,12 +577,27 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                             draggable="true"
                             onDragStart={(e) => {
                               console.log("Drag started for job:", job.id);
-                              e.dataTransfer.setData("text/plain", job.id.toString());
-                              e.dataTransfer.effectAllowed = "move";
+                              // Set job ID as data transfer
+                              e.dataTransfer.setData("application/json", JSON.stringify({ jobId: job.id }));
+                              // Allow both copy and move operations
+                              e.dataTransfer.effectAllowed = "copyMove";
+                              // Set a visual drag image (optional)
+                              try {
+                                const dragImage = document.createElement('div');
+                                dragImage.className = 'p-2 bg-white shadow rounded border border-primary';
+                                dragImage.textContent = job.description?.substring(0, 30) || 'Job';
+                                document.body.appendChild(dragImage);
+                                e.dataTransfer.setDragImage(dragImage, 20, 20);
+                                setTimeout(() => document.body.removeChild(dragImage), 0);
+                              } catch (err) {
+                                console.log("Could not set custom drag image");
+                              }
                               handleDragStart(job);
                             }}
                             onDragEnd={handleDragEnd}
-                            className={`bg-card border rounded-md p-3 shadow-sm cursor-move hover:shadow-md transition-shadow ${isScheduled ? 'border-green-500' : 'border-amber-500'} active:scale-95`}
+                            className={`bg-card border rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
+                              ${isScheduled ? 'border-green-500' : 'border-amber-500'} 
+                              hover:border-primary`}
                           >
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
                             <div className="flex flex-col gap-1">
@@ -556,38 +631,79 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             <div 
               className={isMaintenanceStaff ? "w-3/4 relative" : "w-full relative"} 
               ref={calendarRef}
+              onDragEnter={(e) => {
+                if (isMaintenanceStaff) {
+                  e.preventDefault();
+                  e.currentTarget.classList.add('calendar-drop-target', 'pulse-animation');
+                }
+              }}
               onDragOver={(e) => {
                 // Allow drops on the calendar container
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
+                if (isMaintenanceStaff) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.classList.remove('calendar-drop-target', 'pulse-animation');
               }}
               onDrop={(e) => {
                 console.log("Drop event on calendar container:", e);
                 e.preventDefault();
+                e.currentTarget.classList.remove('calendar-drop-target', 'pulse-animation');
                 
-                if (draggedJob) {
+                // Try to get the job ID from the data transfer
+                let jobId: number | null = null;
+                
+                try {
+                  // First try to get from the application/json format
+                  const jsonData = e.dataTransfer.getData("application/json");
+                  if (jsonData) {
+                    const data = JSON.parse(jsonData);
+                    jobId = parseInt(data.jobId);
+                  }
+                } catch (err) {
+                  console.log("Could not parse JSON data from drop");
+                }
+                
+                // If we couldn't get the job ID from data transfer, use the draggedJob state
+                if (!jobId && draggedJob) {
+                  jobId = draggedJob.id;
+                }
+                
+                // If we have a job ID, schedule it
+                if (jobId) {
                   // Use current date/time if dropped directly on container
                   const now = new Date();
                   const logDate = format(now, 'yyyy-MM-dd');
                   const logTime = format(now, 'HH:mm');
                   
-                  console.log(`Direct drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+                  console.log(`Direct drop: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                   
                   toast({
                     title: "Job scheduled",
-                    description: `Job scheduled for ${logDate} at ${logTime}`,
+                    description: `Job scheduled for today at ${logTime}`,
+                    className: "toast-drag-indicator",
                   });
                   
                   updateJobLogMutation.mutate({
-                    id: draggedJob.id,
+                    id: jobId,
                     data: {
                       logDate,
                       logTime
                     }
                   });
-                  
-                  setDraggedJob(null);
+                } else {
+                  console.log("No job ID found in drop event");
+                  toast({
+                    title: "Scheduling failed",
+                    description: "Could not identify the job to schedule. Please try again.",
+                    variant: "destructive"
+                  });
                 }
+                
+                // Clear the dragged job
+                setDraggedJob(null);
               }}>
               {calendarEvents.length === 0 ? (
                 <div 
