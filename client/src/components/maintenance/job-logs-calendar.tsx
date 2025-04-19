@@ -159,14 +159,16 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     switch (event.flag) {
       case 'urgent':
-        backgroundColor = '#ef4444';
+        backgroundColor = '#ef4444'; // red
         break;
       case 'long_standing':
-        backgroundColor = '#eab308';
+        backgroundColor = '#eab308'; // yellow
         break;
       default:
-        backgroundColor = '#3b82f6';
+        backgroundColor = '#3b82f6'; // blue
     }
+    
+    console.log(`Styling event ${event.id} with flag ${event.flag}, color: ${backgroundColor}`);
     
     return {
       style: {
@@ -176,6 +178,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         borderStyle: 'none',
         display: 'block',
         opacity: 0.9,
+        border: '2px solid black', // Add border to make events more visible
+        padding: '2px',
       }
     };
   };
@@ -559,6 +563,37 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   views={['month', 'week', 'day']}
                   date={new Date(2025, 3, 15)}
                   onNavigate={(date) => console.log('Calendar navigated to:', date)}
+                  
+                  // Add back the drag-and-drop functionality
+                  selectable={isMaintenanceStaff}
+                  onSelectSlot={(slotInfo) => {
+                    console.log("Slot selected:", slotInfo);
+                    handleDropOnCalendar(slotInfo);
+                  }}
+                  
+                  // Add back the custom components
+                  components={{
+                    toolbar: (props) => <CustomToolbar {...props} />,
+                    event: EventComponent
+                  }}
+                  
+                  // Add drop functionality
+                  onDropFromOutside={handleOnDropFromOutside}
+                  
+                  // Enable drag and drop
+                  draggableAccessor={() => true}
+                  
+                  // Add tooltip for events
+                  tooltipAccessor={(event) => {
+                    try {
+                      const eventObj = event as CalendarEvent;
+                      return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
+                    } catch (error) {
+                      console.error("Error generating tooltip", error);
+                      return "Error displaying details";
+                    }
+                  }}
+                  popup
                 />
               )}
             </div>
