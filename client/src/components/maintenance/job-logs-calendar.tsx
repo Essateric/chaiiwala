@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarX, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarX, Loader2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -78,17 +78,26 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return () => clearInterval(intervalId);
   }, []);
   
-  // Force calendar refresh when job logs change
+  // Force calendar refresh after job updates
   useEffect(() => {
-    // This will trigger the calendarEvents useMemo to run again
-    setCurrentDate(new Date(currentDate));
-    console.log("Jobs updated, triggering calendar refresh");
+    // Set up an interval to refresh the job logs
+    const intervalId = setInterval(() => {
+      // Re-query the job logs directly from the server
+      fetch('/api/joblogs')
+        .then(res => res.json())
+        .then(data => {
+          // If we have valid data, force update to current date to refresh calendar
+          if (Array.isArray(data) && data.length > 0) {
+            setDraggableJobs(data);
+            setCurrentDate(new Date(currentDate));
+            console.log("Refreshed job logs directly from server:", data.length);
+          }
+        })
+        .catch(err => console.error("Error refreshing job logs:", err));
+    }, 1000); // Check every second
     
-    // Update draggable jobs list from current job logs
-    if (Array.isArray(jobLogs)) {
-      setDraggableJobs([...jobLogs]);
-    }
-  }, [jobLogs]);
+    return () => clearInterval(intervalId);
+  }, []);
   
   // Create events from job logs - force dependency on the currentDate
   const calendarEvents = useMemo(() => {
