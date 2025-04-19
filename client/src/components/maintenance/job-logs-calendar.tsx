@@ -555,32 +555,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   endAccessor="end"
                   style={{ height: '100%' }}
                   eventPropGetter={eventStyleGetter}
-                  components={{
-                    toolbar: (props) => <CustomToolbar {...props} />,
-                    event: EventComponent
-                  }}
-                  tooltipAccessor={(event) => {
-                    try {
-                      const eventObj = event as CalendarEvent;
-                      return `${eventObj.description}\nStore: ${eventObj.storeName}\nLogged by: ${eventObj.loggedBy}\nStatus: ${eventObj.flag}`;
-                    } catch (error) {
-                      console.error("Error generating tooltip", error);
-                      return "Error displaying details";
-                    }
-                  }}
-                  popup
-                  // Force month view as default for better visibility
                   defaultView="month"
                   views={['month', 'week', 'day']}
-                  // Enable selection for maintenance staff
-                  selectable={isMaintenanceStaff}
-                  onSelectSlot={handleDropOnCalendar}
-                  // Add these for better debugging and display
+                  date={new Date(2025, 3, 15)}
                   onNavigate={(date) => console.log('Calendar navigated to:', date)}
-                  date={new Date(2025, 3, 15)} // Set to April 15, 2025 as fixed date where we know events exist
-                  // Make sure we return to current month
-                  min={new Date(2025, 0, 1)}  
-                  max={new Date(2025, 11, 31)}
                 />
               )}
             </div>
