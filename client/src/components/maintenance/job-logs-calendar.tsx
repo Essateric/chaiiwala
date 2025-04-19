@@ -78,48 +78,44 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return () => clearInterval(intervalId);
   }, []);
   
-  // Create hardcoded events to debug calendar display issues
+  // Create events from job logs
   const calendarEvents = useMemo(() => {
-    // Create a few events for April 2025 (matching the forced calendar date)
-    const events: CalendarEvent[] = [
-      {
-        id: 1001,
-        title: "Test Urgent Job",
-        start: new Date(2025, 3, 12, 10, 0), // April 12, 2025 at 10:00 AM
-        end: new Date(2025, 3, 12, 11, 0),   // April 12, 2025 at 11:00 AM
-        storeId: 1,
-        storeName: "Cheetham Hill",
-        flag: "urgent",
-        description: "Test urgent job - please ignore",
-        loggedBy: "System Test"
-      },
-      {
-        id: 1002,
-        title: "Test Normal Job",
-        start: new Date(2025, 3, 15, 14, 0), // April 15, 2025 at 2:00 PM
-        end: new Date(2025, 3, 15, 15, 0),   // April 15, 2025 at 3:00 PM
-        storeId: 1,
-        storeName: "Cheetham Hill",
-        flag: "normal",
-        description: "Test normal job - please ignore",
-        loggedBy: "System Test"
-      },
-      {
-        id: 1003,
-        title: "Test Long Standing Job",
-        start: new Date(2025, 3, 18, 9, 0),  // April 18, 2025 at 9:00 AM
-        end: new Date(2025, 3, 18, 10, 0),   // April 18, 2025 at 10:00 AM
-        storeId: 1,
-        storeName: "Cheetham Hill",
-        flag: "long_standing",
-        description: "Test long standing job - please ignore",
-        loggedBy: "System Test"
-      }
-    ];
+    if (!Array.isArray(jobLogs) || jobLogs.length === 0) {
+      return [];
+    }
     
-    console.log("Created fixed test events for calendar display:", events.length);
+    // Filter to only include job logs that have a scheduled date and time
+    const scheduledJobs = jobLogs.filter(job => job.logDate && job.logTime);
+    
+    // Convert job logs to calendar events
+    const events: CalendarEvent[] = scheduledJobs.map(job => {
+      // Parse the date and time
+      const [year, month, day] = job.logDate!.split('-').map(n => parseInt(n));
+      const [hour, minute] = job.logTime!.split(':').map(n => parseInt(n));
+      
+      const start = new Date(year, month - 1, day, hour, minute);
+      const end = new Date(start);
+      end.setHours(end.getHours() + 1); // Default to 1 hour duration
+      
+      // Find store name
+      const store = stores.find(s => s.id === job.storeId);
+      
+      return {
+        id: job.id,
+        title: job.title || 'Maintenance Job',
+        start,
+        end,
+        storeId: job.storeId,
+        storeName: store ? store.name : 'Unknown Store',
+        flag: job.flag as 'normal' | 'urgent' | 'long_standing',
+        description: job.description || 'No description',
+        loggedBy: job.loggedBy || 'Unknown'
+      };
+    });
+    
+    console.log("Created events from job logs:", events.length);
     return events;
-  }, []);
+  }, [jobLogs, stores]);
 
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
@@ -257,40 +253,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     );
   };
   
-  // Time Now Indicator component to show current time line
-  const TimeNowIndicator = () => {
-    // Only show in day or week view
-    if (currentView === 'month') return null;
-    
-    // Calculate the position based on time
-    const hours = currentTime.getHours();
-    const minutes = currentTime.getMinutes();
-    const totalMinutes = (hours * 60) + minutes;
-    
-    // Calendar day typically runs from 7am to 7pm (12 hours = 720 minutes)
-    // Assuming calendar starts at 7AM and ends at 7PM
-    const startHour = 7; // 7am
-    const endHour = 19; // 7pm
-    const totalCalendarMinutes = (endHour - startHour) * 60;
-    
-    // Calculate percentage through the day
-    const percentage = Math.min(
-      Math.max(0, (totalMinutes - (startHour * 60)) / totalCalendarMinutes * 100),
-      100
-    );
-    
-    // If outside of business hours, don't show
-    if (hours < startHour || hours >= endHour) return null;
-    
-    return (
-      <div className="time-now-container" style={{ position: 'absolute', width: '100%', zIndex: 10 }}>
-        <div className="time-now-indicator" style={{ top: `${percentage}%` }} />
-        <div className="time-now-label" style={{ top: `${percentage}%` }}>
-          {format(currentTime, 'h:mm a')}
-        </div>
-      </div>
-    );
-  };
+  // Time Now Indicator component - removed as per user request
   
   // Custom event component to show more details
   const EventComponent = ({ event }: { event: CalendarEvent }) => {
@@ -867,8 +830,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     }}
                     popup
                   />
-                  {/* Add time now indicator */}
-                  {(currentView === 'day' || currentView === 'week') && <TimeNowIndicator />}
                 </div>
               )}
             </div>
