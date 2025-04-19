@@ -843,8 +843,8 @@ export default function JobLogsSection() {
         ) : (
           <JobLogsCalendar 
             jobLogs={filteredJobLogs}
+            stores={stores || []}
             isLoading={isLoading}
-            onClick={(id) => setSelectedJobLog(id)}
           />
         )}
         
