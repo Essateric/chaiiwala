@@ -89,33 +89,38 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     // Convert job logs to calendar events
     const events: CalendarEvent[] = scheduledJobs.map(job => {
-      // Parse the date and time
-      const [year, month, day] = job.logDate!.split('-').map(n => parseInt(n));
-      const [hour, minute] = job.logTime!.split(':').map(n => parseInt(n));
-      
-      const start = new Date(year, month - 1, day, hour, minute);
-      const end = new Date(start);
-      end.setHours(end.getHours() + 1); // Default to 1 hour duration
-      
-      // Find store name
-      const store = stores.find(s => s.id === job.storeId);
-      
-      return {
-        id: job.id,
-        title: job.title || 'Maintenance Job',
-        start,
-        end,
-        storeId: job.storeId,
-        storeName: store ? store.name : 'Unknown Store',
-        flag: job.flag as 'normal' | 'urgent' | 'long_standing',
-        description: job.description || 'No description',
-        loggedBy: job.loggedBy || 'Unknown'
-      };
-    });
+      try {
+        // Parse the date and time
+        const [year, month, day] = job.logDate!.split('-').map(n => parseInt(n));
+        const [hour, minute] = job.logTime!.split(':').map(n => parseInt(n));
+        
+        const start = new Date(year, month - 1, day, hour, minute);
+        const end = new Date(start);
+        end.setHours(end.getHours() + 1); // Default to 1 hour duration
+        
+        // Find store name
+        const store = stores.find(s => s.id === job.storeId);
+        
+        return {
+          id: job.id,
+          title: job.title || 'Maintenance Job',
+          start,
+          end,
+          storeId: job.storeId,
+          storeName: store ? store.name : 'Unknown Store',
+          flag: job.flag as 'normal' | 'urgent' | 'long_standing',
+          description: job.description || 'No description',
+          loggedBy: job.loggedBy || 'Unknown'
+        };
+      } catch (err) {
+        console.error('Error creating calendar event from job log:', job, err);
+        return null;
+      }
+    }).filter(Boolean) as CalendarEvent[];
     
-    console.log("Created events from job logs:", events.length);
+    console.log("Created events from job logs:", events.length, "from", scheduledJobs.length, "scheduled jobs");
     return events;
-  }, [jobLogs, stores]);
+  }, [jobLogs, stores, currentDate]);
 
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
@@ -307,8 +312,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     );
   }
   
-  // Check if we have valid job logs and stores data
-  const hasValidData = Array.isArray(jobLogs) && jobLogs.length > 0 && Array.isArray(stores);
+  // Check if we have valid stores data - we don't need jobs to display the calendar
+  const hasValidData = Array.isArray(stores) && stores.length > 0;
   
   // List of jobs to drag and drop (only shown to maintenance staff)
   // We'll show all jobs for maintenance staff to be able to reschedule them
@@ -723,6 +728,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       
                       // Force refresh data
                       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+                      
+                      // Force refresh the calendar display immediately
+                      setCurrentDate(new Date(currentDate));
                     }
                   });
                 } else {
@@ -826,6 +834,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       console.log("Slot selected:", slotInfo);
                       handleDropOnCalendar(slotInfo);
                     }}
+
                     components={{
                       toolbar: (props) => <CustomToolbar {...props} />,
                       event: EventComponent
