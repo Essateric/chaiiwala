@@ -585,7 +585,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle>Job Logs Calendar</CardTitle>
-          {isMaintenanceStaff && (
+          {isMaintenance && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -618,7 +618,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         ) : (
           <div className="flex" style={{ height: 600 }}>
             {/* Left panel with draggable job cards - only visible for maintenance staff */}
-            {isMaintenanceStaff && (
+            {isMaintenance && (
               <div className="w-1/4 pr-4 border-r">
                 <h3 className="text-sm font-semibold mb-2">Maintenance Jobs</h3>
                 <p className="text-xs text-muted-foreground mb-2">Drag any job to the calendar to schedule/reschedule it</p>
@@ -707,17 +707,17 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             
             {/* Calendar */}
             <div 
-              className={isMaintenanceStaff ? "w-3/4 relative" : "w-full relative"} 
+              className={isMaintenance ? "w-3/4 relative" : "w-full relative"} 
               ref={calendarRef}
               onDragEnter={(e) => {
-                if (isMaintenanceStaff) {
+                if (isMaintenance) {
                   e.preventDefault();
                   e.currentTarget.classList.add('calendar-drop-target', 'pulse-animation');
                 }
               }}
               onDragOver={(e) => {
                 // Allow drops on the calendar container
-                if (isMaintenanceStaff) {
+                if (isMaintenance) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                 }
@@ -787,19 +787,19 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 <div 
                   className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md"
                   onDragOver={(e) => {
-                    if (isMaintenanceStaff) {
+                    if (isMaintenance) {
                       e.preventDefault();
                       e.currentTarget.classList.add("border-primary", "bg-primary/5");
                       e.dataTransfer.dropEffect = "copy";
                     }
                   }}
                   onDragLeave={(e) => {
-                    if (isMaintenanceStaff) {
+                    if (isMaintenance) {
                       e.currentTarget.classList.remove("border-primary", "bg-primary/5");
                     }
                   }}
                   onDrop={(e) => {
-                    if (isMaintenanceStaff && draggedJob) {
+                    if (isMaintenance && draggedJob) {
                       e.preventDefault();
                       e.currentTarget.classList.remove("border-primary", "bg-primary/5");
                       
@@ -833,7 +833,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   <CalendarX className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-lg font-medium mb-2">No jobs scheduled</p>
                   <p className="text-sm text-muted-foreground text-center">
-                    {isMaintenanceStaff 
+                    {isMaintenance 
                       ? "Drag a job from the left panel to schedule it on the calendar" 
                       : "No maintenance jobs are currently scheduled"}
                   </p>
@@ -849,13 +849,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   defaultView={isMaintenance ? "day" : "month"}
                   views={['month', 'week', 'day']}
                   date={currentDate}
+                  view={currentView}
+                  onView={(view) => {
+                    console.log('Calendar view changed to:', view);
+                    setCurrentView(view);
+                  }}
                   onNavigate={(date) => {
                     console.log('Calendar navigated to:', date);
                     setCurrentDate(date);
                   }}
                   
                   // Add back the drag-and-drop functionality
-                  selectable={isMaintenanceStaff}
+                  selectable={isMaintenance}
                   onSelectSlot={(slotInfo) => {
                     console.log("Slot selected:", slotInfo);
                     handleDropOnCalendar(slotInfo);
