@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarX, Loader2 } from 'lucide-react';
+import { CalendarX, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -184,37 +184,107 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     };
   };
   
-  // Custom toolbar to show store filter for admins and regional managers
-  const CustomToolbar = ({ label }: { label: string }) => {
+  // Custom toolbar to show store filter and view controls based on user role
+  const CustomToolbar = (props: any) => {
+    const { label, onNavigate, onView, views } = props;
+    
     // Only show store filter to admin and regional managers
     const canFilterByStore = user?.role === 'admin' || user?.role === 'regional';
+    const canViewMonthView = user?.role === 'admin' || user?.role === 'regional';
+    
+    // Function to handle view changes based on role
+    const handleViewChange = (view: string) => {
+      // If user is maintenance and tries to select month view, default to week view
+      if (!canViewMonthView && view === 'month') {
+        onView('week');
+        toast({
+          title: "View restricted",
+          description: "Month view is only available to admin and regional managers",
+          variant: "default"
+        });
+      } else {
+        onView(view);
+      }
+    };
     
     return (
-      <div className="flex justify-between items-center mb-4 px-2">
-        <div className="text-xl font-semibold">{label}</div>
-        {canFilterByStore && stores && stores.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Filter by store:</span>
-            <Select 
-              value={selectedStoreId?.toString() || "all"} 
-              onValueChange={(value) => {
-                setSelectedStoreId(value === "all" ? undefined : parseInt(value));
-              }}
+      <div className="flex flex-col gap-2 mb-4 px-2">
+        <div className="flex justify-between items-center">
+          <div className="text-xl font-semibold">{label}</div>
+          
+          {/* Navigation buttons */}
+          <div className="flex gap-1">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onNavigate('TODAY')}
             >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Stores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stores</SelectItem>
-                {stores && stores.map(store => (
-                  <SelectItem key={store.id} value={store.id.toString()}>
-                    {store.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              Today
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onNavigate('PREV')}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onNavigate('NEXT')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        )}
+        </div>
+        
+        <div className="flex justify-between items-center">
+          {/* View toggle buttons */}
+          <div className="flex">
+            {views.map((view: string) => {
+              // For maintenance users, disable month view
+              const isDisabled = view === 'month' && !canViewMonthView;
+              
+              return (
+                <Button
+                  key={view}
+                  variant={props.view === view ? "default" : "outline"}
+                  size="sm"
+                  className="capitalize mr-1"
+                  onClick={() => handleViewChange(view)}
+                  disabled={isDisabled}
+                >
+                  {view}
+                </Button>
+              );
+            })}
+          </div>
+          
+          {/* Store filter */}
+          {canFilterByStore && stores && stores.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Filter by store:</span>
+              <Select 
+                value={selectedStoreId?.toString() || "all"} 
+                onValueChange={(value) => {
+                  setSelectedStoreId(value === "all" ? undefined : parseInt(value));
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Stores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stores</SelectItem>
+                  {stores && stores.map(store => (
+                    <SelectItem key={store.id} value={store.id.toString()}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -290,8 +360,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Reference to the calendar element
   const calendarRef = useRef<HTMLDivElement>(null);
   
-  // Is user maintenance staff?
+  // Check user roles
   const isMaintenanceStaff = user?.role === 'maintenance';
+  const isAdmin = user?.role === 'admin';
+  const isRegionalManager = user?.role === 'regional';
+  const canViewMonthView = isAdmin || isRegionalManager;
   console.log('User role:', user?.role, 'isMaintenanceStaff:', isMaintenanceStaff);
   
   // Handle drag start
@@ -768,7 +841,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   endAccessor="end"
                   style={{ height: '100%' }}
                   eventPropGetter={eventStyleGetter}
-                  defaultView="month"
+                  defaultView={isMaintenanceStaff ? "day" : "month"}
                   views={['month', 'week', 'day']}
                   date={new Date(2025, 3, 15)}
                   onNavigate={(date) => console.log('Calendar navigated to:', date)}
