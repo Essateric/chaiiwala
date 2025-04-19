@@ -456,7 +456,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drop on calendar
   const handleDropOnCalendar = (slotInfo: SlotInfo) => {
-    console.log("Calendar slot selected with info:", slotInfo);
+    console.log("CALENDAR SLOT SELECTED (handleDropOnCalendar):", slotInfo);
+    console.log("Current dragged job:", draggedJob);
 
     // Only process this as a drop if there's a job being dragged
     if (!draggedJob) {
@@ -471,9 +472,22 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     console.log(`Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
     
+    // Store the job ID before clearing the state
+    const jobId = draggedJob.id;
+    
+    // Clear the dragged job state immediately to prevent multiple drops
+    setDraggedJob(null);
+    
+    // Remove any visual feedback
+    const calendarEl = calendarRef.current;
+    if (calendarEl) {
+      calendarEl.classList.remove('calendar-drop-target', 'pulse-animation');
+      calendarEl.classList.remove('border-primary', 'border-2');
+    }
+    
     // Update the job log with the new date and time
     updateJobLogMutation.mutate({
-      id: draggedJob.id,
+      id: jobId,
       data: {
         logDate,
         logTime
@@ -495,18 +509,16 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           // After refresh, navigate to the date where the job was scheduled
           setCurrentDate(new Date(slotInfo.start));
         });
+      },
+      onError: (error) => {
+        console.error("Failed to update job:", error);
+        toast({
+          title: "Failed to schedule job",
+          description: "Could not schedule the job. Please try again.",
+          variant: "destructive"
+        });
       }
     });
-    
-    // Clear the dragged job
-    setDraggedJob(null);
-    
-    // Remove any visual feedback
-    const calendarEl = calendarRef.current;
-    if (calendarEl) {
-      calendarEl.classList.remove('calendar-drop-target', 'pulse-animation');
-      calendarEl.classList.remove('border-primary', 'border-2');
-    }
   };
   
   // Mutation to reset job dates (clear logDate and logTime)
@@ -902,10 +914,43 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     }}
                     min={new Date(0, 0, 0, 7, 0)} // Start at 7am
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
-                    selectable={isMaintenance}
+                    selectable={true}
                     onSelectSlot={(slotInfo) => {
-                      console.log("Slot selected:", slotInfo);
-                      handleDropOnCalendar(slotInfo);
+                      console.log("SLOT SELECTED IN CALENDAR:", slotInfo);
+                      console.log("Current dragged job in onSelectSlot:", draggedJob);
+                      
+                      // Only process if we have a dragged job
+                      if (draggedJob) {
+                        // Format date and time
+                        const logDate = format(slotInfo.start, 'yyyy-MM-dd');
+                        const logTime = format(slotInfo.start, 'HH:mm');
+                        
+                        // Get the job ID before clearing state
+                        const jobId = draggedJob.id;
+                        
+                        // Clear dragged job immediately to prevent multiple operations
+                        setDraggedJob(null);
+                        
+                        console.log(`Calendar onSelectSlot: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
+                        
+                        // Update the job
+                        updateJobLogMutation.mutate({
+                          id: jobId,
+                          data: { logDate, logTime }
+                        }, {
+                          onSuccess: () => {
+                            toast({
+                              title: "Job scheduled",
+                              description: `Job scheduled for ${logDate} at ${logTime}`,
+                            });
+                            
+                            // Direct refresh and navigate to date
+                            refreshCalendar().then(() => {
+                              setCurrentDate(new Date(slotInfo.start));
+                            });
+                          }
+                        });
+                      }
                     }}
 
                     components={{
