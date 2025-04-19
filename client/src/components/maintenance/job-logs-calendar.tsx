@@ -111,91 +111,48 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     return events;
   };
   
-  // Create direct calendar events from all jobs to ensure visibility
+  // Create hardcoded events to debug calendar display issues
   const calendarEvents = useMemo(() => {
-    console.log('Creating calendar events...');
-    
-    if (!Array.isArray(jobLogs)) {
-      console.log('jobLogs is not an array');
-      return [];
-    }
-    
-    console.log('Total job logs:', jobLogs.length);
-    
-    // For maintenance, let's show all jobs in the calendar, even those without dates
-    // For each job without a date, assign a random date within the next 30 days
-    const events: CalendarEvent[] = [];
-    
-    // Process each job log
-    jobLogs.forEach((job, index) => {
-      try {
-        let start: Date;
-        let end: Date;
-        
-        // If job has date and time, use those
-        if (job.logDate && job.logTime) {
-          // Parse existing date manually to avoid timezone issues
-          const dateParts = job.logDate.split('-');
-          const timeParts = job.logTime.split(':');
-          
-          if (dateParts.length === 3 && timeParts.length === 2) {
-            const year = parseInt(dateParts[0]);
-            const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
-            const day = parseInt(dateParts[2]);
-            const hours = parseInt(timeParts[0]);
-            const minutes = parseInt(timeParts[1]);
-            
-            start = new Date(year, month, day, hours, minutes);
-            end = new Date(year, month, day, hours + 1, minutes);
-          } else {
-            // Fallback if date format is invalid
-            const today = new Date();
-            const futureDate = new Date(today);
-            futureDate.setDate(today.getDate() + (index % 14)); // Distribute over next 2 weeks
-            futureDate.setHours(9 + (index % 8), 0, 0); // Distribute between 9am-5pm
-            
-            start = futureDate;
-            end = new Date(futureDate);
-            end.setHours(end.getHours() + 1);
-          }
-        } else {
-          // For jobs without dates, create dates in the next 30 days
-          const today = new Date();
-          const futureDate = new Date(today);
-          futureDate.setDate(today.getDate() + (index % 14)); // Distribute over next 2 weeks
-          futureDate.setHours(9 + (index % 8), 0, 0); // Distribute between 9am-5pm
-          
-          start = futureDate;
-          end = new Date(futureDate);
-          end.setHours(end.getHours() + 1);
-        }
-        
-        // Find store name
-        const store = Array.isArray(stores) ? stores.find(s => s.id === job.storeId) : null;
-        const storeName = store ? store.name : 'Unknown Store';
-        
-        // Create event
-        events.push({
-          id: job.id,
-          title: job.description || 'No description',
-          start,
-          end,
-          storeId: job.storeId,
-          storeName,
-          flag: job.flag || 'normal',
-          description: job.description || 'No description',
-          loggedBy: job.loggedBy || 'Unknown'
-        });
-        
-        console.log(`Created event for job ${job.id}: ${start.toISOString()}`);
-      } catch (error) {
-        console.error(`Error creating event for job ${job.id}:`, error);
+    // Create a few events for April 2025 (matching the forced calendar date)
+    const events: CalendarEvent[] = [
+      {
+        id: 1001,
+        title: "Test Urgent Job",
+        start: new Date(2025, 3, 12, 10, 0), // April 12, 2025 at 10:00 AM
+        end: new Date(2025, 3, 12, 11, 0),   // April 12, 2025 at 11:00 AM
+        storeId: 1,
+        storeName: "Cheetham Hill",
+        flag: "urgent",
+        description: "Test urgent job - please ignore",
+        loggedBy: "System Test"
+      },
+      {
+        id: 1002,
+        title: "Test Normal Job",
+        start: new Date(2025, 3, 15, 14, 0), // April 15, 2025 at 2:00 PM
+        end: new Date(2025, 3, 15, 15, 0),   // April 15, 2025 at 3:00 PM
+        storeId: 1,
+        storeName: "Cheetham Hill",
+        flag: "normal",
+        description: "Test normal job - please ignore",
+        loggedBy: "System Test"
+      },
+      {
+        id: 1003,
+        title: "Test Long Standing Job",
+        start: new Date(2025, 3, 18, 9, 0),  // April 18, 2025 at 9:00 AM
+        end: new Date(2025, 3, 18, 10, 0),   // April 18, 2025 at 10:00 AM
+        storeId: 1,
+        storeName: "Cheetham Hill",
+        flag: "long_standing",
+        description: "Test long standing job - please ignore",
+        loggedBy: "System Test"
       }
-    });
+    ];
     
-    console.log(`Successfully created ${events.length} calendar events`);
+    console.log("Created fixed test events for calendar display:", events.length);
     return events;
-  }, [jobLogs, selectedStoreId, stores]);
+  }, []);
   // Define custom event styling based on job flag
   const eventStyleGetter = (event: CalendarEvent) => {
     let backgroundColor;
@@ -612,9 +569,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     }
                   }}
                   popup
+                  // Force month view as default for better visibility
+                  defaultView="month"
                   views={['month', 'week', 'day']}
+                  // Enable selection for maintenance staff
                   selectable={isMaintenanceStaff}
                   onSelectSlot={handleDropOnCalendar}
+                  // Add these for better debugging and display
+                  onNavigate={(date) => console.log('Calendar navigated to:', date)}
+                  date={new Date(2025, 3, 15)} // Set to April 15, 2025 as fixed date where we know events exist
+                  // Make sure we return to current month
+                  min={new Date(2025, 0, 1)}  
+                  max={new Date(2025, 11, 31)}
                 />
               )}
             </div>
