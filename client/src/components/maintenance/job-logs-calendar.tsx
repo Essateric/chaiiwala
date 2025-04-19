@@ -53,9 +53,18 @@ interface JobLogsCalendarProps {
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Define initial variables
+  const isMaintenance = user?.role === 'maintenance';
+  const isAdminUser = user?.role === 'admin';
+  const isRegionalMgr = user?.role === 'regional';
+  const canViewMonthView = isAdminUser || isRegionalMgr;
+  
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
+  const [currentDate, setCurrentDate] = useState<Date>(new Date(2025, 3, 15));
+  const [currentView, setCurrentView] = useState<string>(user?.role === 'maintenance' ? "day" : "month");
   
   // Helper function to create mock job events for testing
   const createSimpleEvents = () => {
@@ -360,12 +369,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Reference to the calendar element
   const calendarRef = useRef<HTMLDivElement>(null);
   
-  // Check user roles
-  const isMaintenanceStaff = user?.role === 'maintenance';
-  const isAdmin = user?.role === 'admin';
-  const isRegionalManager = user?.role === 'regional';
-  const canViewMonthView = isAdmin || isRegionalManager;
-  console.log('User role:', user?.role, 'isMaintenanceStaff:', isMaintenanceStaff);
+  // Console log user role
+  console.log('User role:', user?.role, 'isMaintenance:', isMaintenance);
   
   // Handle drag start
   const handleDragStart = (job: JobLog) => {
@@ -841,10 +846,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   endAccessor="end"
                   style={{ height: '100%' }}
                   eventPropGetter={eventStyleGetter}
-                  defaultView={isMaintenanceStaff ? "day" : "month"}
+                  defaultView={isMaintenance ? "day" : "month"}
                   views={['month', 'week', 'day']}
-                  date={new Date(2025, 3, 15)}
-                  onNavigate={(date) => console.log('Calendar navigated to:', date)}
+                  date={currentDate}
+                  onNavigate={(date) => {
+                    console.log('Calendar navigated to:', date);
+                    setCurrentDate(date);
+                  }}
                   
                   // Add back the drag-and-drop functionality
                   selectable={isMaintenanceStaff}
