@@ -366,20 +366,25 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     }
     
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-      if (!isMaintenance) return; // Only maintenance staff can move events
+      if (!isMaintenance) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
       
       console.log("Event drag started:", event.id);
-      e.dataTransfer.setData("application/json", JSON.stringify({ 
-        eventId: event.id,
-        type: "existing-event" 
-      }));
       
-      // Also set this job as the dragged job to allow our slot selection handler to work
+      // Find the corresponding job log
       const job = jobLogs.find(j => j.id === event.id);
       if (job) {
         setDraggedJob(job);
         
-        // Show toast for better UX
+        // Set drag data
+        e.dataTransfer.setData("application/json", JSON.stringify({ 
+          jobId: event.id,
+          type: "existing-event" 
+        }));
+        e.dataTransfer.effectAllowed = "move";
+        
         toast({
           title: "Moving event",
           description: "Drop on a time slot to reschedule this event",
@@ -513,14 +518,16 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
 
     // Only process this as a drop if there's a job being dragged
     if (!draggedJob) {
-      // If not dragging, this is just a normal click/selection, do nothing special
       console.log("No job being dragged when slot selected");
       return;
     }
+
+    // Get the slot's time - use the exact time from the slot
+    const slotTime = new Date(slotInfo.start);
     
-    // Format date and time from the drop position
-    const logDate = format(slotInfo.start, 'yyyy-MM-dd');
-    const logTime = format(slotInfo.start, 'HH:mm');
+    // Format date and time from the slot position
+    const logDate = format(slotTime, 'yyyy-MM-dd');
+    const logTime = format(slotTime, 'HH:mm');
     
     console.log(`Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
     
