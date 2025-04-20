@@ -323,7 +323,32 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     );
   };
   
-  // Time Now Indicator component - removed as per user request
+  // Time Now Indicator component
+  const TimeNowIndicator = () => {
+    const now = new Date();
+    const timeLinePosition = (now.getHours() - 7) * 60 + now.getMinutes(); // 7am = 0 minutes
+    const totalMinutes = 12 * 60; // 12 hours from 7am to 7pm
+    const percentOfDay = (timeLinePosition / totalMinutes) * 100;
+    
+    // Only show if the current time is between 7am and 7pm 
+    if (percentOfDay < 0 || percentOfDay > 100) {
+      return null;
+    }
+    
+    return (
+      <div 
+        className="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none"
+        style={{ 
+          top: `${percentOfDay}%`,
+          borderColor: 'red'
+        }}
+      >
+        <div 
+          className="absolute -left-1 -top-2 rounded-full w-4 h-4 bg-red-500"
+        />
+      </div>
+    );
+  };
   
   // Custom event component to show more details
   const EventComponent = ({ event }: { event: CalendarEvent }) => {
@@ -892,7 +917,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   </p>
                 </div>
               ) : (
-                <div className="relative h-full">
+                <div className="relative h-full" ref={calendarRef}>
+                  {/* Current time indicator line - only show in day/week views */}
+                  {(currentView === 'day' || currentView === 'week') && (
+                    <TimeNowIndicator />
+                  )}
                   <Calendar
                     localizer={localizer}
                     events={calendarEvents}
@@ -919,9 +948,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       console.log("SLOT SELECTED IN CALENDAR:", slotInfo);
                       console.log("Current dragged job in onSelectSlot:", draggedJob);
                       
-                      // Only process if we have a dragged job
+                      // Make sure we're using the actual slot time, not the current time
                       if (draggedJob) {
-                        // Format date and time
+                        // Format date and time from the selected slot
                         const logDate = format(slotInfo.start, 'yyyy-MM-dd');
                         const logTime = format(slotInfo.start, 'HH:mm');
                         
@@ -933,7 +962,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         
                         console.log(`Calendar onSelectSlot: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                         
-                        // Update the job
+                        // Update the job with the selected time
                         updateJobLogMutation.mutate({
                           id: jobId,
                           data: { logDate, logTime }
@@ -949,6 +978,33 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               setCurrentDate(new Date(slotInfo.start));
                             });
                           }
+                        });
+                      }
+                    }}
+                    onSelectEvent={(event) => {
+                      // Show job details in a dialog when clicked
+                      const jobEvent = event as CalendarEvent;
+                      const job = jobLogs.find(j => j.id === jobEvent.id);
+                      
+                      if (job) {
+                        // Find store name
+                        const store = stores.find(s => s.id === job.storeId);
+                        
+                        toast({
+                          title: job.title || "Maintenance Job",
+                          description: (
+                            <div className="space-y-2">
+                              <p className="font-medium">{job.description}</p>
+                              <div className="flex flex-col gap-1 text-xs">
+                                <div><strong>Store:</strong> {store?.name || 'Unknown'}</div>
+                                <div><strong>Scheduled:</strong> {job.logDate} at {job.logTime}</div>
+                                <div><strong>Status:</strong> {job.flag}</div>
+                                <div><strong>Logged by:</strong> {job.loggedBy}</div>
+                                {job.category && <div><strong>Category:</strong> {job.category}</div>}
+                              </div>
+                            </div>
+                          ),
+                          duration: 5000,
                         });
                       }
                     }}
