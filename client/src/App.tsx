@@ -68,9 +68,9 @@ function App() {
         <DeepCleaningPage />
       </ProtectedRoute>
 
-      <ProtectedRoute path="/maintenance" feature="maintenance">
+      <Route path="/maintenance">
         <MaintenancePage />
-      </ProtectedRoute>
+      </Route>
 
       <ProtectedRoute path="/event-orders" feature="event_orders">
         <EventOrdersPage />

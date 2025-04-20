@@ -42,7 +42,7 @@ export function ProtectedRoute({ path, feature, children }: ProtectedRouteProps)
     'announcements': ['admin', 'regional', 'store'],
     'user_management': ['admin'],
     'settings': ['admin', 'regional', 'store'],
-    'maintenance': ['admin', 'regional', 'store', 'maintenance'], // Added maintenance role
+    'maintenance': ['admin', 'regional', 'store', 'maintenance', 'staff'],
     'deep_cleaning': ['admin', 'regional', 'store'],
     'event_orders': ['admin', 'regional', 'store'],
     'stock_orders': ['admin', 'regional'],
