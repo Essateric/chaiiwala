@@ -725,7 +725,6 @@ export default function SettingsPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                </div>
                 
                 <Table>
                   <TableHeader>
