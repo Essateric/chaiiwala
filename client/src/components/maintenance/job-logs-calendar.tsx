@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer, SlotInfo, View, EventProps } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
 import { enUS } from 'date-fns/locale';
@@ -365,8 +365,35 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         badgeVariant = "default";
     }
     
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+      if (!isMaintenance) return; // Only maintenance staff can move events
+      
+      console.log("Event drag started:", event.id);
+      e.dataTransfer.setData("application/json", JSON.stringify({ 
+        eventId: event.id,
+        type: "existing-event" 
+      }));
+      
+      // Also set this job as the dragged job to allow our slot selection handler to work
+      const job = jobLogs.find(j => j.id === event.id);
+      if (job) {
+        setDraggedJob(job);
+        
+        // Show toast for better UX
+        toast({
+          title: "Moving event",
+          description: "Drop on a time slot to reschedule this event",
+          duration: 3000,
+        });
+      }
+    };
+    
     return (
-      <div className="text-xs">
+      <div 
+        className="text-xs cursor-move"
+        draggable={isMaintenance}
+        onDragStart={handleDragStart}
+      >
         <strong>{event.title.length > 25 ? `${event.title.substring(0, 22)}...` : event.title}</strong>
         <div className="flex items-center mt-1 gap-1">
           <Badge variant={badgeVariant} className="text-[10px] py-0 px-1">
@@ -962,10 +989,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         
                         console.log(`Calendar onSelectSlot: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                         
-                        // Update the job with the selected time
+                        // Update the job with the selected time from slotInfo.start
                         updateJobLogMutation.mutate({
                           id: jobId,
-                          data: { logDate, logTime }
+                          data: { 
+                            logDate, 
+                            logTime 
+                          }
                         }, {
                           onSuccess: () => {
                             toast({
@@ -1023,6 +1053,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       }
                     }}
                     popup
+                    // These features are supported in React Big Calendar, but we're using a custom approach
+                    // draggable={isMaintenance} // Enables dragging events
+                    // step={15} // 15-min increments
+                    // timeslots={4} // 4 slots per hour
+                    slotPropGetter={() => ({
+                      className: 'custom-time-slot',
+                    })}
                   />
                 </div>
               )}
