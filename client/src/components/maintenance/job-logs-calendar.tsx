@@ -485,9 +485,14 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   console.log('User role:', user?.role, 'isMaintenance:', isMaintenance);
   
   // Handle drag start
-  const handleDragStart = (job: JobLog) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, job: JobLog) => {
+    e.preventDefault();
     console.log(`Starting drag for job ${job.id}: ${job.description}`);
     setDraggedJob(job);
+    
+    // Set drag data
+    e.dataTransfer.setData('application/json', JSON.stringify({ jobId: job.id }));
+    e.dataTransfer.effectAllowed = 'move';
     
     // Add visual feedback - highlight the calendar
     const calendarEl = calendarRef.current;
@@ -779,25 +784,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           <div
                             key={job.id}
                             draggable="true"
-                            onDragStart={(e) => {
-                              console.log("Drag started for job:", job.id);
-                              // Set job ID as data transfer
-                              e.dataTransfer.setData("application/json", JSON.stringify({ jobId: job.id }));
-                              // Allow both copy and move operations
-                              e.dataTransfer.effectAllowed = "copyMove";
-                              // Set a visual drag image (optional)
-                              try {
-                                const dragImage = document.createElement('div');
-                                dragImage.className = 'p-2 bg-white shadow rounded border border-primary';
-                                dragImage.textContent = job.description?.substring(0, 30) || 'Job';
-                                document.body.appendChild(dragImage);
-                                e.dataTransfer.setDragImage(dragImage, 20, 20);
-                                setTimeout(() => document.body.removeChild(dragImage), 0);
-                              } catch (err) {
-                                console.log("Could not set custom drag image");
-                              }
-                              handleDragStart(job);
-                            }}
+                            onDragStart={(e) => handleDragStart(e, job)}
                             onDragEnd={handleDragEnd}
                             className={`bg-card border rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
                               ${isScheduled ? 'border-green-500' : 'border-amber-500'} 
