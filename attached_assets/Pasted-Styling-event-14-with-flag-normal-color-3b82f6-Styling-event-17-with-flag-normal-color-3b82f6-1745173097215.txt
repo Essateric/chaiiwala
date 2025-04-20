@@ -1,0 +1,78 @@
+Styling event 14 with flag normal, color: #3b82f6
+Styling event 17 with flag normal, color: #3b82f6
+Styling event 15 with flag long_standing, color: #eab308
+Styling event 19 with flag normal, color: #3b82f6
+Styling event 4 with flag urgent, color: #ef4444
+Styling event 16 with flag urgent, color: #ef4444
+Styling event 2 with flag urgent, color: #ef4444
+Styling event 18 with flag long_standing, color: #eab308
+Styling event 3 with flag long_standing, color: #eab308
+Styling event 6 with flag urgent, color: #ef4444
+Styling event 13 with flag normal, color: #3b82f6
+Styling event 5 with flag normal, color: #3b82f6
+Response from query /api/joblogs: status=200
+User role: maintenance isMaintenance: true
+Styling event 14 with flag normal, color: #3b82f6
+Styling event 17 with flag normal, color: #3b82f6
+Styling event 15 with flag long_standing, color: #eab308
+Styling event 19 with flag normal, color: #3b82f6
+Styling event 4 with flag urgent, color: #ef4444
+Styling event 16 with flag urgent, color: #ef4444
+Styling event 2 with flag urgent, color: #ef4444
+Styling event 18 with flag long_standing, color: #eab308
+Styling event 3 with flag long_standing, color: #eab308
+Styling event 6 with flag urgent, color: #ef4444
+Styling event 13 with flag normal, color: #3b82f6
+Styling event 5 with flag normal, color: #3b82f6
+Response from query /api/joblogs: status=200
+Response from /api/joblogs/8: status=500
+Error resetting job: 
+Error {}
+message: "Failed to reset job"
+stack: "Error: Failed to reset job↵ at Object.mutationFn (https://cb47eb42-ce7a-4a5f-a4ee-5958f1b510f9-00-k7isletecpax.kirk.replit.dev/src/components/maintenance/job-logs-calendar.tsx:658:15)"
+get stack: ƒ ()
+length: 0
+name: ""
+[[Prototype]]: ƒ ()
+apply: ƒ apply()
+arguments: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get arguments: ƒ ()
+set arguments: ƒ ()
+bind: ƒ bind()
+length: 1
+name: "bind"
+[[Prototype]]: ƒ ()
+call: ƒ call()
+caller: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get caller: ƒ ()
+set caller: ƒ ()
+constructor: ƒ Function()
+length: 1
+name: ""
+toString: ƒ toString()
+Symbol(Symbol.hasInstance): undefined
+[[Prototype]]: Object
+set stack: ƒ ()
+length: 1
+name: ""
+[[Prototype]]: ƒ ()
+[[Prototype]]: Object
+
+at t.value (https://cb47eb42-ce7a-4a5f-a4ee-5958f1b510f9-00-k7isletecpax.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://cb47eb42-ce7a-4a5f-a4ee-5958f1b510f9-00-k7isletecpax.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://cb47eb42-ce7a-4a5f-a4ee-5958f1b510f9-00-k7isletecpax.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://cb47eb42-ce7a-4a5f-a4ee-5958f1b510f9-00-k7isletecpax.kirk.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Current user role: maintenance
+Current page: dashboard
+User role: maintenance isMaintenance: true
+Styling event 14 with flag normal, color: #3b82f6
+Styling event 17 with flag normal, color: #3b82f6
+Styling event 15 with flag long_standing, color: #eab308
+Styling event 19 with flag normal, color: #3b82f6
+Styling event 4 with flag urgent, color: #ef4444
+Styling event 16 with flag urgent, color: #ef4444
+Styling event 2 with flag urgent, color: #ef4444
+Styling event 18 with flag long_standing, color: #eab308
+Styling event 3 with flag long_standing, color: #eab308
+Styling event 6 with flag urgent, color: #ef4444
+Styling event 13 with flag normal, color: #3b82f6
