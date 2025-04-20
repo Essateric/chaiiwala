@@ -414,6 +414,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/joblogs/:id", isAuthenticated, hasRole(["admin", "regional", "store", "maintenance"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Validate the request body
+      if (req.body.logDate === null && req.body.logTime === null) {
+        req.body.completed = false; // Reset completed status when unscheduling
+      }
+      
       const updatedJobLog = await storage.updateJobLog(id, req.body);
       if (updatedJobLog) {
         res.json(updatedJobLog);
@@ -421,7 +427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Job log not found" });
       }
     } catch (error) {
-      res.status(500).json({ message: "Failed to update job log" });
+      console.error("Error updating job log:", error);
+      res.status(500).json({ message: "Failed to update job log", error: String(error) });
     }
   });
 
