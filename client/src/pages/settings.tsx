@@ -10,8 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, PackageX, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,53 +29,65 @@ interface StockConfigItem {
   sku: string;
 }
 
-// Removed static initialStockConfig array - using real data from the API
+const initialStockConfig: StockConfigItem[] = [
+  { 
+    id: 1, 
+    itemCode: "BP401", 
+    name: "Masala Beans", 
+    lowStockThreshold: 5, 
+    category: "Food",
+    price: 3.99,
+    sku: "CHW-MB-001"
+  },
+  { 
+    id: 2, 
+    itemCode: "BP402", 
+    name: "Daal", 
+    lowStockThreshold: 4, 
+    category: "Food",
+    price: 2.99,
+    sku: "CHW-DA-001"
+  },
+  { 
+    id: 3, 
+    itemCode: "BP440", 
+    name: "Mogo Sauce", 
+    lowStockThreshold: 6, 
+    category: "Food",
+    price: 1.99,
+    sku: "CHW-MS-001"
+  },
+  { 
+    id: 4, 
+    itemCode: "DP196", 
+    name: "Orange Juice (12x250ml)", 
+    lowStockThreshold: 3, 
+    category: "Drinks",
+    price: 6.99,
+    sku: "CHW-OJ-001"
+  },
+  { 
+    id: 5, 
+    itemCode: "FPFC204", 
+    name: "Karak Chaii Sugar free (50 per box)", 
+    lowStockThreshold: 2, 
+    category: "Drinks",
+    price: 24.99,
+    sku: "CHW-KC-001"
+  },
+];
 
 export default function SettingsPage() {
+  const [stockConfig, setStockConfig] = useState(initialStockConfig);
   const [activeTab, setActiveTab] = useState("general");
   const [editItem, setEditItem] = useState<StockConfigItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [newItem, setNewItem] = useState({
     name: "",
     lowStockThreshold: 5,
     category: "Food",
     price: 0.00,
     sku: ""
-  });
-  
-  // Fetch stock configuration items from API
-  const { 
-    data: stockConfig = [], 
-    isLoading: isLoadingStockConfig,
-    refetch: refetchStockConfig
-  } = useQuery<StockConfigItem[]>({
-    queryKey: ['/api/stock-config'],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-  
-  // Create mutation for updating stock items
-  const updateStockItemMutation = useMutation({
-    mutationFn: async (data: { id: number, updates: Partial<StockConfigItem> }) => {
-      const response = await apiRequest('PATCH', `/api/stock-config/${data.id}`, data.updates);
-      return await response.json();
-    },
-    onSuccess: () => {
-      // Refetch stock items after successful update
-      refetchStockConfig();
-    }
-  });
-  
-  // Create mutation for adding stock items
-  const addStockItemMutation = useMutation({
-    mutationFn: async (data: Omit<StockConfigItem, 'id'>) => {
-      const response = await apiRequest('POST', '/api/stock-config', data);
-      return await response.json();
-    },
-    onSuccess: () => {
-      // Refetch stock items after successful addition
-      refetchStockConfig();
-    }
   });
   
   // State for category management
@@ -141,29 +152,20 @@ export default function SettingsPage() {
   // Handle save changes
   const handleSaveChanges = () => {
     if (editItem) {
-      // Send update to the API
-      updateStockItemMutation.mutate({
-        id: editItem.id,
-        updates: editItem
-      }, {
-        onSuccess: () => {
-          toast({
-            title: "Settings Updated",
-            description: `${editItem.name} threshold has been updated.`,
-          });
-          
-          // Close the dialog
-          setDialogOpen(false);
-          setEditItem(null);
-        },
-        onError: (error) => {
-          toast({
-            title: "Update Failed",
-            description: error.message || "Failed to update stock item",
-            variant: "destructive"
-          });
-        }
+      // In a real application, this would make an API call to update the database
+      const updatedConfig = stockConfig.map(item => 
+        item.id === editItem.id ? editItem : item
+      );
+      setStockConfig(updatedConfig);
+      
+      toast({
+        title: "Settings Updated",
+        description: `${editItem.name} threshold has been updated.`,
       });
+      
+      // Close the dialog
+      setDialogOpen(false);
+      setEditItem(null);
     }
   };
   
@@ -182,66 +184,42 @@ export default function SettingsPage() {
     // Generate item code based on category and name
     const itemCode = generateItemCode(newItem.category, newItem.name);
     
-    // Create new item to add
+    // Create new item with a unique ID
+    const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
     const itemToAdd = {
       ...newItem,
-      itemCode
+      itemCode,
+      id: newId
     };
     
-    // Add item via API
-    addStockItemMutation.mutate(itemToAdd, {
-      onSuccess: () => {
-        // Reset form and close dialog
-        setNewItem({
-          name: "",
-          lowStockThreshold: 5,
-          category: "Food",
-          price: 0.00,
-          sku: ""
-        });
-        setIsAddDialogOpen(false);
-        
-        toast({
-          title: "Item Added",
-          description: `${newItem.name} has been added to stock configuration.`,
-        });
-      },
-      onError: (error) => {
-        toast({
-          title: "Failed to Add Item",
-          description: error.message || "Could not add the item. Please try again.",
-          variant: "destructive"
-        });
-      }
+    // Add to stock configuration
+    setStockConfig([...stockConfig, itemToAdd]);
+    
+    // Reset form and close dialog
+    setNewItem({
+      name: "",
+      lowStockThreshold: 5,
+      category: "Food",
+      price: 0.00,
+      sku: ""
+    });
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "Item Added",
+      description: `${newItem.name} has been added to stock configuration.`,
     });
   };
   
   // Handle delete item
   const handleDeleteItem = (id: number) => {
-    // In this version, we don't have a delete endpoint yet, 
-    // so we'll just show a notification
-    toast({
-      title: "Delete Not Implemented",
-      description: "The delete operation is not yet implemented on the server.",
-      variant: "destructive"
-    });
+    const updatedConfig = stockConfig.filter(item => item.id !== id);
+    setStockConfig(updatedConfig);
     
-    // When the API is ready, we would implement:
-    // deleteStockItemMutation.mutate(id, {
-    //   onSuccess: () => {
-    //     toast({
-    //       title: "Item Removed",
-    //       description: "Item has been removed from stock configuration.",
-    //     });
-    //   },
-    //   onError: (error) => {
-    //     toast({
-    //       title: "Delete Failed",
-    //       description: error.message || "Could not delete the item",
-    //       variant: "destructive"
-    //     });
-    //   }
-    // });
+    toast({
+      title: "Item Removed",
+      description: "Item has been removed from stock configuration.",
+    });
   };
   
   // Handle CSV upload
@@ -250,7 +228,7 @@ export default function SettingsPage() {
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const csvData = e.target?.result as string;
         const items = processCSV(csvData);
@@ -264,53 +242,29 @@ export default function SettingsPage() {
           return;
         }
         
-        // Show processing notification
-        toast({
-          title: "Processing",
-          description: `Processing ${items.length} items...`,
-        });
+        // Add the items to stock config
+        const currentIds = stockConfig.map(item => item.id);
+        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 1;
         
-        // Use our API to add each item
-        let successCount = 0;
-        let errorCount = 0;
+        const newItems = items.map((item, index) => ({
+          id: nextId + index,
+          itemCode: generateItemCode(item.category, item.name),
+          name: item.name,
+          category: item.category,
+          lowStockThreshold: item.lowStockThreshold,
+          price: item.price,
+          sku: item.sku
+        }));
         
-        for (const item of items) {
-          try {
-            // Generate item code for each item
-            const itemCode = generateItemCode(item.category, item.name);
-            const itemToAdd = {
-              ...item,
-              itemCode
-            };
-            
-            // Send to API
-            await apiRequest("POST", "/api/stock-config", itemToAdd);
-            successCount++;
-          } catch (err) {
-            console.error("Error adding item:", err);
-            errorCount++;
-          }
-        }
-        
-        // Refresh the data
-        refetchStockConfig();
+        setStockConfig([...stockConfig, ...newItems]);
         
         // Reset file input
         event.target.value = '';
         
-        // Show results
-        if (successCount > 0) {
-          toast({
-            title: "Import Successful",
-            description: `${successCount} items were imported. ${errorCount > 0 ? `${errorCount} items failed.` : ''}`,
-          });
-        } else {
-          toast({
-            title: "Import Failed",
-            description: "Failed to import any items. Please check the console for errors.",
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Import Successful",
+          description: `${newItems.length} items were imported.`,
+        });
         
       } catch (error) {
         console.error('Error processing CSV:', error);
@@ -354,7 +308,6 @@ export default function SettingsPage() {
       lowStockThreshold: number;
       price: number;
       sku: string;
-      itemCode?: string;
     }[] = [];
     
     // Skip header row and process data
@@ -396,8 +349,7 @@ export default function SettingsPage() {
           category,
           lowStockThreshold: threshold,
           price: isNaN(price) ? 0.00 : price,
-          sku: altItemCode || itemCode,
-          itemCode: itemCode
+          sku: altItemCode || itemCode
         });
       }
     }
@@ -593,141 +545,65 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 
-                {/* Category Filter */}
-                <div className="mb-4 flex items-center gap-3">
-                  <Label htmlFor="categoryFilter" className="whitespace-nowrap">Filter by Category:</Label>
-                  <Select 
-                    onValueChange={(value) => {
-                      setSelectedCategory(value);
-                    }}
-                    defaultValue="all"
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories?.map((category) => (
-                        <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <div className="ml-auto text-sm">
-                    <span className="font-medium">Total Items:</span> {isLoadingStockConfig ? (
-                      <span className="animate-pulse rounded-md bg-muted inline-block h-4 w-10 align-middle"></span>
-                    ) : (
-                      <span className="ml-1">
-                        {selectedCategory === "all" 
-                          ? stockConfig.length 
-                          : stockConfig.filter(item => item.category === selectedCategory).length
-                        }
-                        {selectedCategory !== "all" && ` / ${stockConfig.length}`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
                 <div className="border rounded-md">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[15%]">Item Code</TableHead>
-                        <TableHead className="w-[25%]">Name</TableHead>
-                        <TableHead className="w-[20%]">Category</TableHead>
+                        <TableHead className="w-[10%]">Item Code</TableHead>
+                        <TableHead className="w-[20%]">Name</TableHead>
+                        <TableHead className="w-[15%]">Category</TableHead>
                         <TableHead className="w-[10%] text-center">Stock</TableHead>
-                        <TableHead className="w-[15%] text-center">Threshold</TableHead>
-                        <TableHead className="w-[15%] text-center">Price</TableHead>
+                        <TableHead className="w-[10%] text-center">Threshold</TableHead>
+                        <TableHead className="w-[10%] text-center">Price</TableHead>
+                        <TableHead className="w-[15%]">SKU</TableHead>
                         <TableHead className="w-[10%] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {isLoadingStockConfig ? (
-                        // Loading state
-                        Array.from({ length: 5 }).map((_, index) => (
-                          <TableRow key={`skeleton-${index}`}>
-                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-16" /></TableCell>
-                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-24" /></TableCell>
-                            <TableCell><div className="animate-pulse rounded-md bg-muted h-4 w-20" /></TableCell>
-                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell className="text-center"><div className="animate-pulse rounded-md bg-muted h-4 w-12 mx-auto" /></TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-2">
-                                <div className="animate-pulse rounded-md bg-muted h-8 w-8" />
-                                <div className="animate-pulse rounded-md bg-muted h-8 w-8" />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : stockConfig.length === 0 ? (
-                        // Empty state when no items at all
-                        <TableRow>
-                          <TableCell colSpan={7} className="h-24 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                              <PackageX className="h-8 w-8 text-muted-foreground mb-2" />
-                              <p className="text-muted-foreground">No stock items found</p>
-                              <p className="text-sm text-muted-foreground mt-1">Add items manually or import from a CSV file</p>
+                      {stockConfig.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-mono">{item.itemCode}</TableCell>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell>{item.category}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                              No Stock
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-sm">
+                              {item.lowStockThreshold} units
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-sm">
+                              £{item.price.toFixed(2)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {item.sku || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditItem(item)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : stockConfig.filter(item => selectedCategory === "all" || item.category === selectedCategory).length === 0 ? (
-                        // Empty state when filtering yields no results
-                        <TableRow>
-                          <TableCell colSpan={7} className="h-24 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                              <PackageX className="h-8 w-8 text-muted-foreground mb-2" />
-                              <p className="text-muted-foreground">No items in this category</p>
-                              <p className="text-sm text-muted-foreground mt-1">Try selecting a different category or add items to this category</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        // Data display
-                        stockConfig
-                          .filter(item => selectedCategory === "all" || item.category === selectedCategory)
-                          .map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-mono">{item.itemCode}</TableCell>
-                            <TableCell>{item.name}</TableCell>
-                            <TableCell>{item.category}</TableCell>
-                            <TableCell className="text-center">
-                              <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                No Stock
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="text-sm">
-                                {item.lowStockThreshold} units
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="text-sm">
-                                £{(item.price / 100).toFixed(2)}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleEditItem(item)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleDeleteItem(item.id)}
-                                  className="text-red-500 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -802,6 +678,53 @@ export default function SettingsPage() {
                     <Plus className="mr-2 h-4 w-4" />
                     Add Category
                   </Button>
+                </div>
+                
+                <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Stock Category</DialogTitle>
+                      <DialogDescription>
+                        Add a new category for organizing stock items
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Name</Label>
+                        <Input
+                          id="name"
+                          value={newCategory.name}
+                          onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                          className="col-span-3"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="prefix" className="text-right">Prefix</Label>
+                        <Input
+                          id="prefix"
+                          value={newCategory.prefix}
+                          onChange={(e) => setNewCategory({...newCategory, prefix: e.target.value})}
+                          className="col-span-3"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="description" className="text-right">Description</Label>
+                        <Input
+                          id="description"
+                          value={newCategory.description}
+                          onChange={(e) => setNewCategory({...newCategory, description: e.target.value})}
+                          className="col-span-3"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => {
+                        createCategory(newCategory);
+                        setCategoryDialogOpen(false);
+                      }}>Save Category</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 </div>
                 
                 <Table>
