@@ -364,6 +364,27 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       default:
         badgeVariant = "default";
     }
+
+    const handleDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      
+      // Update the job with null dates to remove from calendar
+      updateJobLogMutation.mutate({
+        id: event.id,
+        data: {
+          logDate: null,
+          logTime: null
+        }
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Job removed",
+            description: "Job has been removed from the calendar",
+          });
+          refreshCalendar();
+        }
+      });
+    };
     
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
       if (!isMaintenance) return;
@@ -395,7 +416,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     return (
       <div 
-        className="text-xs cursor-move"
+        className="text-xs cursor-move relative group"
         draggable={isMaintenance}
         onDragStart={handleDragStart}
       >
@@ -407,6 +428,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           <span className="text-[10px] truncate">
             {event.storeName}
           </span>
+          <button
+            onClick={handleDelete}
+            className="opacity-0 group-hover:opacity-100 absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center text-[10px] transition-opacity"
+            title="Remove from calendar"
+          >
+            ×
+          </button>
         </div>
       </div>
     );
