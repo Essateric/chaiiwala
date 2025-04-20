@@ -38,14 +38,14 @@ export default function JobLogsSection() {
   const [selectedJobLog, setSelectedJobLog] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const itemsPerPage = 10;
-  
+
   // For store managers, always keep the store ID fixed to their assigned store
   useEffect(() => {
     if (user?.role === "store" && typeof user?.storeId === 'number') {
       setSelectedStoreId(user.storeId);
     }
   }, [user?.role, user?.storeId]);
-  
+
   // Check if user can create maintenance logs
   // Only admin, regional, store, or maintenance role
   const canCreateLogs = 
@@ -53,10 +53,10 @@ export default function JobLogsSection() {
     user?.role === "regional" ||
     user?.role === "store" ||
     user?.role === "maintenance";
-  
+
   // Get all stores
   const { stores, isLoading: isLoadingStores } = useStores();
-  
+
   // Get store staff for the "Logged By" dropdown
   const initialStoreId = user?.role === "store" ? user?.storeId ?? 1 : 1; 
   const [formStoreId, setFormStoreId] = useState<number>(initialStoreId);
@@ -70,7 +70,7 @@ export default function JobLogsSection() {
     createJobLog, 
     isCreating 
   } = useJobLogs(storeIdForQuery);
-  
+
   // Filter job logs based on selected store
   const filteredJobLogs = React.useMemo(() => {
     if (!selectedStoreId) return allJobLogs;
@@ -79,14 +79,14 @@ export default function JobLogsSection() {
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredJobLogs.length / itemsPerPage);
-  
+
   // Get current page items
   const jobLogs = React.useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredJobLogs.slice(startIndex, endIndex);
   }, [filteredJobLogs, currentPage, itemsPerPage]);
-  
+
   const form = useForm({
     resolver: zodResolver(insertJobLogSchema.extend({
       storeId: z.number(),
@@ -113,7 +113,7 @@ export default function JobLogsSection() {
       comments: null,
     },
   });
-  
+
   function handleImageUpload(imageUrl: string) {
     const currentAttachments = form.getValues("attachments") || [];
     form.setValue("attachments", [...currentAttachments, imageUrl]);
@@ -124,20 +124,25 @@ export default function JobLogsSection() {
     const currentAttachments = [...form.getValues("attachments")];
     currentAttachments.splice(index, 1);
     form.setValue("attachments", currentAttachments);
-    
+
     const newUploadedImages = [...uploadedImages];
     newUploadedImages.splice(index, 1);
     setUploadedImages(newUploadedImages);
   }
-  
+
   async function onSubmit(values: any) {
     try {
-      const newJobLog = await createJobLog(values);
+      const now = new Date();
+      const londonTime = now.toLocaleString("en-US", { timeZone: "Europe/London" });
+      const londonDate = new Date(londonTime);
+      const logDate = format(londonDate, "yyyy-MM-dd");
+      const logTime = format(londonDate, "HH:mm");
+      const newJobLog = await createJobLog({...values, logDate, logTime});
       console.log("New job log created:", newJobLog);
-      
+
       // Close the dialog
       setOpen(false);
-      
+
       // Reset the form for next use
       form.reset({
         storeId: values.storeId,
@@ -192,19 +197,19 @@ export default function JobLogsSection() {
     const [userSearchTerm, setUserSearchTerm] = useState("");
     const [cursorPosition, setCursorPosition] = useState(0);
     const { toast } = useToast();
-    
+
     // Fetch comments for this job log
     const { data: comments = [], isLoading: isLoadingComments, refetch: refetchComments } = useQuery<any[]>({
       queryKey: [`/api/joblogs/${jobLog.id}/comments`],
       enabled: !!jobLog.id,
     });
-    
+
     // Fetch all staff for mentions
     const { data: staffList = [] } = useQuery<{ id: number; name: string; role: string; }[]>({
       queryKey: ['/api/staff'],
       enabled: !!jobLog.id,
     });
-    
+
     // Add comment mutation
     const addCommentMutation = useMutation({
       mutationFn: async (commentData: { comment: string, mentionedUsers: number[] }) => {
@@ -215,11 +220,11 @@ export default function JobLogsSection() {
           },
           body: JSON.stringify(commentData),
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to add comment');
         }
-        
+
         return response.json();
       },
       onSuccess: () => {
@@ -239,17 +244,17 @@ export default function JobLogsSection() {
         });
       }
     });
-    
+
     // Handle @ mentions
     const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const value = e.target.value;
       setComment(value);
-      
+
       // Handle @ mentions
       if (value.includes('@')) {
         const lastAtIndex = value.lastIndexOf('@');
         const cursorPos = e.target.selectionStart;
-        
+
         if (cursorPos > lastAtIndex) {
           const searchTerm = value.substring(lastAtIndex + 1, cursorPos).trim();
           setUserSearchTerm(searchTerm);
@@ -262,21 +267,21 @@ export default function JobLogsSection() {
         setShowUserMenu(false);
       }
     };
-    
+
     // Handle user selection from mention menu
     const handleUserSelect = (userId: number, userName: string) => {
       const beforeAt = comment.substring(0, comment.lastIndexOf('@'));
       const afterCursor = comment.substring(cursorPosition);
       const newComment = `${beforeAt}@${userName} ${afterCursor}`;
-      
+
       setComment(newComment);
       setShowUserMenu(false);
-      
+
       // Add user to mentioned users if not already included
       if (!mentionedUsers.includes(userId)) {
         setMentionedUsers([...mentionedUsers, userId]);
       }
-      
+
       // Focus the textarea and set cursor position after the inserted name
       if (commentInputRef.current) {
         commentInputRef.current.focus();
@@ -288,17 +293,17 @@ export default function JobLogsSection() {
         }, 0);
       }
     };
-    
+
     // Submit comment
     const handleSubmitComment = () => {
       if (!comment.trim()) return;
-      
+
       addCommentMutation.mutate({
         comment,
         mentionedUsers
       });
     };
-    
+
     // Format comment date
     const formatCommentDate = (dateString: string) => {
       const date = new Date(dateString);
@@ -310,7 +315,7 @@ export default function JobLogsSection() {
         minute: '2-digit'
       }).format(date);
     };
-    
+
     return (
       <Dialog open={!!jobLog} onOpenChange={(open) => !open && setSelectedJobLog(null)}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
@@ -323,13 +328,13 @@ export default function JobLogsSection() {
               Created by {jobLog.loggedBy} on {jobLog.logDate} at {jobLog.logTime}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             <div>
               <h3 className="text-sm font-medium mb-2">Description</h3>
               <p className="text-sm text-muted-foreground">{jobLog.description}</p>
             </div>
-            
+
             {jobLog.attachments && jobLog.attachments.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium mb-2">Attachments</h3>
@@ -356,7 +361,7 @@ export default function JobLogsSection() {
                 </div>
               </div>
             )}
-            
+
             <div>
               <h3 className="text-sm font-medium mb-2">Comments</h3>
               <div className="space-y-4 mb-4 max-h-60 overflow-y-auto bg-muted/50 p-3 rounded-md">
@@ -391,7 +396,7 @@ export default function JobLogsSection() {
                   })
                 )}
               </div>
-              
+
               <div className="relative">
                 <Textarea 
                   ref={commentInputRef}
@@ -400,7 +405,7 @@ export default function JobLogsSection() {
                   onChange={handleCommentChange}
                   className="min-h-24"
                 />
-                
+
                 {showUserMenu && (
                   <div className="absolute z-10 w-full max-h-40 overflow-y-auto mt-1 bg-background border rounded-md shadow-md">
                     {staffList
@@ -419,7 +424,7 @@ export default function JobLogsSection() {
                       ))}
                   </div>
                 )}
-                
+
                 <Button 
                   size="sm" 
                   className="mt-2" 
@@ -497,7 +502,7 @@ export default function JobLogsSection() {
               Calendar View
             </Button>
           </div>
-          
+
           {/* Only show Create button for admin or maintenance staff */}
           {canCreateLogs && (
             <Dialog open={open} onOpenChange={setOpen}>
@@ -507,7 +512,7 @@ export default function JobLogsSection() {
                   Log New Job
                 </Button>
               </DialogTrigger>
-              
+
               <DialogContent className="sm:max-w-[650px]">
                 <DialogHeader>
                   <DialogTitle>Create New Job Log</DialogTitle>
@@ -548,7 +553,7 @@ export default function JobLogsSection() {
                         )}
                       />
                     )}
-                    
+
                     {/* New fields: Title and Category */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
@@ -637,7 +642,7 @@ export default function JobLogsSection() {
                         )}
                       />
                     </div>
-                    
+
                     <FormField
                       control={form.control}
                       name="description"
@@ -651,7 +656,7 @@ export default function JobLogsSection() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Image Upload */}
                     <FormField
                       control={form.control}
@@ -666,7 +671,7 @@ export default function JobLogsSection() {
                                 placeholder="Upload images of the issue"
                                 buttonText="Upload Image"
                               />
-                              
+
                               {uploadedImages.length > 0 && (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                                   {uploadedImages.map((url, index) => (
@@ -693,7 +698,7 @@ export default function JobLogsSection() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -739,7 +744,7 @@ export default function JobLogsSection() {
                         )}
                       />
                     </div>
-                    
+
                     <DialogFooter>
                       <Button type="submit" disabled={isCreating}>
                         {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -752,7 +757,7 @@ export default function JobLogsSection() {
             </Dialog>
           )}
         </div>
-        
+
         {viewMode === "list" ? (
           <>
             {isLoading ? (
@@ -810,7 +815,7 @@ export default function JobLogsSection() {
                     </TableBody>
                   </Table>
                 </div>
-                
+
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-end space-x-2 py-4">
@@ -847,7 +852,7 @@ export default function JobLogsSection() {
             isLoading={isLoading}
           />
         )}
-        
+
         {/* Job log detail dialog */}
         {selectedJobLog !== null && (
           <JobLogDetails 
