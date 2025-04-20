@@ -1,8 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
-import { withDragAndDrop } from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { JobLog } from '@shared/schema';
