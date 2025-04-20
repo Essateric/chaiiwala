@@ -583,10 +583,15 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Mutation to reset job dates (clear logDate and logTime)
   const resetJobMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest('PATCH', `/api/joblogs/${id}`, {
+      const response = await apiRequest('PATCH', `/api/joblogs/${id}`, {
         logDate: null,
-        logTime: null
+        logTime: null,
+        completed: false
       });
+      if (!response.ok) {
+        throw new Error('Failed to reset job');
+      }
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
@@ -595,8 +600,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         description: "The job has been reset and is now available for scheduling.",
       });
       
-      // Refresh calendar immediately
+      // Force refresh calendar and data
       refreshCalendar();
+      setDraggableJobs(prevJobs => prevJobs.map(job => ({...job, logDate: null, logTime: null})));
     },
     onError: (error) => {
       console.error('Error resetting job:', error);
