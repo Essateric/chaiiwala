@@ -1020,6 +1020,42 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         // Find store name
                         const store = stores.find(s => s.id === job.storeId);
                         
+                        // For maintenance staff, make the job draggable to move it
+                        if (isMaintenance) {
+                          // Set as the dragged job to allow repositioning
+                          setDraggedJob(job);
+                          
+                          // Show toast with instructions
+                          toast({
+                            title: "Moving job",
+                            description: "Drop on another time slot to reschedule",
+                            duration: 2000,
+                          });
+                          
+                          // Then also show the details
+                          setTimeout(() => {
+                            toast({
+                              title: job.title || "Maintenance Job",
+                              description: (
+                                <div className="space-y-2">
+                                  <p className="font-medium">{job.description}</p>
+                                  <div className="flex flex-col gap-1 text-xs">
+                                    <div><strong>Store:</strong> {store?.name || 'Unknown'}</div>
+                                    <div><strong>Scheduled:</strong> {job.logDate} at {job.logTime}</div>
+                                    <div><strong>Status:</strong> {job.flag}</div>
+                                    <div><strong>Logged by:</strong> {job.loggedBy}</div>
+                                    {job.category && <div><strong>Category:</strong> {job.category}</div>}
+                                  </div>
+                                </div>
+                              ),
+                              duration: 5000,
+                            });
+                          }, 2100);
+                          
+                          return;
+                        }
+                        
+                        // For other roles, just show details
                         toast({
                           title: job.title || "Maintenance Job",
                           description: (
