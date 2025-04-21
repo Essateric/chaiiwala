@@ -486,6 +486,31 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Reference to the calendar element
   const calendarRef = useRef<HTMLDivElement>(null);
   
+  // Create a mutation for updating job logs
+  const updateJobLogMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<JobLog> }) => {
+      return apiRequest('PATCH', `/api/joblogs/${id}`, data);
+    },
+    onSuccess: () => {
+      // Invalidate the joblogs query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+      console.log('Job log updated successfully');
+      
+      // Use our direct refresh function to immediately update the calendar
+      refreshCalendar().then(() => {
+        console.log('Calendar refreshed after job update');
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating job log:', error);
+      toast({
+        title: "Error updating job",
+        description: "Could not update the maintenance job. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Console log user role
   console.log('User role:', user?.role, 'isMaintenance:', isMaintenance);
   
@@ -532,25 +557,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     }, 100);
   };
   
-  // Create a mutation for updating job logs
-  const updateJobLogMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<JobLog> }) => {
-      return apiRequest('PATCH', `/api/joblogs/${id}`, data);
-    },
-    onSuccess: () => {
-      // Invalidate the joblogs query to refresh the data
-      queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
-      console.log('Job log updated successfully');
-      
-      // Use our direct refresh function to immediately update the calendar
-      refreshCalendar().then(() => {
-        console.log('Calendar refreshed after job update');
-      });
-    },
-    onError: (error) => {
-      console.error('Error updating job log:', error);
-    }
-  });
+
   
   // Handle drop on calendar
   const handleDropOnCalendar = (slotInfo: SlotInfo) => {
