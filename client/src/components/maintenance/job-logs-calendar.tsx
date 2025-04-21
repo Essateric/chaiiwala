@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
+import { format, parse, startOfWeek, getDay, addHours, differenceInMinutes } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { JobLog } from '@shared/schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1199,38 +1199,86 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         // Find store name
                         const store = stores.find(s => s.id === job.storeId);
                         
-                        // For maintenance staff, make the job draggable to move it
+                        // For maintenance staff, show reschedule options
                         if (isMaintenance) {
-                          // Set as the dragged job to allow repositioning
-                          setDraggedJob(job);
-                          
-                          // Show toast with instructions
+                          // Show a toast with actions for maintenance staff
                           toast({
-                            title: "Moving job",
-                            description: "Drop on another time slot to reschedule",
-                            duration: 2000,
-                          });
-                          
-                          // Then also show the details
-                          setTimeout(() => {
-                            toast({
-                              title: job.title || "Maintenance Job",
-                              description: (
-                                <div className="space-y-2">
-                                  <p className="font-medium">{job.description}</p>
-                                  <div className="flex flex-col gap-1 text-xs">
-                                    <div><strong>Store:</strong> {store?.name || 'Unknown'}</div>
-                                    <div><strong>Scheduled:</strong> {job.logDate} at {job.logTime}</div>
-                                    <div><strong>Status:</strong> {job.flag}</div>
-                                    <div><strong>Logged by:</strong> {job.loggedBy}</div>
-                                    {job.category && <div><strong>Category:</strong> {job.category}</div>}
-                                  </div>
+                            title: job.title || "Maintenance Job",
+                            description: (
+                              <div className="space-y-3">
+                                <p className="font-medium">{job.description}</p>
+                                <div className="flex flex-col gap-1 text-xs">
+                                  <div><strong>Store:</strong> {store?.name || 'Unknown'}</div>
+                                  <div><strong>Scheduled:</strong> {job.logDate} at {job.logTime}</div>
+                                  <div><strong>Status:</strong> {job.flag}</div>
+                                  <div><strong>Logged by:</strong> {job.loggedBy}</div>
+                                  {job.category && <div><strong>Category:</strong> {job.category}</div>}
                                 </div>
-                              ),
-                              duration: 5000,
-                            });
-                          }, 2100);
-                          
+                                <div className="flex flex-col gap-2 mt-2">
+                                  <div className="text-xs font-semibold">Reschedule this job:</div>
+                                  <div className="flex justify-between gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="flex-1"
+                                      onClick={() => {
+                                        // Set as the dragged job to allow repositioning
+                                        setDraggedJob(job);
+                                        
+                                        toast({
+                                          title: "Moving job",
+                                          description: "Select a time slot on the calendar to reschedule",
+                                        });
+                                      }}
+                                    >
+                                      Move to new time
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="flex-1"
+                                      onClick={() => {
+                                        // Calculate tomorrow's date
+                                        const tomorrow = new Date();
+                                        tomorrow.setDate(tomorrow.getDate() + 1);
+                                        const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+                                        
+                                        // Update job to tomorrow, same time
+                                        updateJobLogMutation.mutate({
+                                          id: job.id,
+                                          data: { 
+                                            logDate: tomorrowStr,
+                                            logTime: job.logTime
+                                          }
+                                        }, {
+                                          onSuccess: () => {
+                                            toast({
+                                              title: "Job rescheduled",
+                                              description: `Job moved to tomorrow (${tomorrowStr}) at ${job.logTime}`,
+                                            });
+                                            refreshCalendar();
+                                          }
+                                        });
+                                      }}
+                                    >
+                                      Move to tomorrow
+                                    </Button>
+                                  </div>
+                                  <Button
+                                    size="sm" 
+                                    variant="default"
+                                    onClick={() => {
+                                      // Navigate to detail page
+                                      router.navigate(`/maintenance/job/${job.id}`);
+                                    }}
+                                  >
+                                    View job details
+                                  </Button>
+                                </div>
+                              </div>
+                            ),
+                            duration: 10000,
+                          });
                           return;
                         }
                         
