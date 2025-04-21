@@ -998,8 +998,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
                     selectable={true}
                     onSelectSlot={(slotInfo) => {
-                      console.log("SLOT SELECTED IN CALENDAR:", slotInfo);
-                      console.log("Current dragged job in onSelectSlot:", draggedJob);
+                      console.log("✅ SLOT SELECTED IN CALENDAR:", slotInfo);
+                      console.log("📋 Current dragged job in onSelectSlot:", draggedJob);
                       
                       // Make sure we're using the actual slot time, not the current time
                       if (draggedJob) {
