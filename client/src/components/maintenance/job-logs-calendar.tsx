@@ -514,47 +514,17 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   // Console log user role
   console.log('User role:', user?.role, 'isMaintenance:', isMaintenance);
   
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, job: JobLog) => {
-    // Don't call preventDefault() here or it will cancel the drag operation
-    console.log(`Starting drag for job ${job.id}: ${job.description}`);
+  // Handle click to start moving a job
+  const handleStartMoveJob = (job: JobLog) => {
+    console.log(`Starting to move job ${job.id}`);
     setDraggedJob(job);
     
-    // Set drag data
-    e.dataTransfer.setData('application/json', JSON.stringify({ jobId: job.id }));
-    e.dataTransfer.effectAllowed = 'move';
-    
-    // Add visual feedback - highlight the calendar
-    const calendarEl = calendarRef.current;
-    if (calendarEl) {
-      calendarEl.classList.add('border-primary', 'border-2');
-    }
-    
-    // Show toast for better UX
+    // Show toast for instructions
     toast({
-      title: "Dragging job",
-      description: "Drop on the calendar to schedule this job",
+      title: "Moving job",
+      description: "Select a time slot on the calendar to reschedule this job",
       duration: 3000,
     });
-  };
-  
-  // Handle drag end
-  const handleDragEnd = () => {
-    console.log("Drag ended");
-    
-    // Remove visual feedback
-    const calendarEl = calendarRef.current;
-    if (calendarEl) {
-      calendarEl.classList.remove('border-primary', 'border-2');
-    }
-    
-    // Clear the time display immediately
-    setDragTimeDisplay(null);
-    
-    // Keep draggedJob state for a small delay to allow drop handling
-    setTimeout(() => {
-      setDraggedJob(null);
-    }, 100);
   };
   
 
@@ -781,9 +751,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         return (
                           <div
                             key={job.id}
-                            draggable="true"
-                            onDragStart={(e) => handleDragStart(e, job)}
-                            onDragEnd={handleDragEnd}
+                            onClick={() => handleStartMoveJob(job)}
                             className={`bg-card border relative rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
                               ${isScheduled ? 'border-green-500' : 'border-amber-500'} 
                               hover:border-primary 
@@ -1154,12 +1122,21 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     }}
                     min={new Date(0, 0, 0, 7, 0)} // Start at 7am
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
-                    selectable={true}
+                    selectable={isMaintenance && draggedJob !== null}
                     onSelectSlot={(slotInfo) => {
                       console.log("✅ SLOT SELECTED IN CALENDAR:", slotInfo);
                       console.log("📋 Current dragged job in onSelectSlot:", draggedJob);
                       console.log("📅 Selected slot start time:", slotInfo.start);
                       console.log("📅 Selected slot end time:", slotInfo.end);
+                      
+                      // Only handle slot selection if we have a job being moved
+                      if (!draggedJob) {
+                        console.log("No job being moved when slot selected");
+                        return;
+                      }
+                      
+                      // Use handleDropOnCalendar for processing slot selection
+                      handleDropOnCalendar(slotInfo);
                       
                       // Make sure we're using the actual slot time, not the current time
                       if (draggedJob) {
