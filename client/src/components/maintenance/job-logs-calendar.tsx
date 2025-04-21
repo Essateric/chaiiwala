@@ -43,6 +43,8 @@ interface CalendarEvent {
   flag: 'normal' | 'urgent' | 'long_standing';
   description: string;
   loggedBy: string;
+  // Add reference to original job data for easier handling during drag operations
+  originalJob?: JobLog;
 }
 
 interface JobLogsCalendarProps {
@@ -168,7 +170,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           storeName: store ? store.name : 'Unknown Store',
           flag: job.flag as 'normal' | 'urgent' | 'long_standing',
           description: job.description || 'No description',
-          loggedBy: job.loggedBy || 'Unknown'
+          loggedBy: job.loggedBy || 'Unknown',
+          originalJob: job // Store the original job data for easier access during drag operations
         };
       } catch (err) {
         console.error('Error creating calendar event from job log:', job, err);
@@ -389,7 +392,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     };
     
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-      if (!isMaintenance) return;
+      if (!isMaintenance) {
+        e.preventDefault(); // Prevent drag if not maintenance role
+        return;
+      }
       
       // Don't call preventDefault() as it will cancel the drag operation
       // Just stop propagation to prevent parent drag handlers from being triggered
@@ -397,8 +403,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       
       console.log("Event drag started:", event.id);
       
-      // Find the corresponding job log
-      const job = jobLogs.find(j => j.id === event.id);
+      // Use the original job data if available, otherwise find it in jobLogs
+      const job = event.originalJob || jobLogs.find(j => j.id === event.id);
       if (job) {
         setDraggedJob(job);
         
@@ -408,6 +414,27 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           type: "existing-event" 
         }));
         e.dataTransfer.effectAllowed = "move";
+        
+        // Set a drag image (custom element or the event itself)
+        try {
+          const dragPreview = document.createElement('div');
+          dragPreview.className = 'drag-preview';
+          dragPreview.innerHTML = `
+            <div style="padding: 8px; background: #3b82f6; color: white; border-radius: 4px; max-width: 200px;">
+              <div style="font-weight: bold;">${event.title}</div>
+              <div style="font-size: 10px;">${event.storeName} - ${event.flag}</div>
+            </div>
+          `;
+          document.body.appendChild(dragPreview);
+          e.dataTransfer.setDragImage(dragPreview, 10, 10);
+          
+          // Clean up after a short delay
+          setTimeout(() => {
+            document.body.removeChild(dragPreview);
+          }, 100);
+        } catch (err) {
+          console.error("Error setting drag image:", err);
+        }
         
         toast({
           title: "Moving event",
