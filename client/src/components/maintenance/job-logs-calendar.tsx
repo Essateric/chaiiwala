@@ -665,45 +665,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     }
   });
   
-  // Render drag indicator if job is being dragged
+  // We'll no longer need the separate drag indicator
   const renderDragIndicator = () => {
-    if (!draggedJob) return null;
-    
-    // Determine badge color based on flag
-    let badgeColor = "#3b82f6"; // Default blue
-    switch (draggedJob.flag) {
-      case 'urgent':
-        badgeColor = "#ef4444"; // Red
-        break;
-      case 'long_standing':
-        badgeColor = "#eab308"; // Yellow
-        break;
-    }
-    
-    // Get store name
-    const storeName = stores.find(store => store.id === draggedJob.storeId)?.name || 'Unknown Store';
-    
-    return (
-      <div className="fixed pointer-events-none z-50" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-        <div className="bg-background border-2 shadow-lg rounded-md p-3 max-w-md shadow-lg" style={{ borderColor: badgeColor }}>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: badgeColor }} />
-                <p className="text-sm font-medium">{draggedJob.flag === 'urgent' ? 'Urgent' : draggedJob.flag === 'long_standing' ? 'Long-standing' : 'Normal'}</p>
-              </div>
-              {dragTimeDisplay && (
-                <div className="bg-primary text-white px-2 py-0.5 rounded text-sm font-bold">
-                  {dragTimeDisplay}
-                </div>
-              )}
-            </div>
-            <p className="font-bold text-sm">{draggedJob.description}</p>
-            <p className="text-xs text-muted-foreground">From: {storeName}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return null; // Return nothing since we're showing the time on the card itself
   };
   
   // Get a random job to reset for testing
@@ -802,16 +766,34 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         // Show scheduling status 
                         const isScheduled = job.logDate && job.logTime;
                         
+                        // Check if this job is currently being dragged and has a time display
+                        const isDragging = draggedJob?.id === job.id && dragTimeDisplay;
+                        
                         return (
                           <div
                             key={job.id}
                             draggable="true"
                             onDragStart={(e) => handleDragStart(e, job)}
                             onDragEnd={handleDragEnd}
-                            className={`bg-card border rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
+                            className={`bg-card border relative rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
                               ${isScheduled ? 'border-green-500' : 'border-amber-500'} 
-                              hover:border-primary`}
+                              hover:border-primary 
+                              ${isDragging ? 'ring-2 ring-primary' : ''}`}
+                            style={{
+                              position: isDragging ? 'fixed' : 'relative',
+                              zIndex: isDragging ? 9999 : 'auto',
+                              left: isDragging ? '50%' : 'auto',
+                              top: isDragging ? '50%' : 'auto',
+                              transform: isDragging ? 'translate(-50%, -50%)' : 'none',
+                              opacity: isDragging ? 0.9 : 1,
+                              width: isDragging ? '250px' : 'auto'
+                            }}
                           >
+                            {isDragging && (
+                              <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-primary text-white font-bold px-2 py-1 rounded-full text-sm shadow-md drag-time-badge">
+                                {dragTimeDisplay}
+                              </div>
+                            )}
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-between text-xs">

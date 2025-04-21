@@ -102,6 +102,24 @@
   animation: pulse-border 2s infinite;
 }
 
+/* Time indicator for dragged jobs */
+.drag-time-badge {
+  animation: pulse-time 1.2s infinite;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse-time {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 :root {
   /* Chaiiwala brand colors */
   --chai-gold: #D4AF37;
