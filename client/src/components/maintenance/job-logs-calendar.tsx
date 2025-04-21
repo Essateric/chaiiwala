@@ -478,6 +478,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // State to track dragged job
   const [draggedJob, setDraggedJob] = useState<JobLog | null>(null);
+  // State to track and display the current time position during dragging
+  const [dragTimeDisplay, setDragTimeDisplay] = useState<string | null>(null);
   
   // Reference to the calendar element
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -518,6 +520,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     if (calendarEl) {
       calendarEl.classList.remove('border-primary', 'border-2');
     }
+    
+    // Clear the time display immediately
+    setDragTimeDisplay(null);
     
     // Keep draggedJob state for a small delay to allow drop handling
     setTimeout(() => {
@@ -688,6 +693,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           <p className="font-bold mb-1">{draggedJob.description}</p>
           <p className="text-xs text-muted-foreground mb-2">From: {storeName}</p>
           <div className="bg-muted text-xs p-2 rounded">
+            {dragTimeDisplay ? (
+              <p className="font-bold text-sm mb-1">Time: {dragTimeDisplay}</p>
+            ) : null}
             <p>Drop anywhere on the calendar to schedule this job</p>
             <p>• Drop on a specific date to schedule for that date</p>
             <p>• Drop on the empty area for default scheduling</p>
@@ -846,6 +854,47 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 if (isMaintenance) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
+                  
+                  // Calculate current time position for drag indicator
+                  const calendarEl = calendarRef.current;
+                  if (calendarEl && draggedJob) {
+                    try {
+                      // Find the time content area
+                      const timeContent = calendarEl.querySelector('.rbc-time-view .rbc-time-content');
+                      if (timeContent) {
+                        const timeRect = timeContent.getBoundingClientRect();
+                        
+                        // Adjust Y position relative to time content
+                        const adjustedY = e.clientY - timeRect.top;
+                        
+                        // Calculate time from position
+                        const totalMinutes = 12 * 60; // 12 hours (7am-7pm)
+                        const percentOfDay = Math.max(0, Math.min(1, adjustedY / timeRect.height));
+                        const minutesFromTop = percentOfDay * totalMinutes;
+                        
+                        // Calculate hours and minutes with 15-minute increments
+                        let hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                        
+                        // Round to nearest 15-minute increment
+                        const rawMinutes = Math.floor(minutesFromTop % 60);
+                        const roundedIncrement = Math.round(rawMinutes / 15) * 15;
+                        let minutes = roundedIncrement === 60 ? 0 : roundedIncrement;
+                        
+                        // If minutes rolled over to 0 due to rounding to 60, increment the hour
+                        if (roundedIncrement === 60) {
+                          hours += 1;
+                        }
+                        
+                        // Format time string (ensure two digits for minutes)
+                        const timeString = `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+                        
+                        // Update state to display in the drag indicator
+                        setDragTimeDisplay(timeString);
+                      }
+                    } catch (err) {
+                      console.error("Error calculating drag time:", err);
+                    }
+                  }
                 }
               }}
               onDragLeave={(e) => {
@@ -1017,8 +1066,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   });
                 }
                 
-                // Clear the dragged job
+                // Clear the dragged job and time display
                 setDraggedJob(null);
+                setDragTimeDisplay(null);
               }}
             >
               {calendarEvents.length === 0 ? (
