@@ -878,6 +878,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 // If we have a job ID, schedule it
                 if (jobId) {
                   // We need to calculate where in the calendar the drop happened
+                  let scheduleDate: Date;
+                  
                   // Get calendar element for measurement
                   const calendarEl = calendarRef.current;
                   if (calendarEl) {
@@ -890,48 +892,82 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       const dropY = e.clientY - calendarRect.top;
                       
                       // Calculate what time this corresponds to
-                      // First, get the height of the calendar
-                      const calendarHeight = calendarRect.height;
                       
-                      // Calendar spans 12 hours (7am to 7pm)
-                      const totalMinutes = 12 * 60;
+                      // First determine where in the day to schedule based on mouse position
+                      let hours = 12;  // Default to noon if calculation fails
+                      let minutes = 0;
                       
-                      // Calculate minutes from top based on drop position percentage
-                      const percentOfDay = dropY / calendarHeight;
-                      const minutesFromTop = percentOfDay * totalMinutes;
+                      try {
+                        // Find the calendar body - this is the area where time slots are displayed
+                        // The calendar has a header at the top, so we need to find the actual time grid
+                        const calendarBody = calendarEl.querySelector('.rbc-time-view .rbc-time-content');
+                        
+                        // Calendar spans 12 hours (7am to 7pm)
+                        const totalMinutes = 12 * 60;
+                        let percentOfDay = 0.5; // Default to middle of day (noon)
+                        
+                        // If we can find the time content div, use that for more accurate calculations
+                        if (calendarBody) {
+                          const timeBodyRect = calendarBody.getBoundingClientRect();
+                          
+                          // Adjust dropY to be relative to the time content area
+                          const adjustedDropY = e.clientY - timeBodyRect.top;
+                          
+                          // Calculate minutes from top based on drop position percentage
+                          percentOfDay = Math.max(0, Math.min(1, adjustedDropY / timeBodyRect.height));
+                          const minutesFromTop = percentOfDay * totalMinutes;
+                          
+                          // Calculate hours and minutes
+                          hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                          minutes = Math.floor(minutesFromTop % 60);
+                          
+                          console.log(`Using time content area: height=${timeBodyRect.height}px, adjustedY=${adjustedDropY}px`);
+                          console.log(`📍 Drop detected at Y: ${adjustedDropY}px (${percentOfDay.toFixed(2)}% of height)`);
+                        } else {
+                          // Fallback to using the entire calendar height if we can't find the time content
+                          const calendarHeight = calendarRect.height;
+                          
+                          // Calculate minutes from top based on drop position percentage
+                          percentOfDay = dropY / calendarHeight;
+                          const minutesFromTop = percentOfDay * totalMinutes;
+                          
+                          // Calculate hours and minutes
+                          hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                          minutes = Math.floor(minutesFromTop % 60);
+                          
+                          console.log(`Using full calendar area: height=${calendarHeight}px, dropY=${dropY}px`);
+                          console.log(`📍 Drop detected at Y: ${dropY}px (${percentOfDay.toFixed(2)}% of height)`);
+                        }
+                      } catch (err) {
+                        console.error("Error in drop position calculation:", err);
+                        // Continue with default noon time if there's an error
+                      }
                       
-                      // Calculate hours and minutes
-                      const hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
-                      const minutes = Math.floor(minutesFromTop % 60);
+                      // Validate hours are within our calendar bounds (7am to 7pm)
+                      hours = Math.max(7, Math.min(19, hours));
                       
                       // Create the date object for the current day at the calculated time
-                      const dropDate = new Date(currentDate);
-                      dropDate.setHours(hours, minutes, 0, 0);
+                      scheduleDate = new Date(currentDate);
+                      scheduleDate.setHours(hours, minutes, 0, 0);
                       
-                      console.log(`📍 Drop detected at Y: ${dropY}px (${percentOfDay.toFixed(2)}% of height)`);
                       console.log(`📍 Calculated time: ${hours}:${minutes < 10 ? '0' + minutes : minutes}`);
                       
-                      // Format date and time
-                      const logDate = format(dropDate, 'yyyy-MM-dd');
-                      const logTime = format(dropDate, 'HH:mm');
-                      
-                      console.log(`📅 Using drop position to schedule job for ${logDate} at ${logTime}`);
                     } catch (err) {
                       console.error("Error calculating drop time:", err);
                       
                       // Fallback to current time if calculation fails
-                      const now = new Date();
-                      const logDate = format(now, 'yyyy-MM-dd');
-                      const logTime = format(now, 'HH:mm');
+                      scheduleDate = new Date();
                     }
                   } else {
                     // Fallback to current time if calendar element not found
-                    const now = new Date();
-                    const logDate = format(now, 'yyyy-MM-dd');
-                    const logTime = format(now, 'HH:mm');
+                    scheduleDate = new Date();
                   }
                   
-                  console.log(`Direct drop: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
+                  // Format date and time for API call
+                  const logDate = format(scheduleDate, 'yyyy-MM-dd');
+                  const logTime = format(scheduleDate, 'HH:mm');
+                  
+                  console.log(`📅 Direct drop: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                   
                   updateJobLogMutation.mutate({
                     id: jobId,
@@ -943,7 +979,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     onSuccess: () => {
                       toast({
                         title: "Job scheduled",
-                        description: `Job scheduled for today at ${logTime}`,
+                        description: `Job scheduled for ${logDate} at ${logTime}`,
                         className: "toast-drag-indicator",
                       });
                       
