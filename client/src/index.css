@@ -105,18 +105,22 @@
 /* Time indicator for dragged jobs */
 .drag-time-badge {
   animation: pulse-time 1.2s infinite;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+  z-index: 10000;
 }
 
 @keyframes pulse-time {
   0% {
     transform: scale(1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
   }
   50% {
     transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.9);
   }
   100% {
     transform: scale(1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
   }
 }
 

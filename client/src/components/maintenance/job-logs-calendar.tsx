@@ -789,9 +789,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               width: isDragging ? '250px' : 'auto'
                             }}
                           >
+                            {/* Time display for dragged item */}
                             {isDragging && (
-                              <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-primary text-white font-bold px-2 py-1 rounded-full text-sm shadow-md drag-time-badge">
+                              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-primary text-white font-bold px-3 py-1 rounded text-lg shadow-lg drag-time-badge">
                                 {dragTimeDisplay}
+                                <div className="absolute left-1/2 top-full transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-primary"></div>
                               </div>
                             )}
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
