@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { format, parse, startOfWeek, getDay, addHours, differenceInMinutes } from 'date-fns';
+import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
+import { useLocation } from 'wouter';
 import { enUS } from 'date-fns/locale';
 import { JobLog } from '@shared/schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,6 +54,7 @@ interface JobLogsCalendarProps {
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   
   // Define initial variables
   const isMaintenance = user?.role === 'maintenance';
@@ -1269,7 +1271,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                                     variant="default"
                                     onClick={() => {
                                       // Navigate to detail page
-                                      router.navigate(`/maintenance/job/${job.id}`);
+                                      navigate(`/maintenance/job/${job.id}`);
                                     }}
                                   >
                                     View job details
