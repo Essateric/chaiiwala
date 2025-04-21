@@ -547,23 +547,25 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drop on calendar
   const handleDropOnCalendar = (slotInfo: SlotInfo) => {
-    console.log("CALENDAR SLOT SELECTED (handleDropOnCalendar):", slotInfo);
-    console.log("Current dragged job:", draggedJob);
+    console.log("🎬 CALENDAR SLOT SELECTED (handleDropOnCalendar):", slotInfo);
+    console.log("📋 Current dragged job:", draggedJob);
+    console.log("📅 Selected slot start time:", slotInfo.start);
+    console.log("📅 Selected slot end time:", slotInfo.end);
 
     // Only process this as a drop if there's a job being dragged
     if (!draggedJob) {
-      console.log("No job being dragged when slot selected");
+      console.log("❌ No job being dragged when slot selected");
       return;
     }
 
-    // Get the slot's time - use the exact time from the slot
-    const slotTime = new Date(slotInfo.start);
+    // Get the slot's time - ALWAYS use the exact time from the slot
+    const slotDate = new Date(slotInfo.start);
     
     // Format date and time from the slot position
-    const logDate = format(slotTime, 'yyyy-MM-dd');
-    const logTime = format(slotTime, 'HH:mm');
+    const logDate = format(slotDate, 'yyyy-MM-dd');
+    const logTime = format(slotDate, 'HH:mm');
     
-    console.log(`Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+    console.log(`🎯 Calendar slot drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
     
     // Store the job ID before clearing the state
     const jobId = draggedJob.id;
@@ -615,11 +617,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   };
   
   // Mutation to reset job dates (clear logDate and logTime)
-  const resetJobMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await apiRequest('PATCH', `/api/joblogs/${id}`, {
-        logDate: undefined,
-        logTime: undefined,
+  const resetJobMutation = useMutation<Response, Error, number>({
+    mutationFn: async (jobId: number) => {
+      const response = await apiRequest('PATCH', `/api/joblogs/${jobId}`, {
+        logDate: '', // Empty string instead of undefined
+        logTime: '', // Empty string instead of undefined
         completed: false
       });
       if (!response.ok) {
@@ -627,7 +629,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       }
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (_, jobId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
       toast({
         title: "Job reset",
@@ -636,7 +638,17 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       
       // Force refresh calendar and data
       refreshCalendar();
-      setDraggableJobs(prevJobs => prevJobs.map(job => ({...job, logDate: undefined, logTime: undefined})));
+      // Only update jobs in draggable jobs list that match the reset job ID
+      setDraggableJobs(prevJobs => 
+        prevJobs.map(job => {
+          if (job.id !== jobId) return job;
+          return {
+            ...job, 
+            logDate: '', // Empty string instead of undefined to satisfy the type
+            logTime: ''  // Empty string instead of undefined to satisfy the type
+          };
+        })
+      );
     },
     onError: (error) => {
       console.error('Error resetting job:', error);
@@ -1000,12 +1012,16 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     onSelectSlot={(slotInfo) => {
                       console.log("✅ SLOT SELECTED IN CALENDAR:", slotInfo);
                       console.log("📋 Current dragged job in onSelectSlot:", draggedJob);
+                      console.log("📅 Selected slot start time:", slotInfo.start);
+                      console.log("📅 Selected slot end time:", slotInfo.end);
                       
                       // Make sure we're using the actual slot time, not the current time
                       if (draggedJob) {
                         // Format date and time from the selected slot
-                        const logDate = format(slotInfo.start, 'yyyy-MM-dd');
-                        const logTime = format(slotInfo.start, 'HH:mm');
+                        // Always use the time from the slot that was selected
+                        const slotDate = new Date(slotInfo.start);
+                        const logDate = format(slotDate, 'yyyy-MM-dd');
+                        const logTime = format(slotDate, 'HH:mm');
                         
                         // Get the job ID before clearing state
                         const jobId = draggedJob.id;
@@ -1013,7 +1029,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         // Clear dragged job immediately to prevent multiple operations
                         setDraggedJob(null);
                         
-                        console.log(`Calendar onSelectSlot: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
+                        console.log(`🎯 Calendar onSelectSlot: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                         
                         // Update the job with the selected time from slotInfo.start
                         updateJobLogMutation.mutate({
