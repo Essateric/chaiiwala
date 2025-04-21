@@ -87,8 +87,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         // If we have valid data, update the draggable jobs and force a calendar refresh
         if (Array.isArray(data)) {
           setDraggableJobs(data);
-          // Create a new date object to force React to detect the change
-          setCurrentDate(new Date());
+          // Don't reset the current date - this preserves the user's selected date
+          // We'll just trigger a re-render of the calendar events by using the same date
           console.log("✅ Calendar refreshed with", data.length, "jobs");
           toast({
             title: "Calendar refreshed",
@@ -368,12 +368,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     const handleDelete = (e: React.MouseEvent) => {
       e.stopPropagation();
       
-      // Update the job with null dates to remove from calendar
+      // Update the job with empty dates to remove from calendar
       updateJobLogMutation.mutate({
         id: event.id,
         data: {
-          logDate: null,
-          logTime: null
+          logDate: undefined,
+          logTime: undefined
         }
       }, {
         onSuccess: () => {
@@ -617,8 +617,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   const resetJobMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await apiRequest('PATCH', `/api/joblogs/${id}`, {
-        logDate: null,
-        logTime: null,
+        logDate: undefined,
+        logTime: undefined,
         completed: false
       });
       if (!response.ok) {
@@ -635,7 +635,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       
       // Force refresh calendar and data
       refreshCalendar();
-      setDraggableJobs(prevJobs => prevJobs.map(job => ({...job, logDate: null, logTime: null})));
+      setDraggableJobs(prevJobs => prevJobs.map(job => ({...job, logDate: undefined, logTime: undefined})));
     },
     onError: (error) => {
       console.error('Error resetting job:', error);
