@@ -684,21 +684,22 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     const storeName = stores.find(store => store.id === draggedJob.storeId)?.name || 'Unknown Store';
     
     return (
-      <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-        <div className="bg-background border border-input shadow-lg rounded-md p-4 max-w-md animate-pulse">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: badgeColor }} />
-            <p className="text-sm font-medium">Dragging {draggedJob.flag === 'urgent' ? 'urgent' : draggedJob.flag === 'long_standing' ? 'long-standing' : 'normal'} job</p>
-          </div>
-          <p className="font-bold mb-1">{draggedJob.description}</p>
-          <p className="text-xs text-muted-foreground mb-2">From: {storeName}</p>
-          <div className="bg-muted text-xs p-2 rounded">
-            {dragTimeDisplay ? (
-              <p className="font-bold text-sm mb-1">Time: {dragTimeDisplay}</p>
-            ) : null}
-            <p>Drop anywhere on the calendar to schedule this job</p>
-            <p>• Drop on a specific date to schedule for that date</p>
-            <p>• Drop on the empty area for default scheduling</p>
+      <div className="fixed pointer-events-none z-50" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+        <div className="bg-background border-2 shadow-lg rounded-md p-3 max-w-md shadow-lg" style={{ borderColor: badgeColor }}>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: badgeColor }} />
+                <p className="text-sm font-medium">{draggedJob.flag === 'urgent' ? 'Urgent' : draggedJob.flag === 'long_standing' ? 'Long-standing' : 'Normal'}</p>
+              </div>
+              {dragTimeDisplay && (
+                <div className="bg-primary text-white px-2 py-0.5 rounded text-sm font-bold">
+                  {dragTimeDisplay}
+                </div>
+              )}
+            </div>
+            <p className="font-bold text-sm">{draggedJob.description}</p>
+            <p className="text-xs text-muted-foreground">From: {storeName}</p>
           </div>
         </div>
       </div>
