@@ -917,9 +917,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           percentOfDay = Math.max(0, Math.min(1, adjustedDropY / timeBodyRect.height));
                           const minutesFromTop = percentOfDay * totalMinutes;
                           
-                          // Calculate hours and minutes
+                          // Calculate hours and minutes with 15-minute increments
                           hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
-                          minutes = Math.floor(minutesFromTop % 60);
+                          
+                          // Round to nearest 15-minute increment (0, 15, 30, 45)
+                          const rawMinutes = Math.floor(minutesFromTop % 60);
+                          const roundedIncrement = Math.round(rawMinutes / 15) * 15;
+                          minutes = roundedIncrement === 60 ? 0 : roundedIncrement;
+                          
+                          // If minutes rolled over to 0 due to rounding to 60, increment the hour
+                          if (roundedIncrement === 60) {
+                            hours += 1;
+                          }
                           
                           console.log(`Using time content area: height=${timeBodyRect.height}px, adjustedY=${adjustedDropY}px`);
                           console.log(`📍 Drop detected at Y: ${adjustedDropY}px (${percentOfDay.toFixed(2)}% of height)`);
@@ -931,9 +940,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           percentOfDay = dropY / calendarHeight;
                           const minutesFromTop = percentOfDay * totalMinutes;
                           
-                          // Calculate hours and minutes
+                          // Calculate hours and minutes with 15-minute increments
                           hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
-                          minutes = Math.floor(minutesFromTop % 60);
+                          
+                          // Round to nearest 15-minute increment (0, 15, 30, 45)
+                          const rawMinutes = Math.floor(minutesFromTop % 60);
+                          const roundedIncrement = Math.round(rawMinutes / 15) * 15;
+                          minutes = roundedIncrement === 60 ? 0 : roundedIncrement;
+                          
+                          // If minutes rolled over to 0 due to rounding to 60, increment the hour
+                          if (roundedIncrement === 60) {
+                            hours += 1;
+                          }
                           
                           console.log(`Using full calendar area: height=${calendarHeight}px, dropY=${dropY}px`);
                           console.log(`📍 Drop detected at Y: ${dropY}px (${percentOfDay.toFixed(2)}% of height)`);
