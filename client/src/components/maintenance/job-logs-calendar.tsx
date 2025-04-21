@@ -389,7 +389,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
       if (!isMaintenance) return;
       
-      e.preventDefault();
+      // Don't call preventDefault() as it will cancel the drag operation
+      // Just stop propagation to prevent parent drag handlers from being triggered
       e.stopPropagation();
       
       console.log("Event drag started:", event.id);
@@ -486,7 +487,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle drag start
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, job: JobLog) => {
-    e.preventDefault();
+    // Don't call preventDefault() here or it will cancel the drag operation
     console.log(`Starting drag for job ${job.id}: ${job.description}`);
     setDraggedJob(job);
     
