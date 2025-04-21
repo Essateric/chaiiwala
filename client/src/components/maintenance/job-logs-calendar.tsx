@@ -63,7 +63,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.role === "store" && typeof user?.storeId === 'number' ? user.storeId : undefined
   );
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2025, 3, 15));
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [currentView, setCurrentView] = useState<View>(user?.role === 'maintenance' ? "day" : "month");
   
   // State to hold current time for the "time now" indicator
