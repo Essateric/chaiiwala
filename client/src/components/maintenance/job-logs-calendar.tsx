@@ -159,7 +159,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         
         return {
           id: job.id,
-          title: job.title || 'Maintenance Job',
+          title: job.description || job.title || 'Maintenance Job',
           start,
           end,
           storeId: job.storeId,
