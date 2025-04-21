@@ -717,7 +717,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             {isMaintenance && (
               <div className="w-1/4 pr-4 border-r calendar-sidebar">
                 <h3 className="text-sm font-semibold mb-2">Maintenance Jobs</h3>
-                <p className="text-xs text-muted-foreground mb-2">Drag any job to the calendar to schedule/reschedule it</p>
+                <p className="text-xs text-muted-foreground mb-2">Click or drag a job to reschedule it</p>
                 
                 <ScrollArea className="h-[550px]">
                   <div className="space-y-2">
@@ -752,6 +752,32 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           <div
                             key={job.id}
                             onClick={() => handleStartMoveJob(job)}
+                            draggable="true"
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              console.log(`Starting drag for job ${job.id}`);
+                              
+                              // Set the job to be moved
+                              setDraggedJob(job);
+                              
+                              // Set drag data
+                              e.dataTransfer.setData('application/json', JSON.stringify({ jobId: job.id }));
+                              e.dataTransfer.effectAllowed = 'move';
+                              
+                              // Visual feedback
+                              toast({
+                                title: "Dragging job",
+                                description: "Drag to a calendar slot to reschedule",
+                                duration: 3000,
+                              });
+                            }}
+                            onDragEnd={() => {
+                              // Clear the dragged job state after a delay
+                              setTimeout(() => {
+                                setDraggedJob(null);
+                                setDragTimeDisplay(null);
+                              }, 100);
+                            }}
                             className={`bg-card border relative rounded-md p-3 shadow-sm hover:shadow-md transition-all duration-150 
                               ${isScheduled ? 'border-green-500' : 'border-amber-500'} 
                               hover:border-primary 
@@ -1091,7 +1117,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   <p className="text-lg font-medium mb-2">No jobs scheduled</p>
                   <p className="text-sm text-muted-foreground text-center">
                     {isMaintenance 
-                      ? "Drag a job from the left panel to schedule it on the calendar" 
+                      ? "Click or drag a job from the left panel to schedule it" 
                       : "No maintenance jobs are currently scheduled"}
                   </p>
                 </div>
