@@ -28,6 +28,27 @@
 
 .rbc-event {
   border-radius: 4px;
+  position: relative;
+}
+
+/* Make calendar events draggable for maintenance role */
+[data-role="maintenance"] .rbc-event {
+  cursor: grab;
+}
+
+[data-role="maintenance"] .rbc-event:active {
+  cursor: grabbing;
+}
+
+/* Add visual drag handle for maintenance staff */
+[data-role="maintenance"] .rbc-event::before {
+  content: '::';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  z-index: 1;
 }
 
 /* Time now indicator line */

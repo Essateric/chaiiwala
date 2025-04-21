@@ -419,9 +419,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     return (
       <div 
-        className="text-xs cursor-move relative group"
+        className={`text-xs relative group ${isMaintenance ? 'cursor-move grab-handle' : ''}`}
         draggable={isMaintenance}
         onDragStart={handleDragStart}
+        title={isMaintenance ? "Drag to reschedule this job" : ""}
       >
         <strong>{event.title.length > 25 ? `${event.title.substring(0, 22)}...` : event.title}</strong>
         <div className="flex items-center mt-1 gap-1">
@@ -712,7 +713,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             </div>
           </div>
         ) : (
-          <div className="flex calendar-container" style={{ height: 600 }}>
+          <div 
+            className="flex calendar-container" 
+            style={{ height: 600 }}
+            data-role={user?.role || 'none'}
+          >
             {/* Left panel with draggable job cards - only visible for maintenance staff */}
             {isMaintenance && (
               <div className="w-1/4 pr-4 border-r calendar-sidebar">
@@ -1328,10 +1333,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       }
                     }}
                     popup
-                    // These features are supported in React Big Calendar, but we're using a custom approach
-                    // draggable={isMaintenance} // Enables dragging events
-                    // step={15} // 15-min increments
-                    // timeslots={4} // 4 slots per hour
+                    // These features are supported in React Big Calendar 
+                    step={15} // 15-min increments
+                    timeslots={4} // 4 slots per hour
                     slotPropGetter={() => ({
                       className: 'custom-time-slot',
                     })}
