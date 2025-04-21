@@ -877,10 +877,59 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 
                 // If we have a job ID, schedule it
                 if (jobId) {
-                  // Use current date/time if dropped directly on container
-                  const now = new Date();
-                  const logDate = format(now, 'yyyy-MM-dd');
-                  const logTime = format(now, 'HH:mm');
+                  // We need to calculate where in the calendar the drop happened
+                  // Get calendar element for measurement
+                  const calendarEl = calendarRef.current;
+                  if (calendarEl) {
+                    try {
+                      // Get calendar dimensions
+                      const calendarRect = calendarEl.getBoundingClientRect();
+                      
+                      // Get the drop position relative to the calendar
+                      const dropX = e.clientX - calendarRect.left;
+                      const dropY = e.clientY - calendarRect.top;
+                      
+                      // Calculate what time this corresponds to
+                      // First, get the height of the calendar
+                      const calendarHeight = calendarRect.height;
+                      
+                      // Calendar spans 12 hours (7am to 7pm)
+                      const totalMinutes = 12 * 60;
+                      
+                      // Calculate minutes from top based on drop position percentage
+                      const percentOfDay = dropY / calendarHeight;
+                      const minutesFromTop = percentOfDay * totalMinutes;
+                      
+                      // Calculate hours and minutes
+                      const hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                      const minutes = Math.floor(minutesFromTop % 60);
+                      
+                      // Create the date object for the current day at the calculated time
+                      const dropDate = new Date(currentDate);
+                      dropDate.setHours(hours, minutes, 0, 0);
+                      
+                      console.log(`📍 Drop detected at Y: ${dropY}px (${percentOfDay.toFixed(2)}% of height)`);
+                      console.log(`📍 Calculated time: ${hours}:${minutes < 10 ? '0' + minutes : minutes}`);
+                      
+                      // Format date and time
+                      const logDate = format(dropDate, 'yyyy-MM-dd');
+                      const logTime = format(dropDate, 'HH:mm');
+                      
+                      console.log(`📅 Using drop position to schedule job for ${logDate} at ${logTime}`);
+                    } catch (err) {
+                      console.error("Error calculating drop time:", err);
+                      
+                      // Fallback to current time if calculation fails
+                      const now = new Date();
+                      const logDate = format(now, 'yyyy-MM-dd');
+                      const logTime = format(now, 'HH:mm');
+                    }
+                  } else {
+                    // Fallback to current time if calendar element not found
+                    const now = new Date();
+                    const logDate = format(now, 'yyyy-MM-dd');
+                    const logTime = format(now, 'HH:mm');
+                  }
                   
                   console.log(`Direct drop: Scheduling job ${jobId} for ${logDate} at ${logTime}`);
                   
