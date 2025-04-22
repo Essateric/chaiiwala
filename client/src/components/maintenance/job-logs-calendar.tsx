@@ -34,6 +34,9 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
+// Create a calendar component with drag and drop capabilities
+const DnDCalendar = withDragAndDrop(Calendar) as any; // Type assertion to avoid TypeScript errors
+
 // Define event type for calendar
 interface CalendarEvent {
   id: number;
@@ -1161,7 +1164,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   {(currentView === 'day' || currentView === 'week') && (
                     <TimeNowIndicator />
                   )}
-                  <Calendar
+                  <DnDCalendar
                     localizer={localizer}
                     events={calendarEvents}
                     startAccessor="start"
@@ -1183,10 +1186,14 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     min={new Date(0, 0, 0, 7, 0)} // Start at 7am
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
                     selectable={isMaintenance}
-                    draggableAccessor={() => isMaintenance} // Enable drag-and-drop
+                    draggableAccessor={() => isMaintenance} // Only maintenance staff can drag events
                     resizable={false}
-                    onEventDrop={({ event, start }) => {
+                    onEventDrop={(data) => {
                       if (!isMaintenance) return;
+                      
+                      // Get event and new start time from drop data
+                      const { event, start } = data;
+                      console.log("Event dropped:", event.id, "to", start);
                       
                       // Format date and time
                       const logDate = format(start, 'yyyy-MM-dd');
@@ -1384,7 +1391,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         return "Error displaying details";
                       }
                     }}
-                    popup
                     // For maintenance users only: allow time slots selection
                     // without a duplicate selectable attribute
                     step={15} // 15-min increments
