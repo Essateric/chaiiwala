@@ -376,6 +376,25 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
+            
+            {/* Job Status Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  title="Job Status Overview"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Job Status Overview</DialogTitle>
+                </DialogHeader>
+                <JobStatusModal jobLogs={jobLogs} stores={stores} />
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         
