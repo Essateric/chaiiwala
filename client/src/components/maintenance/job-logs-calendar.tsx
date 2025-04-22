@@ -99,10 +99,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           // Don't reset the current date - this preserves the user's selected date
           // We'll just trigger a re-render of the calendar events by using the same date
           console.log("✅ Calendar refreshed with", data.length, "jobs");
-          toast({
-            title: "Calendar refreshed",
-            description: `Successfully loaded ${data.length} jobs from server`,
-          });
           return data;
         }
         return null;
