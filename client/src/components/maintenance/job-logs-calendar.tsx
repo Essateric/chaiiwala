@@ -215,8 +215,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         backgroundColor = '#3b82f6'; // blue
     }
     
-    console.log(`Styling event ${event.id} with flag ${event.flag}, color: ${backgroundColor}`);
-    
     return {
       style: {
         backgroundColor,
@@ -225,7 +223,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         borderStyle: 'none',
         display: 'block',
         opacity: 0.9,
-        border: '2px solid black', // Add border to make events more visible
         padding: '2px',
         cursor: isMaintenance ? 'grab' : 'pointer'
       }
@@ -448,13 +445,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   
   // Handle starting to move a job
   const handleStartMoveJob = (job: JobLog) => {
+    console.log("Starting to move job:", job);
     setDraggedJob(job);
     
-    toast({
-      title: "Moving job",
-      description: "Select a time slot on the calendar to schedule",
-      duration: 3000,
-    });
+    // Don't show toast as we now have the bottom indicator
   };
   
   // Handle dropping a job on the calendar
@@ -502,15 +496,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
   const renderDragIndicator = () => {
     if (draggedJob) {
       return (
-        <div className="fixed bottom-4 right-4 bg-primary text-white p-3 rounded-lg shadow-lg flex gap-2 items-center z-50">
-          <span>Moving: {draggedJob.description || draggedJob.title}</span>
-          <Button 
-            size="sm" 
-            variant="secondary"
-            onClick={() => setDraggedJob(null)}
-          >
-            Cancel
-          </Button>
+        <div className="fixed bottom-20 right-4 bg-amber-500 text-black p-4 rounded-md shadow-lg z-50">
+          <div>
+            <div className="font-semibold">Moving job</div>
+            <div className="text-sm">Select a time slot on the calendar to schedule</div>
+          </div>
         </div>
       );
     }
