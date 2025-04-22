@@ -137,12 +137,19 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       });
   }, []);
   
+  // Remove this useEffect as it's duplicated below
+  
   // Setup initial calendar load
   useEffect(() => {
-    // Initial refresh
-    refreshCalendar();
-  }, [refreshCalendar]);
-  
+    // Only try to refresh the jobs if the user is authenticated
+    if (user) {
+      console.log("User authenticated, initial refresh for: ", user.username);
+      refreshCalendar();
+    } else {
+      console.log("User not authenticated, skipping refresh");
+    }
+  }, [user, refreshCalendar]);
+
   // Create events from job logs - force dependency on the currentDate
   const calendarEvents = useMemo(() => {
     if (!Array.isArray(jobLogs) || jobLogs.length === 0) {
@@ -163,6 +170,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     
     // Log the scheduled jobs to help with debugging
     console.log("Scheduled jobs:", scheduledJobs.map(job => `${job.id}: ${job.logDate} ${job.logTime}`));
+    
+    // Also update the draggable jobs so they're available for the sidebar
+    setDraggableJobs(jobLogs);
     
     // Convert job logs to calendar events
     const events: CalendarEvent[] = scheduledJobs.map(job => {
