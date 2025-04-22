@@ -764,20 +764,219 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           </div>
         ) : (
           <div 
-            className="flex calendar-container" 
-            style={{ height: 600 }}
+            className="flex flex-col calendar-container" 
+            style={{ height: 800 }}
             data-role={user?.role || 'none'}
           >
-            {/* Left panel with draggable job cards - only visible for maintenance staff */}
+            {/* Calendar (top part) */}
+            <div 
+              className="flex-1 mb-4 relative" 
+              ref={calendarRef}
+              onDragEnter={(e) => {
+                if (isMaintenance) {
+                  e.preventDefault();
+                  e.currentTarget.classList.add('calendar-drop-target', 'pulse-animation');
+                }
+              }}
+              onDragOver={(e) => {
+                // Allow drops on the calendar container
+                if (isMaintenance) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  
+                  // Calculate current time position for drag indicator
+                  const calendarEl = calendarRef.current;
+                  if (calendarEl && draggedJob) {
+                    try {
+                      // Find the time content area
+                      const timeContent = calendarEl.querySelector('.rbc-time-view .rbc-time-content');
+                      if (timeContent) {
+                        const timeRect = timeContent.getBoundingClientRect();
+                        
+                        // Adjust Y position relative to time content
+                        const adjustedY = e.clientY - timeRect.top;
+                        
+                        // Calculate time from position
+                        const totalMinutes = 12 * 60; // 12 hours (7am-7pm)
+                        const percentOfDay = Math.max(0, Math.min(1, adjustedY / timeRect.height));
+                        const minutesFromTop = percentOfDay * totalMinutes;
+                        
+                        // Calculate hours and minutes with 15-minute increments
+                        let hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                        
+                        // Round to nearest 15-minute increment
+                        const rawMinutes = Math.floor(minutesFromTop % 60);
+                        const roundedIncrement = Math.round(rawMinutes / 15) * 15;
+                        let minutes = roundedIncrement === 60 ? 0 : roundedIncrement;
+                        
+                        // If minutes rolled over to 0 due to rounding to 60, increment the hour
+                        if (roundedIncrement === 60) {
+                          hours += 1;
+                        }
+                        
+                        // Format time string (ensure two digits for minutes)
+                        const timeString = `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+                        
+                        // Update state to display in the drag indicator
+                        setDragTimeDisplay(timeString);
+                      }
+                    } catch (err) {
+                      console.error("Error calculating drag time:", err);
+                    }
+                  }
+                }
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.classList.remove('calendar-drop-target', 'pulse-animation');
+              }}
+              onDrop={(e) => {
+                console.log("Drop event on calendar container:", e);
+                e.preventDefault();
+                e.currentTarget.classList.remove('calendar-drop-target', 'pulse-animation');
+                
+                // Try to get the job ID from the data transfer
+                let jobId: number | null = null;
+                
+                try {
+                  // First try to get from the application/json format
+                  const jsonData = e.dataTransfer.getData("application/json");
+                  if (jsonData) {
+                    const data = JSON.parse(jsonData);
+                    jobId = parseInt(data.jobId);
+                  }
+                } catch (err) {
+                  console.log("Could not parse JSON data from drop");
+                }
+                
+                // If we couldn't get the job ID from data transfer, use the draggedJob state
+                if (!jobId && draggedJob) {
+                  jobId = draggedJob.id;
+                }
+                
+                // If we have a job ID, schedule it
+                if (jobId) {
+                  handleScheduleJobOnCalendar(e, jobId);
+                } else {
+                  console.log("No job ID found in drop event");
+                  toast({
+                    title: "Scheduling failed",
+                    description: "Could not identify the job to schedule. Please try again.",
+                    variant: "destructive"
+                  });
+                }
+                
+                // Clear the dragged job and time display
+                setDraggedJob(null);
+                setDragTimeDisplay(null);
+              }}
+            >
+              {calendarEvents.length === 0 ? (
+                <div 
+                  className="h-full flex flex-col items-center justify-center p-8 border border-dashed rounded-md"
+                  onDragOver={(e) => {
+                    if (isMaintenance) {
+                      e.preventDefault();
+                      e.currentTarget.classList.add("border-primary", "bg-primary/5");
+                      e.dataTransfer.dropEffect = "copy";
+                    }
+                  }}
+                  onDragLeave={(e) => {
+                    if (isMaintenance) {
+                      e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (isMaintenance && draggedJob) {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+                      
+                      // Schedule for tomorrow at 9 AM by default
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      tomorrow.setHours(9, 0, 0, 0);
+                      
+                      const logDate = format(tomorrow, 'yyyy-MM-dd');
+                      const logTime = '09:00';
+                      
+                      console.log(`Empty calendar drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
+                      
+                      updateJobLogMutation.mutate({
+                        id: draggedJob.id,
+                        data: {
+                          logDate,
+                          logTime
+                        }
+                      }, {
+                        onSuccess: () => {
+                          toast({
+                            title: "Job scheduled",
+                            description: `Job scheduled for tomorrow at 9:00 AM`,
+                          });
+                          
+                          // Force refresh data
+                          queryClient.invalidateQueries({ queryKey: ['/api/joblogs'] });
+                          
+                          // Force refresh the calendar display immediately
+                          setCurrentDate(new Date(currentDate));
+                        }
+                      });
+                    }
+                  }}
+                >
+                  <p className="text-muted-foreground mb-2">No events on this day</p>
+                  <p className="text-sm text-muted-foreground">Drag jobs from below to schedule them</p>
+                </div>
+              ) : (
+                <DragAndDropCalendar
+                  localizer={localizer}
+                  events={calendarEvents}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: 500 }}
+                  defaultView={currentView}
+                  view={currentView}
+                  onView={setCurrentView}
+                  defaultDate={currentDate}
+                  date={currentDate}
+                  onNavigate={setCurrentDate}
+                  min={new Date(0, 0, 0, 7, 0, 0)} // Start at 7am
+                  max={new Date(0, 0, 0, 19, 0, 0)} // End at 7pm
+                  selectable={isMaintenance}
+                  onSelectSlot={isMaintenance ? handleSelectSlot : undefined}
+                  onSelectEvent={handleSelectEvent}
+                  eventPropGetter={eventStyleGetter}
+                  dayPropGetter={dayPropGetter}
+                  components={{
+                    event: EventComponent,
+                    timeSlotWrapper: TimeSlotWrapperComponent,
+                    toolbar: CustomToolbar
+                  }}
+                  formats={{
+                    timeGutterFormat: (date) => format(date, 'h:mm a'),
+                    eventTimeRangeFormat: ({ start, end }) => {
+                      return `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+                    }
+                  }}
+                  step={15}
+                  timeslots={4}
+                  onEventDrop={isMaintenance ? handleEventDrop : undefined}
+                  onEventResize={isMaintenance ? handleEventResize : undefined}
+                  resizable={isMaintenance}
+                  draggableAccessor={() => isMaintenance}
+                />
+              )}
+            </div>
+            
+            {/* Draggable jobs section (bottom part) - only shown for maintenance staff */}
             {isMaintenance && (
-              <div className="w-1/4 pr-4 border-r calendar-sidebar">
+              <div className="h-52 border-t pt-4">
                 <h3 className="text-sm font-semibold mb-2">Maintenance Jobs</h3>
                 <p className="text-xs text-muted-foreground mb-2">Click or drag a job to reschedule it</p>
                 
-                <ScrollArea className="h-[550px]">
-                  <div className="space-y-2">
+                <ScrollArea className="h-[9rem]">
+                  <div className="flex flex-wrap gap-3">
                     {draggableJobs.length === 0 ? (
-                      <div className="text-center py-4">
+                      <div className="text-center py-4 w-full">
                         <p className="text-sm text-muted-foreground mb-2">No jobs available</p>
                         <p className="text-xs text-muted-foreground">Create new maintenance job logs to see them here</p>
                       </div>
