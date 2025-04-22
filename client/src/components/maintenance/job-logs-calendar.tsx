@@ -856,7 +856,73 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                 
                 // If we have a job ID, schedule it
                 if (jobId) {
-                  handleScheduleJobOnCalendar(e, jobId);
+                  // Find the job with this ID
+                  const job = jobLogs.find(j => j.id === jobId);
+                  if (job) {
+                    // Get time from drop position
+                    try {
+                      const calendarEl = calendarRef.current;
+                      if (calendarEl) {
+                        // Get the time content area
+                        const timeContent = calendarEl.querySelector('.rbc-time-view .rbc-time-content');
+                        if (timeContent) {
+                          const timeRect = timeContent.getBoundingClientRect();
+                          const adjustedY = e.clientY - timeRect.top;
+                          
+                          // Calculate time
+                          const totalMinutes = 12 * 60; // 12 hours (7am-7pm)
+                          const percentOfDay = Math.max(0, Math.min(1, adjustedY / timeRect.height));
+                          const minutesFromTop = percentOfDay * totalMinutes;
+                          
+                          // Calculate hours and minutes with 15-minute increments
+                          let hours = Math.floor(minutesFromTop / 60) + 7; // Add 7 as we start at 7am
+                          
+                          // Round to nearest 15-minute increment
+                          const rawMinutes = Math.floor(minutesFromTop % 60);
+                          const roundedIncrement = Math.round(rawMinutes / 15) * 15;
+                          let minutes = roundedIncrement === 60 ? 0 : roundedIncrement;
+                          
+                          // If minutes rolled over, increment hour
+                          if (roundedIncrement === 60) hours++;
+                          
+                          // Format as HH:mm
+                          const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                          
+                          // Get the date (current date in calendar view)
+                          const dateStr = format(currentDate, 'yyyy-MM-dd');
+                          
+                          // Update job with new date/time
+                          updateJobLogMutation.mutate({
+                            id: job.id,
+                            data: {
+                              logDate: dateStr,
+                              logTime: timeStr
+                            }
+                          });
+                          
+                          // Show success message
+                          toast({
+                            title: "Job scheduled",
+                            description: `Job scheduled for ${dateStr} at ${timeStr}`,
+                            duration: 3000,
+                          });
+                        }
+                      }
+                    } catch (err) {
+                      console.error("Error scheduling job:", err);
+                      toast({
+                        title: "Scheduling failed",
+                        description: "Could not schedule the job. Try clicking a time slot directly.",
+                        variant: "destructive"
+                      });
+                    }
+                  } else {
+                    toast({
+                      title: "Scheduling failed",
+                      description: "Could not find the job to schedule.",
+                      variant: "destructive"
+                    });
+                  }
                 } else {
                   console.log("No job ID found in drop event");
                   toast({
