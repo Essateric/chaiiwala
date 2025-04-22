@@ -28,18 +28,7 @@ export default function JobStatusOverview({ jobLogs, stores }: JobStatusOverview
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm"
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            setIsOpen(true);
-          }}
-        >
-          <ClipboardList className="h-4 w-4 mr-2" />
-          Job Status Overview
-        </Button>
+        <div></div>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
         <DialogHeader>
