@@ -1180,7 +1180,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     }}
                     min={new Date(0, 0, 0, 7, 0)} // Start at 7am
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
-                    selectable={isMaintenance && draggedJob !== null}
+                    selectable={isMaintenance}
                     onSelectSlot={(slotInfo) => {
                       console.log("✅ SLOT SELECTED IN CALENDAR:", slotInfo);
                       console.log("📋 Current dragged job in onSelectSlot:", draggedJob);
@@ -1360,7 +1360,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       }
                     }}
                     popup
-                    // These features are supported in React Big Calendar 
+                    // For maintenance users only: allow selecting time slots
+                    // and moving events with drag and drop
+                    selectable={isMaintenance}
                     step={15} // 15-min increments
                     timeslots={4} // 4 slots per hour
                     slotPropGetter={() => ({
