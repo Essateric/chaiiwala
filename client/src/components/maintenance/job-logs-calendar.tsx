@@ -1159,7 +1159,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   </p>
                 </div>
               ) : (
-                <div className="relative h-full" ref={calendarRef}>
+                <div className="relative h-full" ref={calendarRef} data-role={user?.role || ""}>
                   {/* Current time indicator line - only show in day/week views */}
                   {(currentView === 'day' || currentView === 'week') && (
                     <TimeNowIndicator />
