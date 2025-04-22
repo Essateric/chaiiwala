@@ -998,10 +998,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     // Format time as HH:mm
                     const timeStr = format(newStart, 'HH:mm');
                     
-                    // Update job with new date/time
-                    updateJob(job.id, {
-                      logDate: dateStr,
-                      logTime: timeStr
+                    // Update job with new date/time using mutation
+                    updateJobLogMutation.mutate({ 
+                      id: job.id, 
+                      data: {
+                        logDate: dateStr,
+                        logTime: timeStr
+                      }
                     });
                   } : undefined}
                   onEventResize={isMaintenance ? (data) => {
@@ -1023,10 +1026,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     // Format time as HH:mm
                     const timeStr = format(newStart, 'HH:mm');
                     
-                    // Update job with new date/time
-                    updateJob(job.id, {
-                      logDate: dateStr,
-                      logTime: timeStr
+                    // Update job with new date/time using mutation
+                    updateJobLogMutation.mutate({ 
+                      id: job.id, 
+                      data: {
+                        logDate: dateStr,
+                        logTime: timeStr
+                      }
                     });
                   } : undefined}
                   resizable={isMaintenance}
