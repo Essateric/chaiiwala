@@ -1201,10 +1201,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                         data: { logDate, logTime }
                       }, {
                         onSuccess: () => {
-                          toast({
-                            title: "Job rescheduled",
-                            description: `Job moved to ${logDate} at ${logTime}`,
-                          });
                           refreshCalendar();
                         }
                       });
