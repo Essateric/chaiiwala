@@ -431,6 +431,10 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
       if (job) {
         setDraggedJob(job);
         
+        // Set initial time display (will be updated during drag)
+        const initialTime = format(event.start, 'HH:mm');
+        setDragTimeDisplay(initialTime);
+        
         // Set drag data
         e.dataTransfer.setData("application/json", JSON.stringify({ 
           jobId: event.id,
@@ -438,15 +442,18 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         }));
         e.dataTransfer.effectAllowed = "move";
         
-        // Set a drag image (custom element or the event itself)
+        // Set a simple drag preview 
         try {
           const dragPreview = document.createElement('div');
           dragPreview.className = 'drag-preview';
+          dragPreview.style.padding = '8px';
+          dragPreview.style.background = '#3b82f6';
+          dragPreview.style.color = 'white';
+          dragPreview.style.borderRadius = '4px';
+          dragPreview.style.width = '200px';
           dragPreview.innerHTML = `
-            <div style="padding: 8px; background: #3b82f6; color: white; border-radius: 4px; max-width: 200px;">
-              <div style="font-weight: bold;">${event.title}</div>
-              <div style="font-size: 10px;">${event.storeName} - ${event.flag}</div>
-            </div>
+            <div style="font-weight: bold;">${event.title}</div>
+            <div style="font-size: 10px;">${event.storeName} - ${event.flag}</div>
           `;
           document.body.appendChild(dragPreview);
           e.dataTransfer.setDragImage(dragPreview, 10, 10);
@@ -457,6 +464,58 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
           }, 100);
         } catch (err) {
           console.error("Error setting drag image:", err);
+        }
+        
+        // Create a floating time badge that follows the cursor
+        try {
+          const timeBadge = document.createElement('div');
+          timeBadge.id = 'drag-time-badge';
+          timeBadge.style.position = 'fixed';
+          timeBadge.style.zIndex = '9999';
+          timeBadge.style.backgroundColor = '#eab308'; // Gold/yellow
+          timeBadge.style.color = 'black';
+          timeBadge.style.fontWeight = 'bold';
+          timeBadge.style.padding = '2px 8px';
+          timeBadge.style.borderRadius = '4px';
+          timeBadge.style.fontSize = '14px';
+          timeBadge.style.border = '1px solid black';
+          timeBadge.style.pointerEvents = 'none'; // Make sure it doesn't interfere with drag
+          timeBadge.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+          timeBadge.textContent = initialTime;
+          
+          document.body.appendChild(timeBadge);
+          
+          // Update badge position during drag
+          const updateBadgePosition = (moveEvent: MouseEvent) => {
+            if (timeBadge) {
+              timeBadge.style.left = `${moveEvent.clientX + 20}px`; // Offset from cursor
+              timeBadge.style.top = `${moveEvent.clientY - 10}px`;
+              
+              // Update time if it has changed
+              if (dragTimeDisplay) {
+                timeBadge.textContent = dragTimeDisplay;
+              }
+            }
+          };
+          
+          // Add mousemove listener to update position
+          document.addEventListener('mousemove', updateBadgePosition);
+          
+          // Clean up on drag end or document mouseup
+          const cleanupBadge = () => {
+            document.removeEventListener('mousemove', updateBadgePosition);
+            document.removeEventListener('mouseup', cleanupBadge);
+            if (timeBadge && timeBadge.parentNode) {
+              timeBadge.parentNode.removeChild(timeBadge);
+            }
+          };
+          
+          document.addEventListener('mouseup', cleanupBadge);
+          
+          // Also set a backup timeout to ensure cleanup
+          setTimeout(cleanupBadge, 30000); // 30 second max
+        } catch (err) {
+          console.error("Error creating time badge:", err);
         }
         
         toast({
@@ -823,45 +882,23 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               const initialTime = "12:00"; // Default to noon
                               setDragTimeDisplay(initialTime);
                               
-                              // Create custom drag image with time display
+                              // Create a simple drag preview (the badge will be handled separately)
                               try {
                                 const dragPreview = document.createElement('div');
                                 dragPreview.style.padding = '8px';
                                 dragPreview.style.background = '#1f2937'; // Dark background
                                 dragPreview.style.color = 'white';
                                 dragPreview.style.borderRadius = '4px';
-                                dragPreview.style.position = 'relative';
                                 dragPreview.style.width = '200px';
-                                
-                                // Create the inner content
-                                const innerContent = document.createElement('div');
-                                innerContent.innerHTML = `
+                                dragPreview.innerHTML = `
                                   <div style="font-weight: bold;">${job.title || 'Maintenance Job'}</div>
                                   <div style="font-size: 10px;">${storeName} - ${job.flag}</div>
                                 `;
                                 
-                                // Create time badge
-                                const timeBadge = document.createElement('div');
-                                timeBadge.style.position = 'absolute';
-                                timeBadge.style.right = '-12px';
-                                timeBadge.style.top = '50%';
-                                timeBadge.style.transform = 'translateY(-50%)';
-                                timeBadge.style.backgroundColor = '#eab308'; // Gold/yellow
-                                timeBadge.style.color = 'black';
-                                timeBadge.style.fontWeight = 'bold';
-                                timeBadge.style.padding = '2px 6px';
-                                timeBadge.style.borderRadius = '4px';
-                                timeBadge.style.fontSize = '12px';
-                                timeBadge.style.border = '1px solid black';
-                                timeBadge.textContent = initialTime;
-                                
-                                // Append everything
-                                dragPreview.appendChild(innerContent);
-                                dragPreview.appendChild(timeBadge);
                                 document.body.appendChild(dragPreview);
                                 
-                                // Use the custom element as drag image
-                                e.dataTransfer.setDragImage(dragPreview, 10, 20);
+                                // Set the drag image to the preview element
+                                e.dataTransfer.setDragImage(dragPreview, 10, 10);
                                 
                                 // Clean up after a short delay
                                 setTimeout(() => {
@@ -869,6 +906,58 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                                 }, 100);
                               } catch (err) {
                                 console.error("Error setting drag image:", err);
+                              }
+                              
+                              // Create a floating time badge that follows the cursor
+                              try {
+                                const timeBadge = document.createElement('div');
+                                timeBadge.id = 'drag-time-badge';
+                                timeBadge.style.position = 'fixed';
+                                timeBadge.style.zIndex = '9999';
+                                timeBadge.style.backgroundColor = '#eab308'; // Gold/yellow
+                                timeBadge.style.color = 'black';
+                                timeBadge.style.fontWeight = 'bold';
+                                timeBadge.style.padding = '2px 8px';
+                                timeBadge.style.borderRadius = '4px';
+                                timeBadge.style.fontSize = '14px';
+                                timeBadge.style.border = '1px solid black';
+                                timeBadge.style.pointerEvents = 'none'; // Make sure it doesn't interfere with drag
+                                timeBadge.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                                timeBadge.textContent = initialTime;
+                                
+                                document.body.appendChild(timeBadge);
+                                
+                                // Update badge position during drag
+                                const updateBadgePosition = (moveEvent: MouseEvent) => {
+                                  if (timeBadge) {
+                                    timeBadge.style.left = `${moveEvent.clientX + 20}px`; // Offset from cursor
+                                    timeBadge.style.top = `${moveEvent.clientY - 10}px`;
+                                    
+                                    // Update time if it has changed
+                                    if (dragTimeDisplay) {
+                                      timeBadge.textContent = dragTimeDisplay;
+                                    }
+                                  }
+                                };
+                                
+                                // Add mousemove listener to update position
+                                document.addEventListener('mousemove', updateBadgePosition);
+                                
+                                // Clean up on drag end or document mouseup
+                                const cleanupBadge = () => {
+                                  document.removeEventListener('mousemove', updateBadgePosition);
+                                  document.removeEventListener('mouseup', cleanupBadge);
+                                  if (timeBadge && timeBadge.parentNode) {
+                                    timeBadge.parentNode.removeChild(timeBadge);
+                                  }
+                                };
+                                
+                                document.addEventListener('mouseup', cleanupBadge);
+                                
+                                // Also set a backup timeout to ensure cleanup
+                                setTimeout(cleanupBadge, 30000); // 30 second max
+                              } catch (err) {
+                                console.error("Error creating time badge:", err);
                               }
                               
                               // Visual feedback
@@ -879,6 +968,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               });
                             }}
                             onDragEnd={() => {
+                              // Clean up floating time badge if it exists
+                              const timeBadge = document.getElementById('drag-time-badge');
+                              if (timeBadge && timeBadge.parentNode) {
+                                timeBadge.parentNode.removeChild(timeBadge);
+                              }
+                              
                               // Clear the dragged job state after a delay
                               setTimeout(() => {
                                 setDraggedJob(null);
@@ -1155,6 +1250,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   });
                 }
                 
+                // Clean up floating time badge if it exists
+                const timeBadge = document.getElementById('drag-time-badge');
+                if (timeBadge && timeBadge.parentNode) {
+                  timeBadge.parentNode.removeChild(timeBadge);
+                }
+                
                 // Clear the dragged job and time display
                 setDraggedJob(null);
                 setDragTimeDisplay(null);
@@ -1180,6 +1281,12 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       e.preventDefault();
                       e.currentTarget.classList.remove("border-primary", "bg-primary/5");
                       
+                      // Clean up floating time badge if it exists
+                      const timeBadge = document.getElementById('drag-time-badge');
+                      if (timeBadge && timeBadge.parentNode) {
+                        timeBadge.parentNode.removeChild(timeBadge);
+                      }
+                      
                       // Schedule for tomorrow at 9 AM by default
                       const tomorrow = new Date();
                       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1190,8 +1297,15 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       
                       console.log(`Empty calendar drop: Scheduling job ${draggedJob.id} for ${logDate} at ${logTime}`);
                       
+                      // Store job ID before clearing state
+                      const jobId = draggedJob.id;
+                      
+                      // Clear dragged job immediately
+                      setDraggedJob(null);
+                      setDragTimeDisplay(null);
+                      
                       updateJobLogMutation.mutate({
-                        id: draggedJob.id,
+                        id: jobId,
                         data: {
                           logDate,
                           logTime
@@ -1210,8 +1324,6 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           setCurrentDate(new Date(currentDate));
                         }
                       });
-                      
-                      setDraggedJob(null);
                     }
                   }}
                 >
