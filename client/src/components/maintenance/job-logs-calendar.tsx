@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
+import { Fragment } from 'react';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
@@ -21,7 +22,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   RefreshCw, 
-  ClipboardList 
+  ClipboardList,
+  X
 } from 'lucide-react';
 import { 
   Select, 
@@ -72,98 +74,8 @@ interface JobLogsCalendarProps {
   isLoading: boolean;
 }
 
-// Job Status Modal component
-function JobStatusModal({ jobLogs, stores }: { jobLogs: JobLog[], stores: Array<{ id: number; name: string }> }) {
-  // Memoize the filtered lists to avoid recalculation on every render
-  const scheduledJobs = useMemo(() => jobLogs.filter(job => job.logDate && job.logTime), [jobLogs]);
-  const unscheduledJobs = useMemo(() => jobLogs.filter(job => !job.logDate || !job.logTime), [jobLogs]);
-  
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="border rounded-lg p-4 bg-card shadow-sm">
-        <h3 className="text-lg font-medium mb-3 border-b pb-2">Scheduled Jobs ({scheduledJobs.length})</h3>
-        <ScrollArea className="h-[300px]">
-          <div className="space-y-3">
-            {scheduledJobs.length > 0 ? (
-              scheduledJobs.map(job => {
-                const store = stores.find(s => s.id === job.storeId);
-                return (
-                  <div key={job.id} className="flex items-center p-3 rounded-md bg-secondary/10 hover:bg-secondary/20 border">
-                    <div className="flex-1">
-                      <div className="font-medium">{job.title || 'Maintenance Job'}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {store?.name || 'Unknown Store'} - {job.logDate} at {job.logTime}
-                      </div>
-                      <div className="text-xs mt-1 text-muted-foreground">
-                        {job.description || 'No description'}
-                      </div>
-                    </div>
-                    <Badge
-                      variant={
-                        job.flag === 'urgent' 
-                          ? 'destructive' 
-                          : job.flag === 'long_standing' 
-                            ? 'secondary' 
-                            : 'default'
-                      }
-                    >
-                      {job.flag}
-                    </Badge>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center text-muted-foreground py-4">
-                No scheduled jobs found
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-      
-      <div className="border rounded-lg p-4 bg-card shadow-sm">
-        <h3 className="text-lg font-medium mb-3 border-b pb-2">Unscheduled Jobs ({unscheduledJobs.length})</h3>
-        <ScrollArea className="h-[300px]">
-          <div className="space-y-3">
-            {unscheduledJobs.length > 0 ? (
-              unscheduledJobs.map(job => {
-                const store = stores.find(s => s.id === job.storeId);
-                return (
-                  <div key={job.id} className="flex items-center p-3 rounded-md bg-secondary/10 hover:bg-secondary/20 border">
-                    <div className="flex-1">
-                      <div className="font-medium">{job.title || 'Maintenance Job'}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {store?.name || 'Unknown Store'} - Not scheduled
-                      </div>
-                      <div className="text-xs mt-1 text-muted-foreground">
-                        {job.description || 'No description'}
-                      </div>
-                    </div>
-                    <Badge
-                      variant={
-                        job.flag === 'urgent' 
-                          ? 'destructive' 
-                          : job.flag === 'long_standing' 
-                            ? 'secondary' 
-                            : 'default'
-                      }
-                    >
-                      {job.flag}
-                    </Badge>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center text-muted-foreground py-4">
-                No unscheduled jobs found
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-    </div>
-  );
-}
+// Import the JobStatusOverview component
+import JobStatusOverview from './job-status-overview';
 
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
   const { user } = useAuth();
@@ -383,26 +295,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
               <RefreshCw className="h-4 w-4" />
             </Button>
             
-            {/* Job Status Dialog */}
-            <Dialog modal={true}>
-              <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  title="Job Status Overview"
-                  type="button"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  <ClipboardList className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Job Status Overview</DialogTitle>
-                </DialogHeader>
-                <JobStatusModal jobLogs={jobLogs} stores={stores} />
-              </DialogContent>
-            </Dialog>
+            {/* Job Status Overview Button */}
+            <JobStatusOverview jobLogs={jobLogs} stores={stores} />
           </div>
         </div>
         
@@ -1531,3 +1425,4 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
     </Card>
   );
 }
+
