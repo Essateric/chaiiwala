@@ -15,7 +15,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarX, Loader2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { 
+  CalendarX, 
+  Loader2, 
+  ChevronLeft, 
+  ChevronRight, 
+  RefreshCw, 
+  ClipboardList 
+} from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -23,6 +30,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // Setup calendar localizer
 const locales = { 'en-US': enUS };
@@ -56,6 +70,93 @@ interface JobLogsCalendarProps {
   jobLogs: JobLog[];
   stores: Array<{ id: number; name: string }>;
   isLoading: boolean;
+}
+
+// Job Status Modal component
+function JobStatusModal({ jobLogs, stores }: { jobLogs: JobLog[], stores: Array<{ id: number; name: string }> }) {
+  // Memoize the filtered lists to avoid recalculation on every render
+  const scheduledJobs = useMemo(() => jobLogs.filter(job => job.logDate && job.logTime), [jobLogs]);
+  const unscheduledJobs = useMemo(() => jobLogs.filter(job => !job.logDate || !job.logTime), [jobLogs]);
+  
+  return (
+    <div className="flex flex-col space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-2">Scheduled Jobs ({scheduledJobs.length})</h3>
+        <ScrollArea className="h-[200px] rounded-md border">
+          <div className="p-4 space-y-2">
+            {scheduledJobs.length > 0 ? (
+              scheduledJobs.map(job => {
+                const store = stores.find(s => s.id === job.storeId);
+                return (
+                  <div key={job.id} className="flex items-center p-2 rounded-md bg-secondary/20 hover:bg-secondary/30">
+                    <div className="flex-1">
+                      <div className="font-medium">{job.title || 'Maintenance Job'}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {store?.name || 'Unknown Store'} - {job.logDate} at {job.logTime}
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        job.flag === 'urgent' 
+                          ? 'destructive' 
+                          : job.flag === 'long_standing' 
+                            ? 'secondary' 
+                            : 'default'
+                      }
+                    >
+                      {job.flag}
+                    </Badge>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-muted-foreground py-4">
+                No scheduled jobs found
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+      
+      <div>
+        <h3 className="text-lg font-medium mb-2">Unscheduled Jobs ({unscheduledJobs.length})</h3>
+        <ScrollArea className="h-[200px] rounded-md border">
+          <div className="p-4 space-y-2">
+            {unscheduledJobs.length > 0 ? (
+              unscheduledJobs.map(job => {
+                const store = stores.find(s => s.id === job.storeId);
+                return (
+                  <div key={job.id} className="flex items-center p-2 rounded-md bg-secondary/20 hover:bg-secondary/30">
+                    <div className="flex-1">
+                      <div className="font-medium">{job.title || 'Maintenance Job'}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {store?.name || 'Unknown Store'} - Not scheduled
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        job.flag === 'urgent' 
+                          ? 'destructive' 
+                          : job.flag === 'long_standing' 
+                            ? 'secondary' 
+                            : 'default'
+                      }
+                    >
+                      {job.flag}
+                    </Badge>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-muted-foreground py-4">
+                No unscheduled jobs found
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
 }
 
 export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsCalendarProps) {
