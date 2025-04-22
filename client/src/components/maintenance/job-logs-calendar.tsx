@@ -765,12 +765,13 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
         ) : (
           <div 
             className="flex flex-col calendar-container" 
-            style={{ height: 800 }}
+            style={{ height: 700 }}
             data-role={user?.role || 'none'}
           >
             {/* Calendar (top part) */}
             <div 
-              className="flex-1 mb-4 relative" 
+              className="flex-1 mb-4" 
+              style={{ height: "500px" }}
               ref={calendarRef}
               onDragEnter={(e) => {
                 if (isMaintenance) {
@@ -1129,7 +1130,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             
             {/* Calendar */}
             <div 
-              className={isMaintenance ? "w-3/4 relative calendar-main" : "w-full relative calendar-main"} 
+              className="w-full relative calendar-main" 
               ref={calendarRef}
               onDragEnter={(e) => {
                 if (isMaintenance) {
