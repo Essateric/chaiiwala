@@ -79,20 +79,23 @@ function JobStatusModal({ jobLogs, stores }: { jobLogs: JobLog[], stores: Array<
   const unscheduledJobs = useMemo(() => jobLogs.filter(job => !job.logDate || !job.logTime), [jobLogs]);
   
   return (
-    <div className="flex flex-col space-y-6">
-      <div>
-        <h3 className="text-lg font-medium mb-2">Scheduled Jobs ({scheduledJobs.length})</h3>
-        <ScrollArea className="h-[200px] rounded-md border">
-          <div className="p-4 space-y-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="border rounded-lg p-4 bg-card shadow-sm">
+        <h3 className="text-lg font-medium mb-3 border-b pb-2">Scheduled Jobs ({scheduledJobs.length})</h3>
+        <ScrollArea className="h-[300px]">
+          <div className="space-y-3">
             {scheduledJobs.length > 0 ? (
               scheduledJobs.map(job => {
                 const store = stores.find(s => s.id === job.storeId);
                 return (
-                  <div key={job.id} className="flex items-center p-2 rounded-md bg-secondary/20 hover:bg-secondary/30">
+                  <div key={job.id} className="flex items-center p-3 rounded-md bg-secondary/10 hover:bg-secondary/20 border">
                     <div className="flex-1">
                       <div className="font-medium">{job.title || 'Maintenance Job'}</div>
                       <div className="text-sm text-muted-foreground">
                         {store?.name || 'Unknown Store'} - {job.logDate} at {job.logTime}
+                      </div>
+                      <div className="text-xs mt-1 text-muted-foreground">
+                        {job.description || 'No description'}
                       </div>
                     </div>
                     <Badge
@@ -118,19 +121,22 @@ function JobStatusModal({ jobLogs, stores }: { jobLogs: JobLog[], stores: Array<
         </ScrollArea>
       </div>
       
-      <div>
-        <h3 className="text-lg font-medium mb-2">Unscheduled Jobs ({unscheduledJobs.length})</h3>
-        <ScrollArea className="h-[200px] rounded-md border">
-          <div className="p-4 space-y-2">
+      <div className="border rounded-lg p-4 bg-card shadow-sm">
+        <h3 className="text-lg font-medium mb-3 border-b pb-2">Unscheduled Jobs ({unscheduledJobs.length})</h3>
+        <ScrollArea className="h-[300px]">
+          <div className="space-y-3">
             {unscheduledJobs.length > 0 ? (
               unscheduledJobs.map(job => {
                 const store = stores.find(s => s.id === job.storeId);
                 return (
-                  <div key={job.id} className="flex items-center p-2 rounded-md bg-secondary/20 hover:bg-secondary/30">
+                  <div key={job.id} className="flex items-center p-3 rounded-md bg-secondary/10 hover:bg-secondary/20 border">
                     <div className="flex-1">
                       <div className="font-medium">{job.title || 'Maintenance Job'}</div>
                       <div className="text-sm text-muted-foreground">
                         {store?.name || 'Unknown Store'} - Not scheduled
+                      </div>
+                      <div className="text-xs mt-1 text-muted-foreground">
+                        {job.description || 'No description'}
                       </div>
                     </div>
                     <Badge
