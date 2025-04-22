@@ -928,7 +928,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   <p className="text-sm text-muted-foreground">Drag jobs from below to schedule them</p>
                 </div>
               ) : (
-                <DragAndDropCalendar
+                <DnDCalendar
                   localizer={localizer}
                   events={calendarEvents}
                   startAccessor="start"
