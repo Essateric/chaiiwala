@@ -849,7 +849,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                           >
                             {/* Time display directly on the dragged item */}
                             {isDragging && dragTimeDisplay && (
-                              <div className="absolute top-0 right-0 -mt-3 -mr-3 bg-primary text-white font-bold px-2 py-1 rounded-full text-sm shadow-md drag-time-badge">
+                              <div className="absolute right-0 top-1/2 transform -translate-y-1/2 -mr-3 bg-[#eab308] text-black font-bold px-2 py-1 rounded-md text-sm shadow-md border border-black">
                                 {dragTimeDisplay}
                               </div>
                             )}
