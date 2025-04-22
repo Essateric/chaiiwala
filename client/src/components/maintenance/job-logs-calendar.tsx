@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { format, parse, startOfWeek, getDay, addHours } from 'date-fns';
 import { useLocation } from 'wouter';
 import { enUS } from 'date-fns/locale';
@@ -1181,6 +1183,29 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     min={new Date(0, 0, 0, 7, 0)} // Start at 7am
                     max={new Date(0, 0, 0, 19, 0)} // End at 7pm
                     selectable={isMaintenance}
+                    draggableAccessor={() => isMaintenance} // Enable drag-and-drop
+                    resizable={false}
+                    onEventDrop={({ event, start }) => {
+                      if (!isMaintenance) return;
+                      
+                      // Format date and time
+                      const logDate = format(start, 'yyyy-MM-dd');
+                      const logTime = format(start, 'HH:mm');
+                      
+                      // Update job with new date/time
+                      updateJobLogMutation.mutate({
+                        id: event.id,
+                        data: { logDate, logTime }
+                      }, {
+                        onSuccess: () => {
+                          toast({
+                            title: "Job rescheduled",
+                            description: `Job moved to ${logDate} at ${logTime}`,
+                          });
+                          refreshCalendar();
+                        }
+                      });
+                    }}
                     onSelectSlot={(slotInfo) => {
                       console.log("✅ SLOT SELECTED IN CALENDAR:", slotInfo);
                       console.log("📋 Current dragged job in onSelectSlot:", draggedJob);
@@ -1360,9 +1385,8 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                       }
                     }}
                     popup
-                    // For maintenance users only: allow selecting time slots
-                    // and moving events with drag and drop
-                    selectable={isMaintenance}
+                    // For maintenance users only: allow time slots selection
+                    // without a duplicate selectable attribute
                     step={15} // 15-min increments
                     timeslots={4} // 4 slots per hour
                     slotPropGetter={() => ({
