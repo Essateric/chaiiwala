@@ -950,8 +950,11 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                     const job = jobLogs.find(j => j.id === jobEvent.id);
                     
                     if (job) {
-                      setSelectedJob(job);
-                      setShowJobDetails(true);
+                      toast({
+                        title: "Job selected",
+                        description: `${job.title || 'Maintenance Job'} at ${job.logTime || 'unscheduled'}`,
+                        duration: 3000,
+                      });
                     }
                   }}
                   eventPropGetter={eventStyleGetter}
@@ -963,7 +966,9 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   }}
                   components={{
                     event: EventComponent,
-                    timeSlotWrapper: TimeSlotWrapperComponent,
+                    timeSlotWrapper: (props) => {
+                      return <div className="rbc-time-slot" {...props} />;
+                    },
                     toolbar: CustomToolbar
                   }}
                   formats={{
@@ -974,8 +979,56 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   }}
                   step={15}
                   timeslots={4}
-                  onEventDrop={isMaintenance ? handleEventDrop : undefined}
-                  onEventResize={isMaintenance ? handleEventResize : undefined}
+                  onEventDrop={isMaintenance ? (data) => {
+                    // Extract the moved event data
+                    if (!data.event) return;
+                    
+                    const movedEvent = data.event as CalendarEvent;
+                    const jobId = movedEvent.id;
+                    const job = jobLogs.find(j => j.id === jobId);
+                    
+                    if (!job) return;
+                    
+                    // Format and update with new time
+                    const newStart = data.start;
+                    const newEnd = data.end;
+                    
+                    // Format date as YYYY-MM-DD
+                    const dateStr = format(newStart, 'yyyy-MM-dd');
+                    // Format time as HH:mm
+                    const timeStr = format(newStart, 'HH:mm');
+                    
+                    // Update job with new date/time
+                    updateJob(job.id, {
+                      logDate: dateStr,
+                      logTime: timeStr
+                    });
+                  } : undefined}
+                  onEventResize={isMaintenance ? (data) => {
+                    // Extract the resized event data
+                    if (!data.event) return;
+                    
+                    const resizedEvent = data.event as CalendarEvent;
+                    const jobId = resizedEvent.id;
+                    const job = jobLogs.find(j => j.id === jobId);
+                    
+                    if (!job) return;
+                    
+                    // Format and update with new time
+                    const newStart = data.start;
+                    const newEnd = data.end;
+                    
+                    // Format date as YYYY-MM-DD  
+                    const dateStr = format(newStart, 'yyyy-MM-dd');
+                    // Format time as HH:mm
+                    const timeStr = format(newStart, 'HH:mm');
+                    
+                    // Update job with new date/time
+                    updateJob(job.id, {
+                      logDate: dateStr,
+                      logTime: timeStr
+                    });
+                  } : undefined}
                   resizable={isMaintenance}
                   draggableAccessor={() => isMaintenance}
                 />
