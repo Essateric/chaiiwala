@@ -819,6 +819,58 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               e.dataTransfer.setData('application/json', JSON.stringify({ jobId: job.id }));
                               e.dataTransfer.effectAllowed = 'move';
                               
+                              // Set initial time display (will be updated during drag)
+                              const initialTime = "12:00"; // Default to noon
+                              setDragTimeDisplay(initialTime);
+                              
+                              // Create custom drag image with time display
+                              try {
+                                const dragPreview = document.createElement('div');
+                                dragPreview.style.padding = '8px';
+                                dragPreview.style.background = '#1f2937'; // Dark background
+                                dragPreview.style.color = 'white';
+                                dragPreview.style.borderRadius = '4px';
+                                dragPreview.style.position = 'relative';
+                                dragPreview.style.width = '200px';
+                                
+                                // Create the inner content
+                                const innerContent = document.createElement('div');
+                                innerContent.innerHTML = `
+                                  <div style="font-weight: bold;">${job.title || 'Maintenance Job'}</div>
+                                  <div style="font-size: 10px;">${storeName} - ${job.flag}</div>
+                                `;
+                                
+                                // Create time badge
+                                const timeBadge = document.createElement('div');
+                                timeBadge.style.position = 'absolute';
+                                timeBadge.style.right = '-12px';
+                                timeBadge.style.top = '50%';
+                                timeBadge.style.transform = 'translateY(-50%)';
+                                timeBadge.style.backgroundColor = '#eab308'; // Gold/yellow
+                                timeBadge.style.color = 'black';
+                                timeBadge.style.fontWeight = 'bold';
+                                timeBadge.style.padding = '2px 6px';
+                                timeBadge.style.borderRadius = '4px';
+                                timeBadge.style.fontSize = '12px';
+                                timeBadge.style.border = '1px solid black';
+                                timeBadge.textContent = initialTime;
+                                
+                                // Append everything
+                                dragPreview.appendChild(innerContent);
+                                dragPreview.appendChild(timeBadge);
+                                document.body.appendChild(dragPreview);
+                                
+                                // Use the custom element as drag image
+                                e.dataTransfer.setDragImage(dragPreview, 10, 20);
+                                
+                                // Clean up after a short delay
+                                setTimeout(() => {
+                                  document.body.removeChild(dragPreview);
+                                }, 100);
+                              } catch (err) {
+                                console.error("Error setting drag image:", err);
+                              }
+                              
                               // Visual feedback
                               toast({
                                 title: "Dragging job",
@@ -847,12 +899,7 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                               width: isDragging ? '250px' : 'auto'
                             }}
                           >
-                            {/* Time display directly on the dragged item */}
-                            {isDragging && dragTimeDisplay && (
-                              <div className="absolute right-0 top-1/2 transform -translate-y-1/2 -mr-3 bg-[#eab308] text-black font-bold px-2 py-1 rounded-md text-sm shadow-md border border-black">
-                                {dragTimeDisplay}
-                              </div>
-                            )}
+                            {/* Time display is now part of the drag image, not in the original element */}
                             <h4 className="font-medium text-sm mb-1 line-clamp-2">{job.description || 'No description'}</h4>
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-between text-xs">
