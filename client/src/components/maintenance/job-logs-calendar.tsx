@@ -378,12 +378,14 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
             </Button>
             
             {/* Job Status Dialog */}
-            <Dialog>
+            <Dialog modal={true}>
               <DialogTrigger asChild>
                 <Button 
                   variant="outline" 
                   size="sm"
                   title="Job Status Overview"
+                  type="button"
+                  onClick={(e) => e.preventDefault()}
                 >
                   <ClipboardList className="h-4 w-4" />
                 </Button>
