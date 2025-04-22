@@ -943,10 +943,24 @@ export default function JobLogsCalendar({ jobLogs, stores, isLoading }: JobLogsC
                   min={new Date(0, 0, 0, 7, 0, 0)} // Start at 7am
                   max={new Date(0, 0, 0, 19, 0, 0)} // End at 7pm
                   selectable={isMaintenance}
-                  onSelectSlot={isMaintenance ? handleSelectSlot : undefined}
-                  onSelectEvent={handleSelectEvent}
+                  onSelectSlot={isMaintenance ? handleDropOnCalendar : undefined}
+                  onSelectEvent={(event) => {
+                    // Show job details in a dialog when clicked
+                    const jobEvent = event as CalendarEvent;
+                    const job = jobLogs.find(j => j.id === jobEvent.id);
+                    
+                    if (job) {
+                      setSelectedJob(job);
+                      setShowJobDetails(true);
+                    }
+                  }}
                   eventPropGetter={eventStyleGetter}
-                  dayPropGetter={dayPropGetter}
+                  dayPropGetter={(date) => {
+                    return {
+                      className: '',
+                      style: {}
+                    };
+                  }}
                   components={{
                     event: EventComponent,
                     timeSlotWrapper: TimeSlotWrapperComponent,
