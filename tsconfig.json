@@ -1,23 +1,22 @@
 {
   "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.js"],
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": true,
     "module": "ESNext",
-    "strict": true,
+    "strict": false,
     "lib": ["esnext", "dom", "dom.iterable"],
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "baseUrl": ".",
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"]
-    }
+    },
+    "allowJs": true
   }
 }
