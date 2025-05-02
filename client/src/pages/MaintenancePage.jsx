@@ -6,6 +6,8 @@ import { WrenchIcon, ActivityIcon, CheckCircleIcon } from "lucide-react";
 import JobLogSection from "@/components/Maintenance/JobLogSection";
 import MaintenanceCalendar from "@/components/maintenance/MaintenanceCalendar";
 import { useJobLogs } from "@/hooks/use-joblogs";
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 export default function MaintenancePage() {
   const { jobLogs } = useJobLogs();
