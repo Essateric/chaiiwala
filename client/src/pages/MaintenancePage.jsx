@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WrenchIcon, ActivityIcon, CheckCircleIcon } from "lucide-react";
 import JobLogSection from "@/components/Maintenance/JobLogSection";
-import MaintenanceCalendar from "@/components/maintenance/MaintenanceCalendar";
+import MaintenanceCalendar from "@/components/Maintenance/MaintenanceCalendar";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -65,7 +65,7 @@ export default function MaintenancePage() {
           </CardContent>
         </Card>
 
-        <MaintenanceCalendar jobLogs={jobLogs} />
+        {/* <MaintenanceCalendar jobLogs={jobLogs} /> */}
         <JobLogSection />
       </div>
     </DashboardLayout>

@@ -28,11 +28,14 @@ import { Button } from "@/components/ui/button";
 import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useState, useEffect } from "react";
+import JobLogsGrid from "@/components/Maintenance/JobLogsGrid";
+
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [selectedStore, setSelectedStore] = useState("all"); 
 
   console.log("inside dashboard page");
   // Fetch stores data
@@ -97,8 +100,8 @@ export default function DashboardPage() {
     fetchProfile();
   }, [user]);
   
- 
-  if (profile?.permissions === "maintenance") {
+
+  if (profile?.permissions !== "maintenance") {
   return (
     <DashboardLayout title="Dashboard">
       {/* Welcome Section */}
@@ -111,7 +114,7 @@ export default function DashboardPage() {
       
       {/* Maintenance Job Logs Widget - Always visible on dashboard */}
       <div className="mb-6">
-        <JobLogsWidget />
+        {/* <JobLogsWidget /> */}
       </div>
       
       {/* Main Dashboard Categories - Based on handwritten diagram */}

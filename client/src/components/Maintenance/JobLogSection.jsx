@@ -1,24 +1,48 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { Loader2, PlusIcon, X } from "lucide-react";
+import { Loader2, PlusIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import JobLogsGrid from "@/components/Maintenance/JobLogsGrid";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl
+} from "@/components/ui/form";
 import { useAuth } from "@/hooks/UseAuth";
 import { useStores } from "@/hooks/use-stores";
 import { useJobLogs } from "@/hooks/use-joblogs";
 import { FileUpload } from "@/components/ui/file-upload";
 import { useCategories } from "@/hooks/use-categories";
 import { JobLogSchema } from "@/schemas/JobLogSchema";
-import { useDrag } from "react-dnd";
 
 const formSchema = JobLogSchema.extend({
   storeId: z.number(),
@@ -30,15 +54,16 @@ const formSchema = JobLogSchema.extend({
   comments: z.string().nullable().optional(),
   loggedBy: z.string(),
   logDate: z.string(),
-  logTime: z.string(),
+  logTime: z.string()
 });
 
-export default function JobLogsSection() {
-  const { user, profile } = useAuth();
-  console.log("👤 profile from useAuth:", profile);
+export default function JobLogSection() {
+  console.log("📍 Rendering JobLogSection");
 
+  const { user, profile } = useAuth();
   const { stores = [] } = useStores();
   const { categories } = useCategories();
+  const [showFullLogs, setShowFullLogs] = useState(false);
 
   const storeId = ["admin", "regional", "maintenance"].includes(profile?.permissions)
     ? null
@@ -49,15 +74,18 @@ export default function JobLogsSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState(undefined);
 
-    const filteredLogs = useMemo(() => {
-      if (!profile) return [];
+  const isPrivileged = ["admin", "regional", "maintenance"].includes(profile?.permissions);
 
-      if (["admin", "regional", "maintenance"].includes(profile?.permissions)) {
-        return jobLogs;
+  const filteredLogs = useMemo(() => {
+    if (!profile) return [];
+    if (isPrivileged) {
+      if (selectedStoreId) {
+        return jobLogs.filter((log) => log.storeId === Number(selectedStoreId));
       }
-      const currentStoreId = selectedStoreId ?? profile?.store_id;
-      return jobLogs.filter((log) => log.storeId === currentStoreId);
-    }, [jobLogs, selectedStoreId, profile?.permissions, profile?.store_id]);
+      return jobLogs;
+    }
+    return jobLogs.filter((log) => log.storeId === profile.store_id);
+  }, [jobLogs, selectedStoreId, profile]);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -65,26 +93,29 @@ export default function JobLogsSection() {
       storeId: user?.storeId ?? 1,
       logDate: format(new Date(), "dd MMM yyyy"),
       logTime: format(new Date(), "hh:mmaaa"),
+      loggedBy: profile?.name ?? "",
       title: "",
       category: "",
       description: "",
-      loggedBy: user?.name ?? "",
       flag: "normal",
       ImageUpload: [],
-      comments: "",
-    },
+      comments: ""
+    }
   });
 
   const onSubmit = async (values) => {
     try {
-      await createJobLog(values);
+      await createJobLog({
+        ...values,
+        user_id: user?.id,
+        loggedBy: profile?.name || ""
+      });
       form.reset();
       setDialogOpen(false);
     } catch (error) {
       console.error("Error creating job log:", error.message || error);
     }
   };
-  
 
   if (!profile) {
     return (
@@ -101,7 +132,7 @@ export default function JobLogsSection() {
           <CardTitle>Maintenance Tasks</CardTitle>
           <CardDescription>View and create maintenance tasks</CardDescription>
         </div>
-        {["admin", "regional"].includes(profile?.permissions) && (
+        {isPrivileged && (
           <Select onValueChange={(val) => setSelectedStoreId(val === "all" ? undefined : parseInt(val))}>
             <SelectTrigger className="w-48 bg-white">
               <SelectValue placeholder="Filter by store" />
@@ -130,12 +161,175 @@ export default function JobLogsSection() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Maintenance Task</DialogTitle>
-                <DialogDescription>Fill out the details below to create a new maintenance task.</DialogDescription>
+                <DialogDescription>
+                  Fill out the details below to create a new maintenance task.
+                </DialogDescription>
               </DialogHeader>
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  {/* Form fields omitted for brevity */}
+                  <FormField
+                    control={form.control}
+                    name="loggedBy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Logged By</FormLabel>
+                        <FormControl>
+                          <input
+                            type="text"
+                            {...field}
+                            readOnly
+                            disabled
+                            className="w-full border p-2 rounded bg-gray-100 text-gray-500"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="logDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
+                        <FormControl>
+                          <input
+                            type="text"
+                            {...field}
+                            readOnly
+                            className="input w-full border p-2 rounded bg-gray-100"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="logTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Time</FormLabel>
+                        <FormControl>
+                          <input
+                            type="text"
+                            {...field}
+                            readOnly
+                            className="input w-full border p-2 rounded bg-gray-100"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <input type="text" {...field} className="input w-full border p-2 rounded" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <textarea {...field} className="textarea w-full border p-2 rounded" rows={3} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <select {...field} className="select w-full border p-2 rounded">
+                            <option value="">Select category</option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.name}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="flag"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority</FormLabel>
+                        <FormControl>
+                          <select {...field} className="select w-full border p-2 rounded">
+                            <option value="normal">Normal</option>
+                            <option value="long_standing">Long Standing</option>
+                            <option value="urgent">Urgent</option>
+                          </select>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="ImageUpload"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Upload Images</FormLabel>
+                        <FormControl>
+                          <FileUpload value={field.value} onChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="comments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comments (optional)</FormLabel>
+                        <FormControl>
+                          <textarea {...field} className="textarea w-full border p-2 rounded" rows={2} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="storeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Store</FormLabel>
+                        <FormControl>
+                          <select {...field} className="select w-full border p-2 rounded">
+                            {stores.map((store) => (
+                              <option key={store.id} value={store.id}>
+                                {store.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
                   <DialogFooter>
                     <Button type="submit" disabled={isCreating}>
@@ -148,21 +342,15 @@ export default function JobLogsSection() {
             </DialogContent>
           </Dialog>
         </div>
-
+        {console.log("🧪 Filtered logs:", filteredLogs.length)}
         {filteredLogs.length === 0 ? (
           <p className="text-gray-500 text-sm">
-            {["admin", "regional", "maintenance"].includes(profile?.permissions)
+            {isPrivileged
               ? "No maintenance tasks found."
               : "No maintenance tasks found for this location."}
           </p>
         ) : (
-          filteredLogs.map((log) => (
-            <div key={log.id} className="border p-4 mb-2 rounded shadow-sm">
-              <strong>{log.title}</strong>
-              <p>{log.description}</p>
-              <p className="text-sm text-muted-foreground">{log.logDate} at {log.logTime}</p>
-            </div>
-          ))
+          <JobLogsGrid jobLogs={filteredLogs} />
         )}
       </CardContent>
     </Card>

@@ -1,17 +1,29 @@
 import { Loader2 } from "lucide-react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/UseAuth";
 
-// ❌ No need to import { Children } from "react"
-
 export function ProtectedRoute({ children, roles }) {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  console.log("user data:", user);
-  console.log("isLoading:", isLoading);
-
+  // Wait for auth and profile to fully load
   if (isLoading) {
+    return (
+      
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/auth" />;
+  }
+
+  // Still wait for profile to load
+  if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
@@ -19,17 +31,13 @@ export function ProtectedRoute({ children, roles }) {
     );
   }
 
-  if (!user) {
-    console.log("user not found");
-    return <Navigate to="/auth" />; // Redirect to login if the user is not authenticated
-  }
-
-  if (!isLoading && user?.permissions === "maintenance") {
+  // Redirect maintenance-only users away from non-maintenance pages
+  if (profile.permissions === "maintenance" && location.pathname !== "/maintenance") {
     return <Navigate to="/maintenance" replace />;
   }
 
-  if (roles && !roles.includes(user.permissions)) {
-    console.log("access denied");
+  // If roles are passed, restrict access
+  if (roles && !roles.includes(profile.permissions)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
@@ -44,7 +52,6 @@ export function ProtectedRoute({ children, roles }) {
     );
   }
 
-  // ✅ Correct: render the children
   return children;
 }
 

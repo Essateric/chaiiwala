@@ -1,6 +1,7 @@
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 function useJobLogs(storeId) {
   const supabase = useSupabaseClient();
@@ -13,15 +14,20 @@ function useJobLogs(storeId) {
     queryFn: async () => {
       let query = supabase.from("joblogs").select("*").order("created_at", { ascending: false });
 
-      if (storeId !== null && storeId !== undefined) {
+      if (typeof storeId === "number" && !isNaN(storeId)) {
         query = query.eq("storeId", storeId);
       }
+      
+
+      // if (storeId !== null && storeId !== undefined) {
+      //   query = query.eq("storeId", storeId);
+      // }
 
       const { data, error } = await query;
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: storeId !== undefined, // Prevent fetch if storeId is not ready
+    enabled: true,
     
   });
 

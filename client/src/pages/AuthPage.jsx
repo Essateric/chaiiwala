@@ -28,19 +28,19 @@ export default function AuthPage() {
   // Get user state and loading status from useAuth
   const { user, isLoading } = useAuth();
 
-  // // Redirect user to dashboard if already logged in
-  // useEffect(() => {
-  //   if (!isLoading && user) {
-  //     const permissions = user?.permissions;
-  //     if (permissions === "maintenance") {
-  //       console.log("Redirecting maintenance user to /maintenance");
-  //       navigate("/maintenance");
-  //     } else {
-  //       console.log("Redirecting to /dashboard");
-  //       navigate("/dashboard");
-  //     }
-  //   }
-  // }, [user, isLoading, navigate]);
+  // Redirect user to dashboard if already logged in
+  useEffect(() => {
+    if (!isLoading && user) {
+      const permissions = user?.permissions;
+      if (permissions === "maintenance") {
+        console.log("Redirecting maintenance user to /maintenance");
+        navigate("/maintenance");
+      } else {
+        console.log("Redirecting to /dashboard");
+        navigate("/dashboard");
+      }
+    }
+  }, [user, isLoading, navigate]);
 
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),

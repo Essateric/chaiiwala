@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-
+import { useSupabaseClient, useSession } from "@supabase/auth-helpers-react";
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -12,34 +12,39 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { toast } = useToast();
+  const supabase = useSupabaseClient();
+  const session = useSession();
 
   useEffect(() => {
     const fetchUserAndProfile = async () => {
       console.log("🔥 useEffect running to fetch user and profile");
-
+    
       try {
         const { data: authData, error: authError } = await supabase.auth.getUser();
-
+    
         if (authError) throw authError;
-
-        const currentUser = authData.user;
+    
+        const currentUser = authData?.user;
         console.log("👤 Authenticated user:", currentUser);
         setUser(currentUser);
-
-        if (currentUser) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("users")
-            .select("permissions, store_id, first_name, last_name")
-            .eq("auth_id", currentUser.id)
-            .single();
-
-          if (profileError) throw profileError;
-
-          console.log("✅ Profile fetched:", profileData);
-          setProfile(profileData);
-        } else {
+    
+        if (!currentUser) {
+          console.log("ℹ️ No authenticated user found.");
           setProfile(null);
+          return; // ✅ exit early
         }
+    
+        const { data: profileData, error: profileError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", currentUser.id)
+          .single();
+    
+        if (profileError) throw profileError;
+    
+        console.log("✅ Profile fetched:", profileData);
+        setProfile(profileData);
+    
       } catch (err) {
         console.error("❌ Error fetching user/profile:", err.message);
         setError(err);
@@ -47,6 +52,7 @@ export function AuthProvider({ children }) {
         setIsLoading(false);
       }
     };
+    
 
     fetchUserAndProfile();
 
@@ -80,6 +86,8 @@ export function AuthProvider({ children }) {
       });
     },
   });
+
+  if (!session) console.log("❌ No session found (user not logged in)");
 
   return (
     <AuthContext.Provider

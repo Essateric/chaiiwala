@@ -12,6 +12,14 @@
   .bg-chai-gold {
     background-color: var(--chai-gold);
   }
+
+  .rbc-allday-cell {
+    display: none !important;
+  }
+
+  .rbc-time-content {
+    background-color: rgba(0, 255, 0, 0.05); /* light green to test */
+  }
   
   .bg-chai-black {
     background-color: var(--chai-black);
