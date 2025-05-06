@@ -19,5 +19,6 @@ createRoot(document.getElementById("root")).render(
   </QueryClientProvider>
 );
 
-const { data: user } = await supabase.auth.getUser();
-console.log(user);
+async function init() {
+  const { data: user } = await supabase.auth.getUser();
+}
