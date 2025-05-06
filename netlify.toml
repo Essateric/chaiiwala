@@ -3,60 +3,22 @@ command = "npx vite build"
 publish = "dist"
 functions = "netlify/functions"
 
-  
-[build.environment]
-  NODE_VERSION = "18.19.0"
-  SESSION_SECRET = "chaiiwala-dashboard-secure-session-key"
-
-[dev]
-  framework = "#custom"
-  port = 8888
-  publish = "dist/public"
-  autoLaunch = false
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/api/:splat"
+status = 200
+force = true
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
-  force = true
-  
-# Additional redirect to ensure direct access to the API function also works
-[[redirects]]
-  from = "/.netlify/functions/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
+from = "/*"
+to = "/index.html"
+status = 200
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# Common secure headers for ALL builds
 [[headers]]
-  for = "/*"
-  [headers.values]
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
-
-# Development (deploy-preview and branch-deploy) relaxed CSP
-[context.deploy-preview]
-  [[headers]]
-    for = "/*"
-    [headers.values]
-      Content-Security-Policy = "default-src 'self' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; connect-src 'self' *; img-src 'self' data: blob: *; frame-src *; style-src 'self' 'unsafe-inline' *"
-
-[context.branch-deploy]
-  [[headers]]
-    for = "/*"
-    [headers.values]
-      Content-Security-Policy = "default-src 'self' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; connect-src 'self' *; img-src 'self' data: blob: *; frame-src *; style-src 'self' 'unsafe-inline' *"
-
-# Production CSP with 'unsafe-eval' allowed for JavaScript frameworks
-[context.production]
-  [[headers]]
-    for = "/*"
-    [headers.values]
-      Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https:; img-src 'self' data: blob:; frame-src 'self'; style-src 'self' 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+for = "/*"
+[headers.values]
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+  X-Content-Type-Options = "nosniff"
+  X-Frame-Options = "DENY"
+  X-XSS-Protection = "1; mode=block"
