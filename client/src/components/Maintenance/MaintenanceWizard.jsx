@@ -58,6 +58,17 @@ export default function MaintenanceWizard({ onClose }) {
       case 1:
         return (
           <div className="space-y-4">
+            <Label>Store</Label>
+            <select
+              className="w-full border p-2 rounded bg-white"
+              value={formData.storeId}
+              onChange={(e) => handleChange("storeId", parseInt(e.target.value))}
+            >
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>{store.name}</option>
+              ))}
+            </select>
+
             <Label>Title</Label>
             <Input
               value={formData.title}
@@ -103,17 +114,6 @@ export default function MaintenanceWizard({ onClose }) {
       case 3:
         return (
           <div className="space-y-4">
-            <Label>Store</Label>
-            <select
-              className="w-full border p-2 rounded bg-white"
-              value={formData.storeId}
-              onChange={(e) => handleChange("storeId", parseInt(e.target.value))}
-            >
-              {stores.map((store) => (
-                <option key={store.id} value={store.id}>{store.name}</option>
-              ))}
-            </select>
-
             <Label>Comments (optional)</Label>
             <Textarea
               rows={2}
