@@ -55,13 +55,20 @@ export default function JobLogCard({ log }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <div className="cursor-pointer border rounded shadow hover:border-chai-gold">
-          {hasImage && (
-            <img
-              src={log.ImageUpload[0]}
-              className="h-32 w-full object-cover rounded-t"
-              alt="Job Image"
-            />
-          )}
+        {Array.isArray(log.ImageUpload) && log.ImageUpload.length > 0 && (
+  <div className="grid grid-cols-2 gap-2 mb-4">
+    {log.ImageUpload.map((url, i) =>
+      url ? (
+        <img
+          key={i}
+          src={url}
+          alt={`Job Image ${i + 1}`}
+          className="w-full max-h-40 object-cover rounded"
+        />
+      ) : null
+    )}
+  </div>
+)}
           <div className="p-4 space-y-1 text-sm">
             <p className="font-semibold truncate">{log.title}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -105,17 +105,26 @@ export default function JobLogSection() {
 
   const onSubmit = async (values) => {
     try {
+      const now = new Date();
+  
+      const isoDate = now.toISOString().split("T")[0]; // yyyy-mm-dd
+      const isoTime = now.toTimeString().split(" ")[0]; // hh:mm:ss
+  
       await createJobLog({
         ...values,
+        logDate: isoDate,        // e.g., "2025-05-06"
+        logTime: isoTime,        // e.g., "14:35:00"
         user_id: user?.id,
         loggedBy: profile?.name || ""
       });
+  
       form.reset();
       setDialogOpen(false);
     } catch (error) {
       console.error("Error creating job log:", error.message || error);
     }
   };
+ 
 
   if (!profile) {
     return (
@@ -223,6 +232,25 @@ export default function JobLogSection() {
                     )}
                   />
 
+<FormField
+                    control={form.control}
+                    name="storeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Store</FormLabel>
+                        <FormControl>
+                          <select {...field} className="select w-full border p-2 rounded">
+                            {stores.map((store) => (
+                              <option key={store.id} value={store.id}>
+                                {store.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="title"
@@ -312,26 +340,7 @@ export default function JobLogSection() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="storeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Store</FormLabel>
-                        <FormControl>
-                          <select {...field} className="select w-full border p-2 rounded">
-                            {stores.map((store) => (
-                              <option key={store.id} value={store.id}>
-                                {store.name}
-                              </option>
-                            ))}
-                          </select>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <DialogFooter>
+                                   <DialogFooter>
                     <Button type="submit" disabled={isCreating}>
                       {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin bg-white" />}
                       Submit
