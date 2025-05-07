@@ -6,6 +6,8 @@ import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 export function FileUpload({
   onUploadComplete,
+  onChange, // ✅ needed to update form field
+  value = [], // ✅ array of URLs
   placeholder = "Select an image to upload",
   buttonText = "Upload Image",
   currentImage,
@@ -18,66 +20,70 @@ export function FileUpload({
   const [preview, setPreview] = useState(currentImage || null);
   const [progress, setProgress] = useState(0);
 
-  const handleUpload = useCallback(async (event) => {
-    if (!event.target.files?.length) return;
+  const handleUpload = useCallback(
+    async (event) => {
+      if (!event.target.files?.length) return;
 
-    const file = event.target.files[0];
-    setError(null);
-    setIsUploading(true);
-    setProgress(0);
+      const file = event.target.files[0];
+      setError(null);
+      setIsUploading(true);
+      setProgress(0);
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Only JPG, JPEG, PNG, and WEBP images are allowed.");
-      setIsUploading(false);
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      setError("File size should be less than 5MB.");
-      setIsUploading(false);
-      return;
-    }
-
-    try {
-      const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
-
-      const filePath = `joblogs/${Date.now()}_${file.name}`;
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('maintenance-images') // your real bucket name
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw new Error(uploadError.message || "Upload failed");
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(file.type)) {
+        setError("Only JPG, JPEG, PNG, and WEBP images are allowed.");
+        setIsUploading(false);
+        return;
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('maintenance-images')
-        .getPublicUrl(filePath);
-
-      const publicUrl = publicUrlData?.publicUrl;
-      if (!publicUrl) throw new Error("Failed to get public URL");
-
-      if (onUploadComplete) {
-        onUploadComplete(publicUrl);
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setError("File size should be less than 5MB.");
+        setIsUploading(false);
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to upload image");
-      setPreview(currentImage || null);
-    } finally {
-      setIsUploading(false);
-      event.target.value = "";
-    }
-  }, [onUploadComplete, currentImage, supabase]);
+
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        setPreview(objectUrl);
+
+        const filePath = `joblogs/${Date.now()}_${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("maintenance-images")
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) throw new Error(uploadError.message || "Upload failed");
+
+        const { data: publicUrlData } = supabase.storage
+          .from("maintenance-images")
+          .getPublicUrl(filePath);
+
+        const publicUrl = publicUrlData?.publicUrl;
+        if (!publicUrl) throw new Error("Failed to get public URL");
+
+        // ✅ Update form with new image URL
+        if (onChange) {
+          onChange([...value, publicUrl]);
+        }
+
+        if (onUploadComplete) {
+          onUploadComplete(publicUrl);
+        }
+      } catch (err) {
+        console.error(err);
+        setError(err.message || "Failed to upload image");
+        setPreview(currentImage || null);
+      } finally {
+        setIsUploading(false);
+        event.target.value = "";
+      }
+    },
+    [onUploadComplete, onChange, value, currentImage, supabase]
+  );
 
   const handleRemoveImage = useCallback(() => {
     setPreview(null);
@@ -98,7 +104,7 @@ export function FileUpload({
           disabled={isUploading}
         />
         <label
-           htmlFor={inputId}
+          htmlFor={inputId}
           className="flex-1 cursor-pointer flex items-center gap-2 border border-dashed rounded-md p-4 hover:bg-gray-50 transition-colors"
         >
           {isUploading ? (

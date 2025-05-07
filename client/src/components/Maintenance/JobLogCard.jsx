@@ -1,4 +1,3 @@
-// JobLogCard.jsx with @mentions support using react-mentions
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
@@ -23,7 +22,6 @@ export default function JobLogCard({ log }) {
   const { comments, addComment, loading } = useJobLogComments(log.id);
   const [staffList, setStaffList] = useState([]);
 
-  // Fetch staff list for @mentions
   useEffect(() => {
     const fetchStaff = async () => {
       const { data, error } = await supabase.from("users").select("id, name");
@@ -49,26 +47,19 @@ export default function JobLogCard({ log }) {
     }
   } catch {}
 
-  const hasImage = log.ImageUpload?.length > 0;
+  const hasImage = Array.isArray(log.ImageUpload) && log.ImageUpload.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <div className="cursor-pointer border rounded shadow hover:border-chai-gold">
-        {Array.isArray(log.ImageUpload) && log.ImageUpload.length > 0 && (
-  <div className="grid grid-cols-2 gap-2 mb-4">
-    {log.ImageUpload.map((url, i) =>
-      url ? (
-        <img
-          key={i}
-          src={url}
-          alt={`Job Image ${i + 1}`}
-          className="w-full max-h-40 object-cover rounded"
-        />
-      ) : null
-    )}
-  </div>
-)}
+          {hasImage && (
+            <img
+              src={log.ImageUpload[0]}
+              className="h-32 w-full object-cover rounded-t"
+              alt="Job Preview"
+            />
+          )}
           <div className="p-4 space-y-1 text-sm">
             <p className="font-semibold truncate">{log.title}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -86,18 +77,23 @@ export default function JobLogCard({ log }) {
         </div>
       </DialogTrigger>
 
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl w-full sm:max-w-[90%] md:max-w-2xl overflow-y-auto max-h-[90vh]">
         <DialogTitle>{log.title}</DialogTitle>
         <DialogDescription>
           Logged on {displayDate} by {log.loggedBy || "Unknown"}
         </DialogDescription>
 
         {hasImage && (
-          <img
-            src={log.ImageUpload[0]}
-            alt="Full"
-            className="w-full max-h-60 object-cover rounded mb-4"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-4">
+            {log.ImageUpload.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt={`Job Image ${i + 1}`}
+                className="w-full max-h-40 object-cover rounded"
+              />
+            ))}
+          </div>
         )}
 
         <p className="text-sm whitespace-pre-wrap mb-4">{log.description}</p>
@@ -107,7 +103,7 @@ export default function JobLogCard({ log }) {
             <strong>Category:</strong> {log.category}
           </p>
           <p>
-            <strong>Priority:</strong> {log.flag}
+            <strong>Priority:</strong> {log.flag.replace("_", " ")}
           </p>
         </div>
 
@@ -120,11 +116,12 @@ export default function JobLogCard({ log }) {
               <p className="text-sm text-muted-foreground">No comments yet.</p>
             ) : (
               comments.map((c) => (
-                <div key={c.id} className="bg-muted rounded p-2 text-sm">
+                <div key={c.id} className="bg-yellow-600 rounded p-2 text-sm text-white">
                   <p>{c.comment}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <div className="text-xs mt-1 opacity-80">
+                    <strong>{c.users?.name || "Unknown"}:</strong>{" "}
                     {format(new Date(c.created_at), "d MMM yyyy, h:mmaaa")}
-                  </p>
+                  </div>
                 </div>
               ))
             )}

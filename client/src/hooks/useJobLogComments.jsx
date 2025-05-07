@@ -9,7 +9,7 @@ export function useJobLogComments(joblogId) {
     setLoading(true);
     const { data, error } = await supabase
       .from("joblog_comments")
-      .select("*")
+      .select("*, users(name)")
       .eq("joblog_id", joblogId)
       .order("created_at", { ascending: true });
 
@@ -22,12 +22,13 @@ export function useJobLogComments(joblogId) {
     setLoading(false);
   };
 
-  const addComment = async (authId, commentText) => {
+  const addComment = async (authId, commentText, commenterName) => {
     const { error } = await supabase.from("joblog_comments").insert([
       {
         joblog_id: joblogId,
         user_auth_id: authId,
         comment: commentText,
+        commenter_name: commenterName,
       },
     ]);
 
