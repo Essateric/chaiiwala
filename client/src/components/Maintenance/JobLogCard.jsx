@@ -24,7 +24,7 @@ export default function JobLogCard({ log }) {
 
   useEffect(() => {
     const fetchStaff = async () => {
-      const { data, error } = await supabase.from("users").select("id, name");
+      const { data, error } = await supabase.from("profiles").select("id, name");
       if (!error) {
         setStaffList(data.map((u) => ({ id: u.id, display: u.name })));
       }
@@ -119,7 +119,7 @@ export default function JobLogCard({ log }) {
                 <div key={c.id} className="bg-yellow-600 rounded p-2 text-sm text-white">
                   <p>{c.comment}</p>
                   <div className="text-xs mt-1 opacity-80">
-                    <strong>{c.users?.name || "Unknown"}:</strong>{" "}
+                    <strong>{c.profiles?.name || "Unknown"}:</strong>{" "}
                     {format(new Date(c.created_at), "d MMM yyyy, h:mmaaa")}
                   </div>
                 </div>

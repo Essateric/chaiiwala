@@ -9,7 +9,7 @@ export function useJobLogComments(joblogId) {
     setLoading(true);
     const { data, error } = await supabase
       .from("joblog_comments")
-      .select("*, users(name)")
+      .select("*, profiles(name)")
       .eq("joblog_id", joblogId)
       .order("created_at", { ascending: true });
 

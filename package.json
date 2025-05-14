@@ -49,10 +49,12 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.3.0",
+    "express": "^5.1.0",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.453.0",
@@ -94,5 +96,17 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
-  }
+  },
+  "description": "A comprehensive full-stack dashboard for Chaiiwala (F&B chain) designed to streamline business operations across multiple domains.",
+  "main": "build-netlify.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Essateric/chaiiwala.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/Essateric/chaiiwala/issues"
+  },
+  "homepage": "https://github.com/Essateric/chaiiwala#readme"
 }

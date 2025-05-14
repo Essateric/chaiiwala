@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/UseAuth";
 import { cn } from "@/lib/utils";
 import {
@@ -23,13 +23,16 @@ import { supabase } from "@/lib/supabaseClient";
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logoutMutation } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
+  // ✅ Always call hooks unconditionally
   useEffect(() => {
     const fetchProfile = async () => {
       if (user?.id) {
         const { data, error } = await supabase
-          .from("users")
+          .from("profiles")
           .select("first_name, last_name, email, permissions, store_id")
           .eq("auth_id", user.id)
           .single();
@@ -40,12 +43,11 @@ export default function Sidebar({ isOpen, onClose }) {
           setProfile(data);
         }
       }
+      setLoading(false);
     };
 
     fetchProfile();
   }, [user]);
-
-  if (!user || !profile) return null;
 
   const currentPage = location.pathname === "/" ? "dashboard" : location.pathname.substring(1);
 
@@ -58,9 +60,12 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Deep Cleaning', icon: ClipboardCheckIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
     { name: 'Staff Schedule', icon: CalendarIcon, href: '/schedule', active: currentPage === 'schedule', roles: ['admin', 'regional', 'store', 'staff'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'store'] },
-    { name: 'User Management', icon: UsersIcon, href: '/users', active: currentPage === 'users', roles: ['admin'] },
+    { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional', 'store'] }
   ];
+
+  // ✅ Wait for profile to load before rendering
+  if (!user || loading || !profile) return null;
 
   const displayName = profile.first_name || profile.email.split("@")[0] || "User";
   const userInitial = displayName.charAt(0).toUpperCase();
@@ -70,7 +75,6 @@ export default function Sidebar({ isOpen, onClose }) {
       "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white transform transition-transform duration-300 ease-in-out",
       isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
     )}>
-      
       {/* Logo */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
         <div className="flex items-center">
@@ -95,17 +99,13 @@ export default function Sidebar({ isOpen, onClose }) {
           <div>
             <p className="text-sm font-medium">{displayName}</p>
             <p className="text-xs text-gray-400">
-              {profile.permissions === 'admin'
-  ? 'Administrator'
-  : profile.permissions === 'regional'
-  ? 'Regional Manager'
-  : profile.permissions === 'store'
-  ? 'Store Manager'
-  : profile.permissions === 'staff'
-  ? 'Staff'
-  : profile.permissions === 'maintenance'
-  ? 'Maintenance'
-  : 'User'}
+              {{
+                admin: 'Administrator',
+                regional: 'Regional Manager',
+                store: 'Store Manager',
+                staff: 'Staff',
+                maintenance: 'Maintenance'
+              }[profile.permissions] || 'User'}
             </p>
           </div>
         </div>
@@ -120,7 +120,6 @@ export default function Sidebar({ isOpen, onClose }) {
               profile.permissions === 'admin' || 
               profile.permissions === 'regional' || 
               (profile.permissions === 'store' && profile.store_id && allowedStoreIds.includes(profile.store_id));
-            
             if (!canAccessStockOrders) return null;
           } else if (!item.roles.includes(profile.permissions)) {
             return null;

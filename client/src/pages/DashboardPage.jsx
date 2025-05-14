@@ -29,6 +29,7 @@ import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useState, useEffect } from "react";
 import JobLogsGrid from "@/components/Maintenance/JobLogsGrid";
+import AddUserForm from "@/components/AddUserForm";
 
 
 export default function DashboardPage() {
@@ -81,7 +82,7 @@ export default function DashboardPage() {
   
       try {
         const { data, error } = await supabase
-          .from("users")
+          .from("profiles")
           .select("first_name, name, permissions, store_id")
           .eq("auth_id", user.id)
           .single();
@@ -416,42 +417,20 @@ export default function DashboardPage() {
         </TabsContent>
         
         {/* Staff Tab - Info from handwritten diagram */}
-        <TabsContent value="staff">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff Management</CardTitle>
-                <CardDescription>
-                  Manage staff schedules and absences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <UserX className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Staff Absences</h3>
-                          <p className="text-sm text-muted-foreground">Manage time off and sick leave</p>
-                        </div>
-                      </div>
-                    </Card>
-                    <Card className="p-4 border border-border">
-                      <div className="flex items-center space-x-3">
-                        <CalendarCheck className="h-10 w-10 text-chai-gold" />
-                        <div>
-                          <h3 className="font-semibold">Leave Approval</h3>
-                          <p className="text-sm text-muted-foreground">Manager review system</p>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+<TabsContent value="staff">
+  <div className="space-y-6">
+    <Card>
+      <CardHeader>
+        <CardTitle>Staff Management</CardTitle>
+        <CardDescription>Manage staff and create new accounts</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <AddUserForm />
+      </CardContent>
+    </Card>
+  </div>
+</TabsContent>
+
         
         {/* Bookings Tab - Info from handwritten diagram */}
         <TabsContent value="bookings">

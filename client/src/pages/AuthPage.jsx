@@ -20,6 +20,13 @@ const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+const signupSchema = z.object({
+  name: z.string().min(2, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+
 export default function AuthPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -27,6 +34,52 @@ export default function AuthPage() {
 
   // Get user state and loading status from useAuth
   const { user, isLoading } = useAuth();
+
+  const signupForm = useForm({
+  resolver: zodResolver(signupSchema),
+  defaultValues: {
+    name: "",
+    email: "",
+    password: "",
+  },
+});
+
+const signupMutation = useMutation({
+  mutationFn: async ({ name, email, password }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+      },
+    });
+    if (error) throw new Error(error.message);
+    return { user: data.user, email }; // manually return email for fallback
+  },
+  onSuccess: async ({ user, email }) => {
+    const name = signupForm.getValues().name;
+
+    await supabase.from("profiles").insert({
+      email,
+      name,
+      auth_id: user?.id || null, // insert null if not available
+      permissions: "store",
+      store_id: 1,
+    });
+
+    toast({ title: "Signup successful", description: "User created. Please check your email to confirm." });
+    setActiveTab("login");
+  },
+  onError: (error) => {
+    toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+  },
+});
+
+
+const onSignupSubmit = (values) => {
+  signupMutation.mutate(values);
+};
+
 
   // Redirect user to dashboard if already logged in
   useEffect(() => {
@@ -57,9 +110,9 @@ export default function AuthPage() {
       return data;
     },
     onSuccess: async ({ user }) => {
-      // Fetch user profile from the `users` table
+      // Fetch user profile from the `profiles` table
       const { data: profile, error } = await supabase
-        .from("users")
+        .from("profiles")
         .select("permissions")
         .eq("auth_id", user.id)
         .single();
@@ -103,6 +156,8 @@ export default function AuthPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+
             </TabsList>
 
             <TabsContent value="login">
@@ -145,6 +200,60 @@ export default function AuthPage() {
                 </form>
               </Form>
             </TabsContent>
+            <TabsContent value="signup">
+  <Form {...signupForm}>
+    <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
+      <FormField
+        control={signupForm.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Name</FormLabel>
+            <FormControl>
+              <Input placeholder="Full name" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={signupForm.control}
+        name="email"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Email</FormLabel>
+            <FormControl>
+              <Input placeholder="Email address" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={signupForm.control}
+        name="password"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Password</FormLabel>
+            <FormControl>
+              <Input type="password" placeholder="Create a password" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <Button 
+        type="submit" 
+        className="w-full bg-chai-gold hover:bg-yellow-700"
+        disabled={signupMutation.isPending}
+      >
+        {signupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Sign Up
+      </Button>
+    </form>
+  </Form>
+</TabsContent>
+
           </Tabs>
         </CardContent>
       </Card>

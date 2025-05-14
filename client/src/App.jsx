@@ -7,6 +7,7 @@ import ImportJobLogsPage from "@/pages/ImportJobLogs";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/hooks/UseAuth";
+import UserManagementPage from "./pages/UserManagementPage";
 
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
           element={
             <ProtectedRoute feature="stock_management">
               <StockManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-management"
+          element={
+            <ProtectedRoute feature="user_management">
+              <UserManagementPage />
             </ProtectedRoute>
           }
         />
