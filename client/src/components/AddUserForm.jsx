@@ -1,102 +1,179 @@
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/UseAuth";
+import { useStores } from "@/hooks/use-stores";
+// import { supabase } from "@/lib/supabaseClient"; // No longer needed for direct admin calls
 
-export default function AddUserForm() {
+export default function AddEmployeePage() {
+  const { profile, accessToken } = useAuth(); // Get accessToken
+  const { stores } = useStores();
+  const { toast } = useToast();
+
   const [form, setForm] = useState({
+    name: "",
     email: "",
     password: "",
-    first_name: "",
-    last_name: "",
-    role: "store",
-    store_id: ""
+    role: "store", // Default role, will be mapped to 'permissions'
+    storeId: "",   // Will be sent as 'store_id'
   });
 
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMessage("Creating user...");
 
-    const res = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      setMessage("✅ User created successfully");
-    } else {
-      setMessage("❌ Error: " + data.error);
+    if (!accessToken) {
+      toast({ title: "Authentication Error", description: "You are not authenticated. Please log in again.", variant: "destructive" });
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Split name into first_name and last_name
+    const nameParts = form.name.trim().split(" ");
+    const first_name = nameParts[0] || "";
+    const last_name = nameParts.slice(1).join(" ") || "";
+
+    if (!first_name) {
+      toast({ title: "Validation Error", description: "Name (first name) is required.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    const payload = {
+      email: form.email,
+      password: form.password,
+      first_name: first_name,
+      last_name: last_name,
+      permissions: form.role, // Map form's 'role' to 'permissions' for the Edge Function
+      store_id: form.storeId ? Number(form.storeId) : undefined, // Ensure store_id is a number or undefined
+    };
+
+    try {
+      const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", { // Ensure this URL is correct for your Edge Function
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`, // Add Authorization header
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        // Use the error message from the Edge Function if available
+        throw new Error(result.error || "Failed to create employee. Please check the details and try again.");
+      }
+
+      toast({ title: "✅ Employee added successfully", description: result.message || `User ${form.email} created.` });
+      // Reset the form to initial state
+      setForm({ name: "", email: "", password: "", role: "store", storeId: "" });
+    } catch (err) {
+      toast({ title: "❌ Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Role-based access control for the page itself
+  const allowed = ["admin", "regional"].includes(profile?.permissions);
+  if (!allowed) {
+    return <p className="p-4 text-center text-red-600">You do not have access to this page.</p>;
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded w-full max-w-md bg-white shadow">
-      <h2 className="text-xl font-semibold">Add New User</h2>
+    <div className="max-w-xl mx-auto p-4 space-y-4">
+      <h1 className="text-2xl font-bold text-center mb-6">Add New Employee</h1>
 
-      <input
-        type="email"
-        name="email"
-        placeholder="Email"
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="password"
-        name="password"
-        placeholder="Password"
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="text"
-        name="first_name"
-        placeholder="First name"
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="text"
-        name="last_name"
-        placeholder="Last name"
-        onChange={handleChange}
-        required
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="text"
-        name="store_id"
-        placeholder="Store ID (optional)"
-        onChange={handleChange}
-        className="w-full p-2 border rounded"
-      />
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-lg">
+        <div>
+          <Label htmlFor="name">Full Name</Label>
+          <Input
+            id="name"
+            value={form.name}
+            onChange={(e) => handleChange("name", e.target.value)}
+            required
+            placeholder="Enter employee's full name"
+            className="bg-white mt-1" // Retained class if it's intentional for styling
+          />
+        </div>
 
-      <select name="role" onChange={handleChange} value={form.role} className="w-full p-2 border rounded">
-        <option value="store">Store</option>
-        <option value="admin">Admin</option>
-        <option value="regional">Regional</option>
-        <option value="maintenance">Maintenance</option>
-      </select>
+        <div>
+          <Label htmlFor="email">Email Address</Label>
+          <Input
+            id="email"
+            type="email"
+            value={form.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            required
+            placeholder="Enter employee's email"
+            className="bg-white mt-1" // Retained class
+          />
+        </div>
 
-      <button
-        type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        disabled={loading}
-      >
-        {loading ? "Adding..." : "Add User"}
-      </button>
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={form.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            required
+            placeholder="Create a password"
+            className="bg-white mt-1" // Retained class
+          />
+        </div>
 
-      <p className="text-sm text-gray-700">{message}</p>
-    </form>
+        <div>
+          <Label htmlFor="role">Role</Label>
+          <select
+            id="role"
+            className="w-full border p-2 rounded bg-white shadow-sm focus:ring-chai-gold focus:border-chai-gold mt-1"
+            value={form.role}
+            onChange={(e) => handleChange("role", e.target.value)}
+          >
+            {/* Ensure roles match what your system expects */}
+            <option value="staff">Staff</option>
+            <option value="store">Store Manager</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="area">Area Manager</option> {/* Added Area Manager for completeness */}
+            <option value="regional">Regional Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        {(form.role === "store" || form.role === "staff" || form.role === "area") && ( // Area managers might also be assigned to specific stores
+          <div>
+            <Label htmlFor="storeId">Assign to Store</Label>
+            <select
+              id="storeId"
+              className="w-full border p-2 rounded bg-white shadow-sm focus:ring-chai-gold focus:border-chai-gold mt-1"
+              value={form.storeId}
+              onChange={(e) => handleChange("storeId", e.target.value)}
+              // Conditionally required if the role needs a store
+              required={form.role === "store" || form.role === "staff"}
+            >
+              <option value="">Select store (required for Staff/Store Manager)</option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name} (ID: {store.id})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <Button type="submit" disabled={loading} className="w-full bg-chai-gold hover:bg-yellow-600 text-white py-2.5">
+          {loading ? "Adding Employee..." : "Add Employee"}
+        </Button>
+      </form>
+    </div>
   );
 }

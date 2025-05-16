@@ -30,18 +30,25 @@ export default function Sidebar({ isOpen, onClose }) {
   // ✅ Always call hooks unconditionally
   useEffect(() => {
     const fetchProfile = async () => {
+      setLoading(true); // Start loading
       if (user?.id) {
+        console.log('[Sidebar] Fetching profile for user ID:', user.id);
         const { data, error } = await supabase
           .from("profiles")
-          .select("first_name, last_name, email, permissions, store_id")
+          .select("first_name, last_name, email, permissions, store_ids, store_location") // Added store_id if it's a separate field
           .eq("auth_id", user.id)
           .single();
 
         if (error) {
           console.error("Error fetching profile:", error.message);
+          setProfile(null); // Ensure profile is null on error
         } else {
           setProfile(data);
+          console.log('[Sidebar] Profile fetched:', data);
         }
+      } else {
+        console.log('[Sidebar] No user ID, profile not fetched.');
+        setProfile(null); // Explicitly set profile to null if no user
       }
       setLoading(false);
     };
@@ -52,8 +59,8 @@ export default function Sidebar({ isOpen, onClose }) {
   const currentPage = location.pathname === "/" ? "dashboard" : location.pathname.substring(1);
 
   const navItems = [
-    { name: 'Dashboard', icon: HomeIcon, href: '/', active: currentPage === 'dashboard', roles: ['admin', 'regional', 'store', 'staff'] },
-    { name: 'Maintenance', icon: WrenchIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store'] },
+    { name: 'Dashboard', icon: HomeIcon, href: '/', active: currentPage === 'dashboard', roles: ['admin', 'regional', 'area','store', 'staff'] },
+    { name: 'Maintenance', icon: WrenchIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
     { name: 'Event Orders', icon: CalendarDaysIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional'] },
@@ -64,11 +71,21 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional', 'store'] }
   ];
 
-  // ✅ Wait for profile to load before rendering
-  if (!user || loading || !profile) return null;
+  if (loading) {
+    console.log('[Sidebar] Profile loading...');
+    // Optionally, render a skeleton sidebar or a loading indicator
+    return <div className="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white p-4">Loading...</div>;
+  }
 
-  const displayName = profile.first_name || profile.email.split("@")[0] || "User";
-  const userInitial = displayName.charAt(0).toUpperCase();
+  if (!user) {
+    console.log('[Sidebar] No authenticated user. Sidebar not rendered.');
+    return null; // Don't render sidebar if no user is logged in
+  }
+
+  // If profile is still null after loading and user exists, it means profile fetch failed or no profile exists.
+  // The UI should gracefully handle this.
+  const displayName = profile?.first_name || profile?.email?.split("@")[0] || "User";
+  const userInitial = displayName?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <div className={cn(
@@ -102,10 +119,11 @@ export default function Sidebar({ isOpen, onClose }) {
               {{
                 admin: 'Administrator',
                 regional: 'Regional Manager',
+                area: 'Area Manager',
                 store: 'Store Manager',
                 staff: 'Staff',
-                maintenance: 'Maintenance'
-              }[profile.permissions] || 'User'}
+                maintenance: 'Maintenance',
+              }[profile?.permissions] || 'User Role'}
             </p>
           </div>
         </div>
@@ -114,14 +132,19 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Navigation */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
         {navItems.map((item, index) => {
-          if (item.name === 'Stock Orders') {
-            const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7];
+          // Safely check profile and permissions before rendering items
+          // If profile is null, or permissions are not in the allowed roles, return null
+          if (item.name === 'Stock Orders' && profile) { // Add profile check here
+            const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // Example IDs
             const canAccessStockOrders = 
-              profile.permissions === 'admin' || 
-              profile.permissions === 'regional' || 
-              (profile.permissions === 'store' && profile.store_id && allowedStoreIds.includes(profile.store_id));
+              profile?.permissions === 'admin' || 
+              profile.permissions === 'regional' ||
+              // Check if profile.store_ids (array) has any common elements with allowedStoreIds
+              (profile.permissions === 'store' && 
+               profile.store_ids && 
+               profile.store_ids.some(id => allowedStoreIds.includes(id)));
             if (!canAccessStockOrders) return null;
-          } else if (!item.roles.includes(profile.permissions)) {
+          } else if (!profile?.permissions || !item.roles.includes(profile.permissions)) {
             return null;
           }
 

@@ -38,7 +38,6 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
   const [selectedStore, setSelectedStore] = useState("all"); 
 
-  console.log("inside dashboard page");
   // Fetch stores data
   const { data: stores = [] } = useQuery({
     queryKey: ["/api/stores"],
@@ -83,7 +82,7 @@ export default function DashboardPage() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("first_name, name, permissions, store_id")
+          .select("first_name, name, permissions, store_ids")
           .eq("auth_id", user.id)
           .single();
   
