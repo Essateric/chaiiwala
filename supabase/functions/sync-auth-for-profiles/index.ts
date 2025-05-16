@@ -24,7 +24,8 @@ Deno.serve(async (req) => {
 
     let profilesQuery = supabaseAdmin
       .from("profiles")
-      .select("id, name, email, auth_id, permissions, store_id");
+      // Ensure you select all necessary fields from profiles table
+      .select("id, name, first_name, last_name, email, auth_id, permissions, store_id, store_ids");
 
     if (specificEmail) {
       profilesQuery = profilesQuery.eq("email", specificEmail);
@@ -50,17 +51,34 @@ Deno.serve(async (req) => {
         skipped++;
         continue;
       }
-       console.log("👤 Attempting auth create for:", user.email); // 🔍 ADD THIS
+      console.log("👤 Attempting auth create for:", user.email);
+
+      const user_metadata_payload: Record<string, any> = {
+        name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        first_name: user.first_name || user.name?.split(" ")[0] || '',
+        last_name: user.last_name || user.name?.split(" ").slice(1).join(" ") || '',
+      };
+
+      const app_metadata_payload: Record<string, any> = {
+        user_role: user.permissions,
+      };
+
+      // Handle store_id (primary) and store_ids (array)
+      if (user.store_id && !isNaN(Number(user.store_id))) {
+        app_metadata_payload.primary_store_id = Number(user.store_id);
+        // If store_ids array isn't on the profile, use primary_store_id to form it
+        app_metadata_payload.user_store_ids = user.store_ids && user.store_ids.length > 0 ? user.store_ids.map(Number).filter(id => !isNaN(id)) : [Number(user.store_id)];
+      } else if (user.store_ids && user.store_ids.length > 0) {
+        app_metadata_payload.user_store_ids = user.store_ids.map(Number).filter(id => !isNaN(id));
+        app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0]; // Default to first in array
+      }
 
       const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: user.email,
-        password: "password123",
+        password: "password123", // SECURITY RISK: Still hardcoded. Consider a flow to force password reset.
         email_confirm: true,
-        user_metadata: {
-          name: user.name,
-          permissions: user.permissions,
-          store_id: user.store_id || null,
-        },
+        user_metadata: user_metadata_payload,
+        app_metadata: app_metadata_payload,
       });
 
   if (createError || !authUser?.user?.id) {

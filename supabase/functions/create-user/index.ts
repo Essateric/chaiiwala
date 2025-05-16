@@ -62,26 +62,41 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, email, password, permissions, store_id } = body;
+    // Expecting first_name, last_name from AddStaff.jsx / AddUserForm.jsx
+    const { first_name, last_name, email, password, permissions, store_id } = body;
 
-    if (!email || !password || !name) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+    if (!email || !password || !first_name || !permissions) {
+      // last_name can be optional, but first_name and permissions are crucial
+      return new Response(JSON.stringify({ error: "Missing required fields: email, password, first_name, permissions are required." }), {
         status: 400,
         headers: corsHeaders,
       });
     }
 
-    // ✅ Try to create auth user
-    const metadata: Record<string, any> = { name, permissions };
+    const full_name = `${first_name} ${last_name || ''}`.trim();
+
+    const user_metadata_payload: Record<string, any> = {
+      name: full_name,
+      first_name: first_name,
+      last_name: last_name || null, // Ensure last_name is explicitly null if empty
+    };
+
+    const app_metadata_payload: Record<string, any> = {
+      user_role: permissions, // The trigger will look for 'user_role'
+    };
+
     if (store_id && !isNaN(Number(store_id))) {
-      metadata.store_id = Number(store_id);
+      const numericStoreId = Number(store_id);
+      app_metadata_payload.primary_store_id = numericStoreId; // For the trigger to identify the main store
+      app_metadata_payload.user_store_ids = [numericStoreId]; // For the trigger, pass as an array
     }
 
     const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: metadata,
+      user_metadata: user_metadata_payload,
+      app_metadata: app_metadata_payload, // Pass app_metadata for the trigger
     });
 
     if (createError) {

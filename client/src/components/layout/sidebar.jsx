@@ -35,7 +35,7 @@ export default function Sidebar({ isOpen, onClose }) {
         console.log('[Sidebar] Fetching profile for user ID:', user.id);
         const { data, error } = await supabase
           .from("profiles")
-          .select("first_name, last_name, email, permissions, store_ids, store_location") // Added store_id if it's a separate field
+          .select("first_name, last_name, email, permissions, store_ids, store_location") // Corrected select: removed store_id, added store_location
           .eq("auth_id", user.id)
           .single();
 
