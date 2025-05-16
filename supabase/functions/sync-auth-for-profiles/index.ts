@@ -1,6 +1,7 @@
 /// <reference types="jsr:@supabase/functions-js/edge-runtime" />
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Supabase admin client using service role
 const supabaseAdmin = createClient(
   Deno.env.get("PROJECT_URL")!,
   Deno.env.get("SERVICE_ROLE_KEY")!
@@ -10,6 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "Content-Length, X-JSON",
   "Content-Type": "application/json",
 };
 
@@ -19,94 +21,143 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200, headers: corsHeaders });
     }
 
-    const body = await req.json();
-    const specificEmail = body?.email;
-
-    let profilesQuery = supabaseAdmin
-      .from("profiles")
-      // Ensure you select all necessary fields from profiles table
-      .select("id, name, first_name, last_name, email, auth_id, permissions, store_id, store_ids");
-
-    if (specificEmail) {
-      profilesQuery = profilesQuery.eq("email", specificEmail);
+    // Authenticate the caller (should be admin or regional)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: corsHeaders,
+      });
     }
 
-    const { data: profiles, error: fetchError } = await profilesQuery;
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseClient = createClient(
+      Deno.env.get("PROJECT_URL")!,
+      Deno.env.get("ANON_KEY")!,
+      {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      }
+    );
 
-    if (fetchError) {
-      console.log("❌ Failed to fetch profiles:", fetchError.message);
-      return new Response(JSON.stringify({ error: fetchError.message }), {
+    const { data: { user: inviter }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !inviter) {
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: corsHeaders,
+      });
+    }
+
+    // Check if the authenticated user has permission to invite
+    const { data: inviterProfile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("permissions")
+      .eq("auth_id", inviter.id)
+      .single();
+
+    if (profileError || !inviterProfile || !["admin", "regional"].includes(inviterProfile.permissions)) {
+      return new Response(JSON.stringify({ error: "Forbidden: Only Admin or Regional Managers can invite users." }), {
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
+
+    const body = await req.json();
+    const { email, role, full_name, store_ids, primary_store_id } = body;
+
+    if (!email || !role || !full_name || !full_name.trim()) {
+      return new Response(JSON.stringify({ error: "Missing required fields: email, role, and full_name are required." }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // Prepare user_metadata
+    const user_metadata_payload: Record<string, any> = {};
+    const trimmed_full_name = full_name.trim();
+    user_metadata_payload.name = trimmed_full_name; // Full name
+    const nameParts = trimmed_full_name.split(" ");
+    user_metadata_payload.first_name = nameParts[0] || ''; 
+    user_metadata_payload.last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : null;
+
+    // Prepare app_metadata
+    const app_metadata_payload: Record<string, any> = {
+      user_role: role,
+    };
+
+    const numericStoreIds = (store_ids && Array.isArray(store_ids))
+      ? store_ids.map(Number).filter(id => !isNaN(id))
+      : [];
+    app_metadata_payload.user_store_ids = numericStoreIds;
+
+    let numericPrimaryStoreId = (primary_store_id && !isNaN(Number(primary_store_id)))
+      ? Number(primary_store_id)
+      : null;
+
+    if (numericPrimaryStoreId) {
+      app_metadata_payload.primary_store_id = numericPrimaryStoreId;
+      if (!app_metadata_payload.user_store_ids.includes(numericPrimaryStoreId)) {
+           app_metadata_payload.user_store_ids.push(numericPrimaryStoreId);
+      }
+    } else if (app_metadata_payload.user_store_ids.length > 0) {
+       app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
+    } else {
+       app_metadata_payload.primary_store_id = null;
+    }
+    
+    if ((role === 'staff' || role === 'store') && !app_metadata_payload.primary_store_id) {
+        return new Response(JSON.stringify({ error: `A store must be assigned for role: ${role}.` }), {
+            status: 400,
+            headers: corsHeaders,
+        });
+    }
+
+    // Step 1: Send the invitation email, this sets user_metadata
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: user_metadata_payload, 
+      // redirectTo: 'https://your-app.com/auth/confirm', // Optional
+    });
+
+    if (inviteError) {
+      console.error("❌ Failed to send invitation (Step 1):", inviteError.message);
+      return new Response(JSON.stringify({ error: `Failed to send invitation: ${inviteError.message}` }), {
         status: 500,
         headers: corsHeaders,
       });
     }
 
-    let createdCount = 0;
-    let skipped = 0;
-    const messages: string[] = [];
-
-    for (const user of profiles) {
-      if (!user.email || user.auth_id) {
-        console.log(`⏭ Skipping user ${user.email} (missing email or already has auth_id)`);
-        skipped++;
-        continue;
-      }
-      console.log("👤 Attempting auth create for:", user.email);
-
-      const user_metadata_payload: Record<string, any> = {
-        name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-        first_name: user.first_name || user.name?.split(" ")[0] || '',
-        last_name: user.last_name || user.name?.split(" ").slice(1).join(" ") || '',
-      };
-
-      const app_metadata_payload: Record<string, any> = {
-        user_role: user.permissions,
-      };
-
-      // Handle store_id (primary) and store_ids (array)
-      if (user.store_id && !isNaN(Number(user.store_id))) {
-        app_metadata_payload.primary_store_id = Number(user.store_id);
-        // If store_ids array isn't on the profile, use primary_store_id to form it
-        app_metadata_payload.user_store_ids = user.store_ids && user.store_ids.length > 0 ? user.store_ids.map(Number).filter(id => !isNaN(id)) : [Number(user.store_id)];
-      } else if (user.store_ids && user.store_ids.length > 0) {
-        app_metadata_payload.user_store_ids = user.store_ids.map(Number).filter(id => !isNaN(id));
-        app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0]; // Default to first in array
-      }
-
-      const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: user.email,
-        password: "password123", // SECURITY RISK: Still hardcoded. Consider a flow to force password reset.
-        email_confirm: true,
-        user_metadata: user_metadata_payload,
-        app_metadata: app_metadata_payload,
+    if (!inviteData || !inviteData.user || !inviteData.user.id) {
+      console.error("❌ Invitation sent but no user data returned from inviteUserByEmail.");
+      return new Response(JSON.stringify({ error: "Invitation sent but no user data returned from invite step." }), {
+        status: 500,
+        headers: corsHeaders,
       });
-
-  if (createError || !authUser?.user?.id) {
-  console.log(`❌ Failed to create auth for ${user.email}:`, createError?.message || "No user returned");
-  messages.push(`Failed for ${user.email}: ${createError?.message || "No user returned"}`);
-  continue;
-}
-
-      await supabaseAdmin
-        .from("profiles")
-        .update({ auth_id: authUser.user.id })
-        .eq("id", user.id);
-
-      messages.push(`✅ Created and linked: ${user.email}`);
-      createdCount++;
     }
 
+    // Step 2: Update the invited user to set app_metadata
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      inviteData.user.id,
+      { app_metadata: app_metadata_payload }
+    );
+
+    if (updateError) {
+      console.error(`❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
+      // Log this critical issue. The invite was sent, but profile creation via trigger will be incomplete.
+      // You might want to return an error that indicates partial success or failure.
+      return new Response(JSON.stringify({ error: `Invitation sent, but failed to set user role/store: ${updateError.message}` }), {
+        status: 500, // Or a different status code indicating partial success
+        headers: corsHeaders,
+      });
+    }
+
+    console.log(`✅ Invitation sent to ${email} with role ${role}. User ID: ${inviteData.user.id}. App metadata updated.`);
     return new Response(
-      JSON.stringify({
-        created: createdCount,
-        skipped,
-        details: messages,
-      }),
+      JSON.stringify({ message: `Invitation sent to ${email}`, user: inviteData.user }),
       { status: 200, headers: corsHeaders }
     );
+
   } catch (err: any) {
-    console.log("🔥 Uncaught error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.log("🔥 Uncaught error in invite-user:", err?.message || err);
+    return new Response(JSON.stringify({ error: "Unhandled server error" }), {
       status: 500,
       headers: corsHeaders,
     });

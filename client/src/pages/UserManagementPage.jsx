@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Search, Edit, Trash, UserPlus, Lock } from "lucide-react";
+import { PlusCircle, Search, Edit, UserPlus, Lock } from "lucide-react"; // Removed unused Trash icon
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/UseAuth";
@@ -29,130 +29,90 @@ export default function UserManagementPage() {
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // New state for the Invite User dialog
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    password: "",
+    permissions: "staff",
+    storeId: "", // Represents the ID of a single selected store for roles like staff/store manager
+    storeIds: [], // Represents the array of store IDs for roles like area manager
+  });
+
   const [showInviteUserDialog, setShowInviteUserDialog] = useState(false);
   const [newInviteUser, setNewInviteUser] = useState({
     email: "",
-    role: "staff", // Default role for invite form
-    storeId: "", // For single store selection (staff, store manager)
-    storeIds: [], // For multiple store selection (area manager)
-    full_name: "", // Optional name for metadata
+    role: "staff",
+    storeId: "",
+    storeIds: [],
+    full_name: "",
   });
 
-
-  // This function calls the create-user Edge Function
-  const createAuthUser = async (user) => {
-  try {
-   // SECURITY RISK: This fetch call does NOT include the Authorization header.
-   // Anyone knowing this URL could potentially call this function.
-   // It should include the admin user's JWT from useAuth.
-   const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    // Add Authorization header here:
-    // Authorization: `Bearer ${accessToken}`, // Assuming accessToken is available
-  },
-  body: JSON.stringify({
-    email: user.email,
-    password: user.password,
-    name: user.name,
-    permissions: user.permissions,
-    store_id: user.store_id, // Note: create-user Edge Function currently expects single store_id
-  }),
-});
-
-    const result = await response.json();
-
-    if (!response.ok) throw new Error(result.error || 'Something went wrong');
-
-    console.log('✅ User created:', result.message);
-    return result;
-  } catch (err) {
-    console.error('❌ Failed to create user:', err.message);
-    throw err;
-  }
-};
-
+  const { profile, accessToken } = useAuth();
 
   const { data: profiles = [], refetch: refetchprofiles } = useQuery({
     queryKey: ["profiles"],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles")
-      .select("*"); // include auth_id, permissions, store_ids
+      .select("id, auth_id, name, first_name, last_name, email, permissions, store_ids, store_location"); // Removed primary_store_id
       if (error) throw new Error(error.message);
+      console.log("UserManagementPage: Fetched profiles data:", data);
       return data;
     },
   });
-
-  
 
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("stores").select("*");
+      const { data, error } = await supabase.from("stores").select("id, name");
       if (error) throw new Error(error.message);
       return data;
     },
   });
 
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    password: "",
-    permissions: "staff", // Use 'permissions' for consistency with profile table
-    storeId: "", // For single store selection in Add/Edit form
-    storeIds: [], // For multiple store selection in Add/Edit form
-  });
-
-  const { profile, accessToken  } = useAuth();
-
   if (!profile || !["admin", "regional"].includes(profile.permissions)) {
     return (
       <DashboardLayout title="User Management">
-        <p className="p-6 text-muted-foreground">Access Denied</p>
+        <p className="p-6 text-muted-foreground text-center">Access Denied</p>
       </DashboardLayout>
     );
   }
 
   const filteredUsers = profiles.filter((user) => {
+    const userName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim();
     const matchesSearch =
       searchTerm === "" ||
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    // Filter by permissions (role) - assuming 'role' in filter state matches 'permissions' in profile
+
     const matchesRole = roleFilter === "all" || user.permissions === roleFilter;
     return matchesSearch && matchesRole;
   });
-
-  console.log("Filtered Users:", filteredUsers);
 
   const getRoleBadge = (permissions) => {
     switch (permissions) {
       case "admin": return <Badge className="bg-purple-100 text-purple-800">Admin</Badge>;
       case "area": return <Badge className="bg-indigo-100 text-indigo-800">Area Manager</Badge>;
       case "regional": return <Badge className="bg-blue-100 text-blue-800">Regional</Badge>;
-      case "store": return <Badge className="bg-green-100 text-green-800">Store</Badge>;
+      case "store": return <Badge className="bg-green-100 text-green-800">Store Manager</Badge>;
       case "staff": return <Badge className="bg-gray-100 text-gray-800">Staff</Badge>;
-      case "maintenance": return <Badge className="bg-orange-100 text-orange-800">Maintenance</Badge>; // Added maintenance badge
+      case "maintenance": return <Badge className="bg-orange-100 text-orange-800">Maintenance</Badge>;
       default: return <Badge>{permissions}</Badge>;
     }
   };
 
   const getStoreName = (storeId) => {
-    if (!storeId) return "N/A";
+    if (!storeId) return "";
     const store = stores.find((s) => s.id === storeId);
     return store ? store.name : `Store #${storeId}`;
   };
 
-  // Handler to open the Add User dialog
   const handleAddUser = () => {
     setSelectedUser(null);
     setNewUser({
       name: "",
       email: "",
       password: "",
-      permissions: "staff", // Default permission for Add User form
+      permissions: "staff",
       storeId: "",
       storeIds: [],
     });
@@ -160,89 +120,59 @@ export default function UserManagementPage() {
     setShowAddUserDialog(true);
   };
 
-  // Handler to open the Invite User dialog
   const handleInviteUserClick = () => {
-    setNewInviteUser({ email: "", role: "staff", storeId: "", storeIds: [], full_name: "" }); // Reset invite form
+    setNewInviteUser({ email: "", role: "staff", storeId: "", storeIds: [], full_name: "" });
     setShowInviteUserDialog(true);
   };
-
 
   const handleEditUser = (user) => {
     if (!user) return;
     setSelectedUser(user);
+
+    let initialStoreId = "";
+    // If the user is staff or store manager and has store_ids, use the first one for the single-select dropdown.
+    if ((user.permissions === "staff" || user.permissions === "store") && user.store_ids && user.store_ids.length > 0) {
+      initialStoreId = user.store_ids[0].toString();
+    }
+    // For area managers, storeId (single select) can be left blank as multi-select (storeIds) is primary.
+    // For admin/regional/maintenance, storeId will also be blank.
+
     setNewUser({
-      name: user.name || "", // Use name from profile, fallback to empty string
-      email: user.email || "", // Use email from profile, fallback
-      password: "", // Password is not fetched/displayed
-      permissions: user.permissions || "staff", // Use permissions from profile
-      storeId: user.store_ids?.[0]?.toString() || "", // Use first store ID for single select, convert to string
-      storeIds: user.store_ids || [], // Use store_ids array
+      name: user.name || "",
+      email: user.email || "",
+      password: "", // Password is not fetched/edited here directly
+      permissions: user.permissions || "staff",
+      storeId: initialStoreId, 
+      storeIds: user.store_ids || [],
     });
     setPasswordReset({ password: "", confirm: "" });
     setShowAddUserDialog(true);
   };
 
-  // This function seems intended to sync profiles without auth_id by creating auth users
   const handleSyncAuth = async (user) => {
+    if (!accessToken) {
+       return toast({ title: "Authentication Error", description: "Missing token.", variant: "destructive" });
+    }
     try {
-      // SECURITY RISK: This fetch call does NOT include the Authorization header.
-      // Anyone knowing this URL could potentially call this function.
-      // It should include the admin user's JWT from useAuth.
-      const session = await supabase.auth.getSession();
-      const token = session.data?.session?.access_token;
-      if (!token) throw new Error("Missing token");
-
+      // The sync-auth-for-profiles function expects 'email' in the body.
+      // It seems to be designed to create an auth user if one doesn't exist for a profile.
       const res = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/sync-auth-for-profiles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // This one correctly includes the token
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ email: user.email }),
+        body: JSON.stringify({ email: user.email }), // Consider if more data is needed by the function
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      if (!res.ok) throw new Error(data.error || "Something went wrong during sync");
 
-      toast({ title: "Success", description: data.details?.[0] || `Auth created for ${user.email}` });
+      toast({ title: "Sync Complete", description: data.details?.[0] || `Auth sync processed for ${user.email}` });
       refetchprofiles();
     } catch (err) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
-  // This function seems intended to create a login for a profile that doesn't have one
-  const handleSetLogin = async (user) => {
-    try {
-      // SECURITY RISK: supabase.auth.admin.createUser is called directly from client-side.
-      // This requires exposing your service role key on the frontend.
-      // This logic should be moved to a secure backend function.
-      const { data: authUser, error } = await supabase.auth.admin.createUser({
-        email: user.email,
-        password: "password123", // SECURITY RISK: Hardcoded password
-        email_confirm: true,
-        user_metadata: {
-          name: user.name,
-          permissions: user.permissions || user.role || "store", // Use permissions from profile
-        },
-      });
-
-      if (error) throw error;
-
-      // Link the newly created auth user to the existing profile
-      await supabase
-        .from("profiles")
-        .update({ auth_id: authUser.user.id })
-        .eq("id", user.id); // Update by profile ID
-
-      toast({
-        title: "Login Enabled",
-        description: `Account created for ${user.name}`,
-      });
-
-      refetchprofiles(); // Refetch profiles to show the updated auth_id
-    } catch (err) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      console.error("❌ Failed to sync auth:", err.message);
+      toast({ title: "❌ Sync Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -257,17 +187,20 @@ export default function UserManagementPage() {
     if (passwordReset.password !== passwordReset.confirm) {
       return toast({ title: "Passwords do not match", variant: "destructive" });
     }
+    if (!selectedUser?.auth_id) {
+        return toast({ title: "Error", description: "User does not have an associated login.", variant: "destructive" });
+    }
+    if (!accessToken) {
+       return toast({ title: "Authentication Error", description: "Missing token.", variant: "destructive" });
+    }
 
     try {
-      // SECURITY RISK: supabase.auth.admin.updateUserById is called directly from client-side.
-      // This requires exposing your service role key on the frontend.
-      // This logic should be moved to a secure backend function.
-      const { error } = await supabase.auth.admin.updateUserById(selectedUser.auth_id, { // Use auth_id
+      // SECURITY NOTE: Calling supabase.auth.admin.updateUserById directly from client is a security risk.
+      // This should ideally be an Edge Function.
+      const { error } = await supabase.auth.admin.updateUserById(selectedUser.auth_id, {
         password: passwordReset.password,
       });
-
       if (error) throw error;
-
       toast({ title: "Password Reset", description: "Password has been reset successfully." });
       setShowResetPasswordDialog(false);
     } catch (err) {
@@ -275,165 +208,190 @@ export default function UserManagementPage() {
     }
   };
 
-  // Function to submit the Add/Edit User form
   const submitUserForm = async () => {
-    // Password check only if adding a new user or if password fields are filled for an existing user
-    if ((!selectedUser || (selectedUser && passwordReset.password)) && passwordReset.password !== passwordReset.confirm) {
+    // Password match validation for new user or if password is being changed for existing
+    if (!selectedUser && passwordReset.password !== passwordReset.confirm) {
       return toast({ title: "Passwords do not match", variant: "destructive" });
     }
+    // Basic validation for new user
+    if (!selectedUser && (!newUser.name || !newUser.email || !passwordReset.password)) {
+         return toast({ title: "Validation Error", description: "Name, Email, and Password are required for new users.", variant: "destructive" });
+    }
+    // Store assignment validation for new user
+     if (!selectedUser && (newUser.permissions === "store" || newUser.permissions === "staff") && !newUser.storeId) {
+        return toast({ title: "Validation Error", description: `Please assign a store for role: ${newUser.permissions}.`, variant: "destructive" });
+     }
+     if (!selectedUser && newUser.permissions === "area" && (!newUser.storeIds || newUser.storeIds.length === 0)) {
+         return toast({ title: "Validation Error", description: "Please assign at least one store for Area Manager role.", variant: "destructive" });
+     }
 
     try {
-      if (!selectedUser) { // Logic for Adding a NEW User
-        // SECURITY RISK: supabase.auth.admin.createUser is called directly from client-side.
-        // This requires exposing your service role key on the frontend.
-        // This logic should be moved to a secure backend function (like your create-user Edge Function).
-        // Note: The existing createAuthUser function above is a better approach, but still needs auth header.
-        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      if (!accessToken) {
+        throw new Error("Authentication token not found. Please log in again.");
+      }
+
+      if (!selectedUser) { // Adding a NEW User
+        const nameParts = newUser.name.trim().split(" ");
+        const first_name = nameParts[0] || "";
+        const last_name = nameParts.slice(1).join(" ") || "";
+
+        // The create-user Edge Function expects 'store_id' (singular) for the primary store.
+        // It uses this to populate app_metadata.primary_store_id and app_metadata.user_store_ids.
+        // The database trigger then uses this app_metadata to populate profiles.store_ids and profiles.store_location.
+        let primaryStoreIdForFunction = undefined;
+        if ((newUser.permissions === "store" || newUser.permissions === "staff") && newUser.storeId) {
+            primaryStoreIdForFunction = Number(newUser.storeId);
+        } else if (newUser.permissions === "area" && newUser.storeIds && newUser.storeIds.length > 0) {
+            // For area managers, create-user expects a single store_id.
+            // We send the first selected storeId as the primary for the function.
+            // The function will then create user_store_ids as [primaryStoreIdForFunction].
+            // If create-user needs to set multiple store_ids directly in app_metadata, it needs modification.
+            primaryStoreIdForFunction = Number(newUser.storeIds[0]);
+        }
+
+
+        const payload = {
           email: newUser.email,
-          password: passwordReset.password, // Use password from state
-          email_confirm: true,
-          user_metadata: { // user_metadata is for user-facing data
-            name: newUser.name,
-            // permissions: newUser.permissions, // Permissions are better in app_metadata or profile table
-            // store_id: newUser.storeId, // Store ID is better in app_metadata or profile table
-          },
-          // app_metadata: { // app_metadata is for internal app data (used by trigger)
-          //   user_role: newUser.permissions,
-          //   user_store_ids: newUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum)), // Ensure array of numbers
-          // }
-        });
-
-        if (authError) throw authError;
-
-        // If relying on trigger, profile is created automatically.
-        // If not relying on trigger, you would manually insert profile here.
-        // Given your trigger exists, rely on it.
-
-        toast({
-          title: "User Created",
-          description: `${newUser.name} has been created. Profile will be set up automatically.`,
-        });
-
-      } else { // Logic for Editing an EXISTING User
-        // Update profile details in 'profiles' table
-        const profileUpdates = {
-          name: newUser.name,
-          permissions: newUser.permissions, // Update permissions from form state
+          password: passwordReset.password,
+          first_name: first_name,
+          last_name: last_name,
+          permissions: newUser.permissions,
+          store_id: primaryStoreIdForFunction, // This is what create-user Edge Function expects
         };
 
-        // Handle store_ids update based on the selected role and input type
+        const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Failed to create user");
+        toast({ title: "✅ User Created", description: result.message || `${newUser.name} created.` });
+
+      } else { // Editing an EXISTING User
+        const profileUpdates = {
+          name: newUser.name,
+          first_name: newUser.name.trim().split(" ")[0] || "",
+          last_name: newUser.name.trim().split(" ").slice(1).join(" ") || null,
+          permissions: newUser.permissions,
+          store_ids: [], // Default to empty
+          store_location: null, // Default to null
+        };
+
         if ((newUser.permissions === "store" || newUser.permissions === "staff") && newUser.storeId) {
-          profileUpdates.store_ids = [parseInt(newUser.storeId, 10)].filter(id => !isNaN(id));
-        } else if (newUser.permissions === "area") {
-          profileUpdates.store_ids = newUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
-        } else {
-          profileUpdates.store_ids = []; // Or null, depending on your schema for roles without stores
+          const numericStoreId = parseInt(newUser.storeId, 10);
+          if (!isNaN(numericStoreId)) {
+            profileUpdates.store_ids = [numericStoreId];
+            profileUpdates.store_location = getStoreName(numericStoreId); // Derive store_location
+          }
+        } else if (newUser.permissions === "area" && newUser.storeIds && newUser.storeIds.length > 0) {
+          const numericStoreIds = newUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
+          profileUpdates.store_ids = numericStoreIds;
+          // Set store_location to the name of the first store, or a generic message, or leave null
+          profileUpdates.store_location = numericStoreIds.length > 0 ? getStoreName(numericStoreIds[0]) : "Multiple Stores";
         }
+        // For admin, regional, maintenance, store_ids remains [] and store_location remains null (access to all)
+        // This is handled by the defaults if the conditions above are not met.
 
         const { error: profileUpdateError } = await supabase
           .from("profiles")
-          .update(profileUpdates)
-          .eq("auth_id", selectedUser.auth_id); // Update by auth_id
-
+          .update(profileUpdates) // profileUpdates no longer contains primary_store_id
+          .eq("auth_id", selectedUser.auth_id);
         if (profileUpdateError) throw profileUpdateError;
-
-        // If password was entered, update auth user's password
-        if (passwordReset.password) {
-           // SECURITY RISK: supabase.auth.admin.updateUserById is called directly from client-side.
-           // This requires exposing your service role key on the frontend.
-           // This logic should be moved to a secure backend function.
-          const { error: passwordUpdateError } = await supabase.auth.admin.updateUserById(
-            selectedUser.auth_id, // Use auth_id of the user being edited
-            { password: passwordReset.password }
-          );
-          if (passwordUpdateError) throw passwordUpdateError;
-        }
-
         toast({ title: "User Updated", description: `${newUser.name}'s details have been updated.` });
       }
-
       setShowAddUserDialog(false);
-      refetchprofiles(); // Refetch profiles to update the list
+      refetchprofiles();
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
-  // Function to submit the invite user form
   const submitInviteUser = async () => {
-    if (!newInviteUser.email || !newInviteUser.role) {
-      return toast({ title: "Email and Role are required", variant: "destructive" });
+    if (!newInviteUser.email || !newInviteUser.role || !newInviteUser.full_name.trim()) {
+      return toast({ title: "Validation Error", description: "Email, Full Name, and Role are required.", variant: "destructive" });
     }
+    if ((newInviteUser.role === "store" || newInviteUser.role === "staff") && !newInviteUser.storeId) {
+      return toast({ title: "Validation Error", description: "Please assign a store for Staff or Store Manager roles.", variant: "destructive" });
+    }
+     if (newInviteUser.role === "area" && (!newInviteUser.storeIds || newInviteUser.storeIds.length === 0)) {
+        return toast({ title: "Validation Error", description: "Please assign at least one store for Area Manager role.", variant: "destructive" });
+     }
 
-    let storeIdsForPayload = [];
-    // Determine store_ids based on role and input type in the invite form
+    // Prepare payload for invite-user Edge Function
+    // The invite-user function expects primary_store_id and store_ids (array)
+    let primaryStoreIdForInvite = undefined;
+    let storeIdsArrayForInvite = [];
+
     if ((newInviteUser.role === "store" || newInviteUser.role === "staff") && newInviteUser.storeId) {
       const id = parseInt(newInviteUser.storeId, 10);
       if (!isNaN(id)) {
-        storeIdsForPayload = [id]; // Single store ID as an array
+        primaryStoreIdForInvite = id;
+        storeIdsArrayForInvite = [id];
       }
     } else if (newInviteUser.role === "area" && newInviteUser.storeIds.length > 0) {
-      // Area manager can have multiple store IDs
-      storeIdsForPayload = newInviteUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
+      storeIdsArrayForInvite = newInviteUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
+       if (storeIdsArrayForInvite.length > 0) {
+        // invite-user function sets primary_store_id from the first element of store_ids if primary_store_id is not explicitly provided.
+        // So, we can either send it explicitly or let the function derive it.
+        primaryStoreIdForInvite = storeIdsArrayForInvite[0];
+      }
     }
-    // For admin, regional, maintenance, storeIdsForPayload remains empty []
 
     try {
-      // Call the new invite-user Edge Function
+      if (!accessToken) {
+         throw new Error("Authentication token not found. Please log in again.");
+      }
       const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/invite-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`, // Authenticate the inviter (admin/regional)
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           email: newInviteUser.email,
           role: newInviteUser.role,
-          store_ids: storeIdsForPayload, // Pass the processed array of numbers
-          full_name: newInviteUser.full_name, // Optional
-          // redirect_to: "https://your-app.com/auth" // Optional: override default redirect
+          full_name: newInviteUser.full_name,
+          primary_store_id: primaryStoreIdForInvite, // Expected by invite-user
+          store_ids: storeIdsArrayForInvite,       // Expected by invite-user
         }),
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to send invitation');
-
       toast({ title: "✅ Invitation Sent", description: `Invitation sent to ${newInviteUser.email}` });
       setShowInviteUserDialog(false);
-      // Note: The invited user won't appear in the 'profiles' list until they accept the invite and sign up.
-      // So, refetching profiles here might not show them immediately, but it's good practice.
       refetchprofiles();
-
     } catch (err) {
       console.error("❌ Failed to send invitation:", err.message);
       toast({ title: "❌ Error Sending Invite", description: err.message, variant: "destructive" });
     }
   };
 
-
-  // Helper function to render store assignment fields based on role and active dialog
   const renderStoreAssignment = () => {
-    // Determine which form state to use based on which dialog is open
     const activeFormState = showInviteUserDialog ? newInviteUser : newUser;
     const updateActiveFormState = showInviteUserDialog ? setNewInviteUser : setNewUser;
-    // Use 'role' for invite form state, 'permissions' for add/edit form state
     const roleField = showInviteUserDialog ? activeFormState.role : activeFormState.permissions;
 
-    // Render single store select for 'store' or 'staff' roles
+    if (roleField === "admin" || roleField === "regional" || roleField === "maintenance") {
+        return <p className="text-sm text-muted-foreground">This role has access to all stores.</p>;
+    }
+
     if (roleField === "store" || roleField === "staff") {
       return (
         <div className="space-y-2">
-          <Label>Assigned Store</Label>
+          <Label htmlFor={showInviteUserDialog ? "invite-store" : "add-edit-store"}>
+            Assigned Store { (roleField === "store" || roleField === "staff") && <span className="text-red-500">*</span>}
+          </Label>
           <Select
-            value={activeFormState.storeId} // Use storeId for single select value
-            onValueChange={(value) => updateActiveFormState({ ...activeFormState, storeId: value })}
+            value={activeFormState.storeId}
+            onValueChange={(value) => updateActiveFormState({ ...activeFormState, storeId: value, storeIds: value ? [parseInt(value,10)] : [] })}
           >
-            <SelectTrigger>
+            <SelectTrigger id={showInviteUserDialog ? "invite-store" : "add-edit-store"}>
               <SelectValue placeholder="Select store" />
             </SelectTrigger>
             <SelectContent>
               {stores.map((store) => (
-                <SelectItem key={store.id} value={store.id.toString()}> {/* Value is string */}
+                <SelectItem key={store.id} value={store.id.toString()}>
                   {store.name}
                 </SelectItem>
               ))}
@@ -443,25 +401,25 @@ export default function UserManagementPage() {
       );
     }
 
-    // Render multi-store checkboxes for 'area' role
     if (roleField === "area") {
       return (
         <div className="space-y-2">
-          <Label>Assigned Stores</Label>
-          <div className="grid gap-2 max-h-48 overflow-y-auto">
+          <Label>Assigned Stores <span className="text-red-500">*</span></Label>
+          <div className="grid gap-2 max-h-48 overflow-y-auto border rounded p-2">
             {stores.map((store) => (
-              <label key={store.id} className="flex items-center space-x-2">
+              <label key={store.id} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  // Check if the store ID (as number) is included in the storeIds array (of numbers)
                   checked={activeFormState.storeIds?.includes(store.id)}
                   onChange={(e) => {
-                    const storeIdNum = store.id; // Store ID is already a number
+                    const storeIdNum = store.id;
                     const updated = e.target.checked
                       ? [...(activeFormState.storeIds || []), storeIdNum]
                       : (activeFormState.storeIds || []).filter((id) => id !== storeIdNum);
-                    updateActiveFormState({ ...activeFormState, storeIds: updated });
+                    // Update storeId (single select) to the first in the array for consistency, or clear if empty
+                    updateActiveFormState({ ...activeFormState, storeIds: updated, storeId: updated.length > 0 ? updated[0].toString() : "" });
                   }}
+                  className="form-checkbox text-chai-gold"
                 />
                 <span>{store.name}</span>
               </label>
@@ -470,7 +428,6 @@ export default function UserManagementPage() {
         </div>
       );
     }
-    // Return null for roles that don't require store assignment (admin, regional, maintenance)
     return null;
   };
 
@@ -484,13 +441,11 @@ export default function UserManagementPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full max-w-sm"
           />
-          {/* Role Filter Select (Optional) */}
            <Select
             value={roleFilter}
             onValueChange={setRoleFilter}
-            className="w-full max-w-[180px]"
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full max-w-[180px]">
               <SelectValue placeholder="Filter by role" />
             </SelectTrigger>
             <SelectContent>
@@ -507,11 +462,9 @@ export default function UserManagementPage() {
           <Button onClick={handleAddUser}>
             <UserPlus className="w-4 h-4 mr-2" /> Add User
           </Button>
-          {/* New Invite User Button */}
           <Button onClick={handleInviteUserClick} variant="outline">
             <UserPlus className="w-4 h-4 mr-2" /> Invite User
           </Button>
-
         </div>
 
         <div className="overflow-auto border rounded">
@@ -521,42 +474,39 @@ export default function UserManagementPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Store(s)</TableHead> {/* Updated column header */}
+                <TableHead>Store(s)</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell>{user.name}</TableCell>
+                  <TableCell>{user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{getRoleBadge(user.permissions)}</TableCell>
-                  {/* Updated cell rendering for store_ids array */}
-                  <TableCell>
+                  <TableCell className="min-w-[150px]">
                     {user.store_ids && user.store_ids.length > 0
-                      ? user.store_ids.map(id => getStoreName(id)).join(', ') // Display list of store names
-                      : (user.store_id ? getStoreName(user.store_id) : 'N/A') // Fallback for old single store_id if needed
+                      ? user.store_ids.map(id => getStoreName(id)).join(', ')
+                      : (user.store_location || 'N/A') // Display store_location if store_ids is empty
                     }
                   </TableCell>
                   <TableCell className="flex justify-end gap-2">
                     <Button size="icon" variant="ghost" onClick={() => handleEditUser(user)}>
                       <Edit className="w-4 h-4" />
                     </Button>
-                    {/* Only show Reset Password if user has an auth_id */}
                     {user.auth_id && (
                        <Button size="icon" variant="ghost" onClick={() => handleResetPassword(user)}>
                          <Lock className="w-4 h-4" />
                        </Button>
                     )}
-                    {/* Only show Sync Auth if user does NOT have an auth_id */}
-                    {!user.auth_id && (
+                    {!user.auth_id && ( // This button is for profiles without an auth_id
                        <Button
                          size="icon"
                          variant="ghost"
                          onClick={() => handleSyncAuth(user)}
                          title="Sync Auth (Create login for existing profile)"
                        >
-                         <UserPlus className="w-4 h-4" /> {/* Using UserPlus for sync */}
+                         <UserPlus className="w-4 h-4" />
                        </Button>
                     )}
                   </TableCell>
@@ -565,7 +515,7 @@ export default function UserManagementPage() {
             </TableBody>
           </Table>
           {filteredUsers.length === 0 && (
-            <p className="p-4 text-muted-foreground">No users found.</p>
+            <p className="p-4 text-muted-foreground text-center">No users found matching criteria.</p>
           )}
         </div>
       </div>
@@ -581,19 +531,17 @@ export default function UserManagementPage() {
                 : "Enter the details for the new user. A login will be created."}
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4 py-4"> {/* Added py-4 for spacing */}
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="add-edit-name">Name</Label>
+              <Label htmlFor="add-edit-name">Full Name</Label>
               <Input
                 id="add-edit-name"
                 value={newUser.name}
                 onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                 placeholder="Full name"
-                required // Added required
+                required
               />
             </div>
-
              <div className="space-y-2">
               <Label htmlFor="add-edit-email">Email</Label>
               <Input
@@ -602,16 +550,15 @@ export default function UserManagementPage() {
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 placeholder="Email address"
-                required // Added required
-                disabled={!!selectedUser} // Disable email edit for existing users
+                required
+                disabled={!!selectedUser} // Email cannot be changed for existing users
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="add-edit-permissions">Role</Label>
               <Select
                 value={newUser.permissions}
-                onValueChange={(value) => setNewUser({ ...newUser, permissions: value, storeId: "", storeIds: [] })} // Reset store selection on role change
+                onValueChange={(value) => setNewUser({ ...newUser, permissions: value, storeId: "", storeIds: [] })}
               >
                 <SelectTrigger id="add-edit-permissions">
                   <SelectValue placeholder="Select role" />
@@ -622,15 +569,12 @@ export default function UserManagementPage() {
                   <SelectItem value="area">Area Manager</SelectItem>
                   <SelectItem value="store">Store Manager</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem> {/* Added maintenance */}
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {renderStoreAssignment()} {/* Re-use for Add/Edit dialog */}
-
-            {/* Password fields only for adding new user or if explicitly resetting */}
-            {!selectedUser && (
+            {renderStoreAssignment()}
+            {!selectedUser && ( // Only show password fields for new users
               <>
                 <div className="space-y-2">
                   <Label htmlFor="add-password">Password</Label>
@@ -640,7 +584,7 @@ export default function UserManagementPage() {
                     value={passwordReset.password}
                     onChange={(e) => setPasswordReset({ ...passwordReset, password: e.target.value })}
                     placeholder="Enter password"
-                    required={!selectedUser} // Required only when adding
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -651,16 +595,12 @@ export default function UserManagementPage() {
                     value={passwordReset.confirm}
                     onChange={(e) => setPasswordReset({ ...passwordReset, confirm: e.target.value })}
                     placeholder="Confirm password"
-                    required={!selectedUser} // Required only when adding
+                    required
                   />
                 </div>
               </>
             )}
-             {/* Note: Resetting password for existing users is handled by the separate Reset Password dialog */}
-
           </div>
-
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddUserDialog(false)}>
               Cancel
@@ -725,7 +665,6 @@ export default function UserManagementPage() {
               Send an email invitation for a new user to set up their account.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email</Label>
@@ -738,23 +677,22 @@ export default function UserManagementPage() {
                 required
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="invite-name">Full Name (Optional)</Label>
+              <Label htmlFor="invite-name">Full Name <span className="text-red-500">*</span></Label>
               <Input
                 id="invite-name"
                 type="text"
+                required
                 value={newInviteUser.full_name}
                 onChange={(e) => setNewInviteUser({ ...newInviteUser, full_name: e.target.value })}
                 placeholder="Full name (for profile)"
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="invite-role">Role</Label>
               <Select
                 value={newInviteUser.role}
-                onValueChange={(value) => setNewInviteUser({ ...newInviteUser, role: value, storeId: "", storeIds: [] })} // Reset store selection on role change
+                onValueChange={(value) => setNewInviteUser({ ...newInviteUser, role: value, storeId: "", storeIds: [] })}
               >
                 <SelectTrigger id="invite-role">
                   <SelectValue placeholder="Select role" />
@@ -769,7 +707,7 @@ export default function UserManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-            {renderStoreAssignment()} {/* Re-use for invite dialog */}
+            {renderStoreAssignment()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInviteUserDialog(false)}>Cancel</Button>

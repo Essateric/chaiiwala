@@ -5,10 +5,10 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/UseAuth";
 import { useStores } from "@/hooks/use-stores";
-import { supabase } from "@/lib/supabaseClient";
+// import { supabase } from "@/lib/supabaseClient"; // No longer needed for direct admin calls
 
 export default function AddEmployeePage() {
-  const { profile } = useAuth();
+  const { profile, accessToken } = useAuth(); // Get accessToken
   const { stores } = useStores();
   const { toast } = useToast();
 
@@ -30,28 +30,46 @@ export default function AddEmployeePage() {
     e.preventDefault();
     setLoading(true);
 
+    if (!accessToken) {
+      toast({ title: "Authentication Error", description: "You are not authenticated. Please log in again.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    // Split name into first_name and last_name
+    const nameParts = form.name.trim().split(" ");
+    const first_name = nameParts[0] || "";
+    const last_name = nameParts.slice(1).join(" ") || "";
+
+    if (!first_name) { // Basic validation for first name
+      toast({ title: "Validation Error", description: "Full Name (at least first name) is required.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    const payload = {
+      email: form.email,
+      password: form.password,
+      first_name: first_name,
+      last_name: last_name,
+      permissions: form.role, // Edge function expects 'permissions'
+      store_id: form.storeId ? Number(form.storeId) : undefined,
+    };
+
     try {
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: form.email,
-        password: form.password,
-        email_confirm: true,
+      const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", { // Ensure this URL is correct
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to create employee. Please check the details and try again.");
 
-      const auth_id = data.user.id;
-
-      const { error: insertError } = await supabase.from("profiles").insert({
-        auth_id,
-        name: form.name,
-        email: form.email,
-        permissions: form.role,
-        store_id: form.storeId || null,
-      });
-
-      if (insertError) throw insertError;
-
-      toast({ title: "✅ Employee added successfully" });
+      toast({ title: "✅ Employee added successfully", description: result.message || `User ${form.email} created.` });
       setForm({ name: "", email: "", password: "", role: "store", storeId: "" });
     } catch (err) {
       toast({ title: "❌ Error", description: err.message, variant: "destructive" });
@@ -64,13 +82,14 @@ export default function AddEmployeePage() {
   if (!allowed) return <p className="p-4">You do not have access to this page.</p>;
 
   return (
-    <div className="max-w-xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Add New Employee</h1>
+    <div className="max-w-xl mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-bold text-center mb-6">Add New Employee</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-lg">
         <div>
-          <Label>Name</Label>
+          <Label htmlFor="name-addstaff">Full Name</Label>
           <Input
+            id="name-addstaff"
             value={form.name}
             onChange={(e) => handleChange("name", e.target.value)}
             required
@@ -79,9 +98,11 @@ export default function AddEmployeePage() {
         </div>
 
         <div>
-          <Label>Email</Label>
+          <Label htmlFor="email-addstaff">Email Address</Label>
           <Input
+            id="email-addstaff"
             type="email"
+            placeholder="Enter employee's email"
             value={form.email}
             onChange={(e) => handleChange("email", e.target.value)}
             required
@@ -90,9 +111,11 @@ export default function AddEmployeePage() {
         </div>
 
         <div>
-          <Label>Password</Label>
+          <Label htmlFor="password-addstaff">Password</Label>
           <Input
+            id="password-addstaff"
             type="password"
+            placeholder="Create a password"
             value={form.password}
             onChange={(e) => handleChange("password", e.target.value)}
             required
@@ -101,13 +124,14 @@ export default function AddEmployeePage() {
         </div>
 
         <div>
-          <Label>Role</Label>
+          <Label htmlFor="role-addstaff">Role</Label>
           <select
-            className="w-full border p-2 rounded bg-white"
+            id="role-addstaff"
+            className="w-full border p-2 rounded bg-white shadow-sm focus:ring-chai-gold focus:border-chai-gold mt-1"
             value={form.role}
             onChange={(e) => handleChange("role", e.target.value)}
           >
-            <option value="store">Store</option>
+            {/* Ensure roles match what your system expects */}
             <option value="staff">Staff</option>
             <option value="maintenance">Maintenance</option>
             <option value="regional">Regional</option>
@@ -117,14 +141,15 @@ export default function AddEmployeePage() {
 
         {(form.role === "store" || form.role === "staff") && (
           <div>
-            <Label>Assign to Store</Label>
+            <Label htmlFor="storeId-addstaff">Assign to Store</Label>
             <select
-              className="w-full border p-2 rounded bg-white"
+              id="storeId-addstaff"
+              className="w-full border p-2 rounded bg-white shadow-sm focus:ring-chai-gold focus:border-chai-gold mt-1"
               value={form.storeId}
               onChange={(e) => handleChange("storeId", e.target.value)}
               required
             >
-              <option value="">Select store</option>
+              <option value="">Select store (required for Staff/Store Manager)</option>
               {stores.map((store) => (
                 <option key={store.id} value={store.id}>
                   {store.name}
@@ -134,7 +159,7 @@ export default function AddEmployeePage() {
           </div>
         )}
 
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="w-full bg-chai-gold hover:bg-yellow-600 text-white py-2.5">
           {loading ? "Adding..." : "Add Employee"}
         </Button>
       </form>
