@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/UseAuth";
 import { useStores } from "@/hooks/use-stores";
 // import { supabase } from "@/lib/supabaseClient"; // No longer needed for direct admin calls
 
-export default function AddEmployeePage() {
+export default function AddStaffPage() {
   const { profile, accessToken } = useAuth(); // Get accessToken
   const { stores } = useStores();
   const { toast } = useToast();
@@ -16,14 +16,19 @@ export default function AddEmployeePage() {
     name: "",
     email: "",
     password: "",
-    role: "store",
+    role: "staff", // Default role to staff, can be changed
     storeId: "",
   });
 
   const [loading, setLoading] = useState(false);
 
   const handleChange = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    console.log(`handleChange called - Key: ${key}, Value: ${value}`); // Log 1: See if handleChange is triggered
+    setForm((prev) => {
+      const newState = { ...prev, [key]: value };
+      console.log("handleChange - New form state after update:", newState); // Log 2: See the state just after setForm
+      return newState;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -47,14 +52,21 @@ export default function AddEmployeePage() {
       return;
     }
 
+    // Log 3: See the form state right before creating the payload
+    console.log("handleSubmit - Current form state before creating payload:", form);
+
     const payload = {
       email: form.email,
       password: form.password,
       first_name: first_name,
       last_name: last_name,
       permissions: form.role, // Edge function expects 'permissions'
-      store_id: form.storeId ? Number(form.storeId) : undefined,
+
+            store_ids: form.storeId ? [Number(form.storeId)] : [],
     };
+
+    // Log the payload to the browser console to inspect what's being sent
+    console.log("Payload being sent to create-user:", payload);
 
     try {
       const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/create-user", { // Ensure this URL is correct
@@ -70,7 +82,7 @@ export default function AddEmployeePage() {
       if (!response.ok) throw new Error(result.error || "Failed to create employee. Please check the details and try again.");
 
       toast({ title: "✅ Employee added successfully", description: result.message || `User ${form.email} created.` });
-      setForm({ name: "", email: "", password: "", role: "store", storeId: "" });
+      setForm({ name: "", email: "", password: "", role: "staff", storeId: "" }); // Reset to new default role
     } catch (err) {
       toast({ title: "❌ Error", description: err.message, variant: "destructive" });
     } finally {
@@ -133,13 +145,15 @@ export default function AddEmployeePage() {
           >
             {/* Ensure roles match what your system expects */}
             <option value="staff">Staff</option>
+            <option value="store">Store Manager</option>
             <option value="maintenance">Maintenance</option>
-            <option value="regional">Regional</option>
+            <option value="area">Area Manager</option>
+            <option value="regional">Regional Manager</option>
             <option value="admin">Admin</option>
           </select>
         </div>
 
-        {(form.role === "store" || form.role === "staff") && (
+        {(form.role === "store" || form.role === "staff" || form.role === "area") && (
           <div>
             <Label htmlFor="storeId-addstaff">Assign to Store</Label>
             <select
@@ -147,9 +161,10 @@ export default function AddEmployeePage() {
               className="w-full border p-2 rounded bg-white shadow-sm focus:ring-chai-gold focus:border-chai-gold mt-1"
               value={form.storeId}
               onChange={(e) => handleChange("storeId", e.target.value)}
-              required
+              // Conditionally required
+              required={form.role === "store" || form.role === "staff"}
             >
-              <option value="">Select store (required for Staff/Store Manager)</option>
+              <option value="">Select store { (form.role === "store" || form.role === "staff") && "(required)"}</option>
               {stores.map((store) => (
                 <option key={store.id} value={store.id}>
                   {store.name}

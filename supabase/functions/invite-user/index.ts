@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
       }
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
+    const { data: { user: inviter }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !inviter) {
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
         status: 401,
         headers: corsHeaders,
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const { data: inviterProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("permissions")
-      .eq("auth_id", user.id)
+      .eq("auth_id", inviter.id)
       .single();
 
     if (profileError || !inviterProfile || !["admin", "regional"].includes(inviterProfile.permissions)) {
@@ -62,78 +62,101 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    // Expecting email, role, optional full_name, store_ids (array), primary_store_id
-    const { email, role, full_name, store_ids, primary_store_id } = body;
+    // Removed unused store_location from destructuring
+    const { email, role, full_name, store_ids, primary_store_id  } = body;
 
-    if (!email || !role) {
-      return new Response(JSON.stringify({ error: "Missing required fields: email and role are required." }), {
+    if (!email || !role || !full_name || !full_name.trim()) {
+      return new Response(JSON.stringify({ error: "Missing required fields: email, role, and full_name are required." }), {
         status: 400,
         headers: corsHeaders,
       });
     }
 
-    // Prepare metadata for the invited user
+    // Prepare user_metadata
     const user_metadata_payload: Record<string, any> = {};
-    if (full_name) {
-        user_metadata_payload.name = full_name;
-        // Attempt to split full name into first/last if only full_name is provided
-        const nameParts = full_name.trim().split(" ");
-        user_metadata_payload.first_name = nameParts[0] || '';
-        user_metadata_payload.last_name = nameParts.slice(1).join(" ") || null;
-    }
-    // If frontend sends first_name/last_name separately, add them here too if needed,
-    // but the trigger should handle parsing 'name' if only that's sent.
+    const trimmed_full_name = full_name.trim();
+    user_metadata_payload.name = trimmed_full_name; // Full name
+    const nameParts = trimmed_full_name.split(" ");
+    user_metadata_payload.first_name = nameParts[0] || ''; 
+    user_metadata_payload.last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : null;
 
+    // Prepare app_metadata
     const app_metadata_payload: Record<string, any> = {
-      user_role: role, // The trigger will look for 'user_role'
+      user_role: role,
     };
 
-    // Add store info to app_metadata if provided
-    if (store_ids && Array.isArray(store_ids)) {
-        app_metadata_payload.user_store_ids = store_ids.map(Number).filter(id => !isNaN(id));
-    } else {
-        app_metadata_payload.user_store_ids = []; // Ensure it's always an array
-    }
+    const numericStoreIds = (store_ids && Array.isArray(store_ids))
+      ? store_ids.map(Number).filter(id => !isNaN(id))
+      : [];
+    app_metadata_payload.user_store_ids = numericStoreIds;
 
-    if (primary_store_id && !isNaN(Number(primary_store_id))) {
-        app_metadata_payload.primary_store_id = Number(primary_store_id);
-        // Ensure primary_store_id is also in user_store_ids if it wasn't already
-        if (!app_metadata_payload.user_store_ids.includes(app_metadata_payload.primary_store_id)) {
-             app_metadata_payload.user_store_ids.push(app_metadata_payload.primary_store_id);
-        }
+    let numericPrimaryStoreId = (primary_store_id && !isNaN(Number(primary_store_id)))
+      ? Number(primary_store_id)
+      : null;
+
+    if (numericPrimaryStoreId) {
+      app_metadata_payload.primary_store_id = numericPrimaryStoreId;
+      if (!app_metadata_payload.user_store_ids.includes(numericPrimaryStoreId)) {
+           app_metadata_payload.user_store_ids.push(numericPrimaryStoreId);
+      }
     } else if (app_metadata_payload.user_store_ids.length > 0) {
-         // If no primary_store_id is explicitly set, use the first one from the array
-         app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
+       app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
     } else {
-         app_metadata_payload.primary_store_id = null;
+       app_metadata_payload.primary_store_id = null;
+    }
+    
+    if ((role === 'staff' || role === 'store') && !app_metadata_payload.primary_store_id) {
+        return new Response(JSON.stringify({ error: `A store must be assigned for role: ${role}.` }), {
+            status: 400,
+            headers: corsHeaders,
+        });
     }
 
-    // Send the invitation email
-    const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { // This data goes into raw_user_meta_data and raw_app_meta_data
-        ...user_metadata_payload,
-        ...app_metadata_payload, // Merge app_metadata fields here
-      },
-      // Optional: redirect the user after they click the confirmation link
-      // redirectTo: 'https://your-app.com/auth/confirm',
+    // Step 1: Send the invitation email, this sets user_metadata
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: user_metadata_payload, 
+      redirectTo: `${Deno.env.get("https://chaiiwala.essateric.com")}/auth`, // Redirect to your main auth page
     });
 
     if (inviteError) {
-      console.error("❌ Failed to send invitation:", inviteError.message);
-      return new Response(JSON.stringify({ error: inviteError.message }), {
+      console.error("❌ Failed to send invitation (Step 1):", inviteError.message);
+      return new Response(JSON.stringify({ error: `Failed to send invitation: ${inviteError.message}` }), {
         status: 500,
         headers: corsHeaders,
       });
     }
 
-    console.log(`✅ Invitation sent to ${email} with role ${role}`);
+    if (!inviteData || !inviteData.user || !inviteData.user.id) {
+      console.error("❌ Invitation sent but no user data returned from inviteUserByEmail.");
+      return new Response(JSON.stringify({ error: "Invitation sent but no user data returned from invite step." }), {
+        status: 500,
+        headers: corsHeaders,
+      });
+    }
+
+    // Step 2: Update the invited user to set app_metadata
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      inviteData.user.id,
+      { app_metadata: app_metadata_payload }
+    );
+
+    if (updateError) {
+      console.error(`❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
+      // Log this critical issue. The invite was sent, but profile creation via trigger will be incomplete.
+      return new Response(JSON.stringify({ error: `Invitation sent, but failed to set user role/store: ${updateError.message}` }), {
+        status: 500, 
+        headers: corsHeaders,
+      });
+    }
+
+    console.log(`✅ Invitation sent to ${email} with role ${role}. User ID: ${inviteData.user.id}. App metadata updated.`);
     return new Response(
-      JSON.stringify({ message: `Invitation sent to ${email}`, user: data.user }),
+      JSON.stringify({ message: `Invitation sent to ${email}`, user: inviteData.user }),
       { status: 200, headers: corsHeaders }
     );
 
   } catch (err: any) {
-    console.log("🔥 Uncaught error:", err?.message || err);
+    console.log("🔥 Uncaught error in invite-user:", err?.message || err);
     return new Response(JSON.stringify({ error: "Unhandled server error" }), {
       status: 500,
       headers: corsHeaders,

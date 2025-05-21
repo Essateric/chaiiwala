@@ -342,6 +342,15 @@ export default function UserManagementPage() {
       if (!accessToken) {
          throw new Error("Authentication token not found. Please log in again.");
       }
+      // CRUCIAL LOG: Inspect the payload before sending
+      console.log("UserManagementPage.jsx - Payload for invite-user:", {
+        email: newInviteUser.email,
+        role: newInviteUser.role,
+        full_name: newInviteUser.full_name,
+        primary_store_id: primaryStoreIdForInvite,
+        store_ids: storeIdsArrayForInvite,
+      });
+
       const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/invite-user", {
         method: "POST",
         headers: {

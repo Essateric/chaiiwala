@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     // Expecting first_name, last_name from AddStaff.jsx / AddUserForm.jsx
-    const { first_name, last_name, email, password, permissions, store_id } = body;
+    const { first_name, last_name, email, password, permissions, store_ids } = body;
 
     if (!email || !password || !first_name || !permissions) {
       // last_name can be optional, but first_name and permissions are crucial

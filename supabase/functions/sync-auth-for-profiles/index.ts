@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, role, full_name, store_ids, primary_store_id } = body;
+    // Removed unused store_location from destructuring
+    const { email, role, full_name, store_ids, primary_store_id  } = body;
 
     if (!email || !role || !full_name || !full_name.trim()) {
       return new Response(JSON.stringify({ error: "Missing required fields: email, role, and full_name are required." }), {
@@ -114,7 +115,7 @@ Deno.serve(async (req) => {
     // Step 1: Send the invitation email, this sets user_metadata
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: user_metadata_payload, 
-      // redirectTo: 'https://your-app.com/auth/confirm', // Optional
+      redirectTo: `${Deno.env.get("https://chaiiwala.essateric.com")}/auth`, // Redirect to your main auth page
     });
 
     if (inviteError) {
@@ -142,9 +143,8 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error(`❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
       // Log this critical issue. The invite was sent, but profile creation via trigger will be incomplete.
-      // You might want to return an error that indicates partial success or failure.
       return new Response(JSON.stringify({ error: `Invitation sent, but failed to set user role/store: ${updateError.message}` }), {
-        status: 500, // Or a different status code indicating partial success
+        status: 500, 
         headers: corsHeaders,
       });
     }

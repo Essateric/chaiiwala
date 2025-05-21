@@ -53,7 +53,7 @@ export default function AddEmployeePage() {
       first_name: first_name,
       last_name: last_name,
       permissions: form.role, // Map form's 'role' to 'permissions' for the Edge Function
-      store_id: form.storeId ? Number(form.storeId) : undefined, // Ensure store_id is a number or undefined
+      store_ids: form.storeId ? [Number(form.storeId)] : [],
     };
 
     try {
