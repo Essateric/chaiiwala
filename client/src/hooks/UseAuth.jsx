@@ -26,25 +26,29 @@ export function AuthProvider({ children }) {
   // const [error, setError] = useState(null); // sessionErrorHook will provide session errors
 
   const { toast } = useToast();
-  const supabase = useSupabaseClient(); // Get Supabase client from auth-helpers
+  const supabaseClient = useSupabaseClient(); // Get Supabase client from auth-helpers
   const { session, isLoading: isLoadingSessionHook, error: sessionErrorHook } = useSessionContext();
 
   // Combined loading state: true if session is loading OR profile is loading
   const isLoading = isLoadingSessionHook || isProfileLoading;
 
   useEffect(() => {
-    // One-time check for invite flow from URL hash on component mount
-    // This effect runs only once when the AuthProvider mounts.
-    if (typeof window !== 'undefined' && window.location.hash.includes('type=invite') && !isInviteFlowContext) {
+    // Check for invite flow from URL hash when the component mounts.
+    // This effect runs once on mount.
+    const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+    console.log("AuthProvider (Mount Effect): Checking for invite. Hash:", currentHash);
+
+    if (currentHash.includes('type=invite')) {
       const urlParams = new URLSearchParams(window.location.hash.substring(1));
       if (urlParams.get('type') === 'invite') {
-        console.log("AuthProvider: Invite token detected in URL. Setting isInviteFlowContext true.");
+        console.log("AuthProvider (Mount Effect): Invite token detected. Setting isInviteFlowContext to true.");
         setIsInviteFlowContext(true);
-        // Clean the hash - Supabase auth-helpers might do this, or we can.
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Let Supabase auth-helpers (via useSessionContext) handle hash consumption and cleaning.
+      } else {
+        console.log("AuthProvider (Mount Effect): 'type=invite' in hash, but 'type' param is not 'invite'.");
       }
     }
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []); // Empty dependency array: runs only once on mount.
 
   useEffect(() => {
     // This effect reacts to changes in session state from useSessionContext
@@ -57,26 +61,31 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    // Log the state of isInviteFlowContext *before* checking sessionErrorHook
+    console.log("AuthProvider (Session Effect): Current isInviteFlowContext before error check:", isInviteFlowContext);
+
     if (sessionErrorHook) {
-      console.error("AuthProvider: Error from useSessionContext:", sessionErrorHook.message);
+      // Log the error, but don't automatically reset isInviteFlowContext here.
+      // The AuthPage can decide how to handle an invite context with a session error.
+      console.error("AuthProvider (Session Effect): Error from useSessionContext:", sessionErrorHook.message, ". isInviteFlowContext remains:", isInviteFlowContext);
       setUser(null);
       setProfile(null);
       setAccessToken(null);
-      setIsInviteFlowContext(false); // If session errored, any pending invite flow is likely invalid
+      // setIsInviteFlowContext(false); // Let AuthPage handle this state based on user actions
       return;
     }
 
     const currentUser = session?.user ?? null;
     const currentToken = session?.access_token ?? null;
 
-    console.log("AuthProvider: Session processed. User:", currentUser?.id, "isInviteFlowContext:", isInviteFlowContext);
+    console.log("AuthProvider (Session Effect): Session processed. User:", currentUser?.id, "isInviteFlowContext (final for this run):", isInviteFlowContext);
     setUser(currentUser);
     setAccessToken(currentToken);
 
     if (currentUser) {
       setIsProfileLoading(true);
       console.log("AuthProvider: Fetching profile for user:", currentUser.id);
-      supabase
+      supabaseClient // Use the renamed supabaseClient
         .from("profiles")
         .select("*")
         .eq("auth_id", currentUser.id)
@@ -95,18 +104,19 @@ export function AuthProvider({ children }) {
     } else {
       setProfile(null);
       setIsProfileLoading(false); // No profile to load
-      if (isInviteFlowContext && !session) {
-        // Invite was detected, session hook finished loading, but no session resulted.
-        // This implies the invite token was invalid or already used.
-        console.log("AuthProvider: Invite flow was active, but no session established. Resetting invite flow.");
-        setIsInviteFlowContext(false);
+      // If isInviteFlowContext is true, but no session/user,
+      // it means the invite token in the URL didn't result in a valid session.
+      // The AuthPage will handle displaying an appropriate message or UI.
+      // We DO NOT reset isInviteFlowContext here.
+      if (isInviteFlowContext) { // This 'isInviteFlowContext' is the one from the current render scope
+        console.log("AuthProvider: Invite flow context is true, but no session/user established from tokens (yet or failed).");
       }
     }
-  }, [session, isLoadingSessionHook, sessionErrorHook, supabase, isInviteFlowContext]);
+  }, [session, isLoadingSessionHook, sessionErrorHook, supabaseClient, isInviteFlowContext]); // isInviteFlowContext remains a dependency for logging purposes
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabaseClient.auth.signOut(); // Use the renamed supabaseClient
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -114,7 +124,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       setProfile(null);
       setIsInviteFlowContext(false); // Reset invite flow on logout
-      setSession(null); // Clear session state as well
+      // session from useSessionContext will become null automatically
       setAccessToken(null);
       toast({ title: "Signed out successfully", variant: "success" });
     },
@@ -164,7 +174,8 @@ useEffect(() => {
 // If your AuthPage component is in a different file, this logic needs to go there.
 export default function AuthPage() { // Assuming AuthPage is the default export
   const { user, isLoading, profile, accessToken, isInviteFlowContext } = useAuth(); // Get isInviteFlowContext
-  const navigate = useNavigate(); // Assuming react-router-dom
+  const supabaseClient = useSupabaseClient();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("login");
@@ -191,7 +202,7 @@ export default function AuthPage() { // Assuming AuthPage is the default export
   // Mutations for auth actions
   const signInMutation = useMutation({
     mutationFn: async ({ email, password }) => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -207,7 +218,7 @@ export default function AuthPage() { // Assuming AuthPage is the default export
   const signUpMutation = useMutation({
     mutationFn: async ({ email, password, name }) => {
       // Supabase Auth signup
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
         options: {
@@ -229,7 +240,7 @@ export default function AuthPage() { // Assuming AuthPage is the default export
   const setPasswordMutation = useMutation({
     mutationFn: async ({ password }) => {
       // User's session is already established by the invite token in the URL
-      const { data, error } = await supabase.auth.updateUser({ password });
+      const { data, error } = await supabaseClient.auth.updateUser({ password });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -256,16 +267,28 @@ export default function AuthPage() { // Assuming AuthPage is the default export
   // This useEffect in AuthPage now primarily reacts to isInviteFlowContext.
   useEffect(() => {
     if (isInviteFlowContext) {
-      console.log("AuthPage: Detected invite flow from context. Setting UI for password set.");
-      toast({ title: "Welcome!", description: "Please set your password to activate your account." });
-      setIsInviteFlow(true); // Set local state for UI control
-      setActiveTab("signup");
+      // Even if context says it's an invite flow, check if a user session was actually established.
+      // The user object comes from the AuthProvider's session processing.
+      if (user && user.email) { // Check for user and email as invite implies a user object should exist
+        console.log("AuthPage: Invite flow context is TRUE and USER session exists. Setting UI for password set for:", user.email);
+        toast({ title: "Welcome!", description: "Please set your password to activate your account." });
+        setIsInviteFlow(true); 
+        setActiveTab("signup");
+      } else if (!isLoading) { // Only show error if not loading and user is not available
+        console.warn("AuthPage: Invite flow context is TRUE, but NO USER session established (or user has no email). Link might be invalid/expired.");
+        toast({ title: "Invite Link Issue", description: "This invite link may be invalid or expired. Please try logging in or contact support.", variant: "destructive", duration: 7000 });
+        setIsInviteFlow(false); // Treat as not an invite flow for UI purposes
+        if (activeTab === "signup") setActiveTab("login");
+      }
     } else {
-      // If not an invite flow (e.g., user navigated here directly or invite was invalid)
-      // ensure local invite state is false.
-      setIsInviteFlow(false);
+      // If isInviteFlowContext from provider is false
+      if (isInviteFlow) { // only reset local UI state if it was previously true
+        console.log("AuthPage: Invite flow context from AuthProvider is now false. Resetting local UI.");
+        setIsInviteFlow(false);
+        if (activeTab === "signup") setActiveTab("login");
+      }
     }
-  }, [isInviteFlowContext, toast]); // React to changes in isInviteFlowContext
+  }, [isInviteFlowContext, user, isLoading, toast, activeTab, isInviteFlow]); // Added user and isLoading
 
   // --- useEffect to handle navigation after auth state changes ---
   useEffect(() => {

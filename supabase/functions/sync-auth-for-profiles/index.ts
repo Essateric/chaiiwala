@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     // Step 1: Send the invitation email, this sets user_metadata
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: user_metadata_payload, 
-      redirectTo: `${Deno.env.get("https://chaiiwala.essateric.com")}/auth`, // Redirect to your main auth page
+      redirectTo: `${Deno.env.get("SITE_URL")}/auth`, // Correctly use SITE_URL environment variable
     });
 
     if (inviteError) {
