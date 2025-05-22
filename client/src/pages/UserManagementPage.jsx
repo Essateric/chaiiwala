@@ -468,12 +468,12 @@ export default function UserManagementPage() {
             </SelectContent>
           </Select>
 
-          <Button onClick={handleAddUser}>
+          {/* <Button onClick={handleAddUser}>
             <UserPlus className="w-4 h-4 mr-2" /> Add User
           </Button>
           <Button onClick={handleInviteUserClick} variant="outline">
             <UserPlus className="w-4 h-4 mr-2" /> Invite User
-          </Button>
+          </Button> */}
         </div>
 
         <div className="overflow-auto border rounded">

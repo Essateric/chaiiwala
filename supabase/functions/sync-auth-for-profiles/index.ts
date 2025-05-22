@@ -63,8 +63,12 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     // Removed unused store_location from destructuring
-    const { email, role, full_name, store_ids, primary_store_id  } = body;
+    const { email, role, full_name, store_ids, primary_store_id } = body;
 
+    // Log incoming body and extracted role
+    console.log("SYNC-AUTH-FOR-PROFILES: Incoming request body:", JSON.stringify(body));
+    console.log(`SYNC-AUTH-FOR-PROFILES: Extracted role: ${role}`);
+    
     if (!email || !role || !full_name || !full_name.trim()) {
       return new Response(JSON.stringify({ error: "Missing required fields: email, role, and full_name are required." }), {
         status: 400,
@@ -83,26 +87,58 @@ Deno.serve(async (req) => {
     // Prepare app_metadata
     const app_metadata_payload: Record<string, any> = {
       user_role: role,
+      user_store_ids: [], // Initialize
+      primary_store_id: null, // Initialize
     };
+    console.log("SYNC-AUTH-FOR-PROFILES: Initial app_metadata_payload:", JSON.stringify(app_metadata_payload));
 
-    const numericStoreIds = (store_ids && Array.isArray(store_ids))
-      ? store_ids.map(Number).filter(id => !isNaN(id))
-      : [];
-    app_metadata_payload.user_store_ids = numericStoreIds;
+    const specialAccessRoles = ['admin', 'regional', 'maintenance'];
+    console.log(`SYNC-AUTH-FOR-PROFILES: Is role '${role}' in specialAccessRoles? : ${specialAccessRoles.includes(role)}`);
 
-    let numericPrimaryStoreId = (primary_store_id && !isNaN(Number(primary_store_id)))
-      ? Number(primary_store_id)
-      : null;
+    if (specialAccessRoles.includes(role)) {
+      console.log(`SYNC-AUTH-FOR-PROFILES: Role '${role}' is a special access role. Fetching all stores.`);
+      // For admin, regional, or maintenance, assign all store IDs
+      const { data: allStores, error: storesError } = await supabaseAdmin
+        .from("stores")
+        .select("id");
 
-    if (numericPrimaryStoreId) {
-      app_metadata_payload.primary_store_id = numericPrimaryStoreId;
-      if (!app_metadata_payload.user_store_ids.includes(numericPrimaryStoreId)) {
-           app_metadata_payload.user_store_ids.push(numericPrimaryStoreId);
+      if (storesError) {
+        console.error("SYNC-AUTH-FOR-PROFILES: Error fetching all stores for special role:", storesError.message);
+        return new Response(JSON.stringify({ error: "Failed to fetch store list for role assignment." }), {
+          status: 500,
+          headers: corsHeaders,
+        });
       }
-    } else if (app_metadata_payload.user_store_ids.length > 0) {
-       app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
+      console.log("SYNC-AUTH-FOR-PROFILES: Fetched allStores:", JSON.stringify(allStores));
+
+      app_metadata_payload.user_store_ids = allStores ? allStores.map(s => s.id) : [];
+      // primary_store_id remains null for these roles, signifying access to all, not one specific primary.
+      app_metadata_payload.primary_store_id = null; 
+      console.log(`SYNC-AUTH-FOR-PROFILES: For special role '${role}', app_metadata_payload updated to:`, JSON.stringify(app_metadata_payload));
     } else {
-       app_metadata_payload.primary_store_id = null;
+      console.log(`SYNC-AUTH-FOR-PROFILES: Role '${role}' is NOT a special access role. Processing store_ids from request.`);
+      // Existing logic for other roles (staff, store, area) that use specific store assignments
+      const numericStoreIdsFromBody = (store_ids && Array.isArray(store_ids))
+        ? store_ids.map(Number).filter(id => !isNaN(id))
+        : [];
+      app_metadata_payload.user_store_ids = numericStoreIdsFromBody;
+
+      let numericPrimaryStoreIdFromBody = (primary_store_id && !isNaN(Number(primary_store_id)))
+        ? Number(primary_store_id)
+        : null;
+
+      if (numericPrimaryStoreIdFromBody) {
+        app_metadata_payload.primary_store_id = numericPrimaryStoreIdFromBody;
+        // Ensure primary_store_id is also in user_store_ids if provided
+        if (!app_metadata_payload.user_store_ids.includes(numericPrimaryStoreIdFromBody)) {
+             app_metadata_payload.user_store_ids.push(numericPrimaryStoreIdFromBody);
+        }
+      } else if (app_metadata_payload.user_store_ids.length > 0) {
+         // Default primary_store_id to the first in the list if not provided and stores are assigned
+         app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
+      }
+      console.log(`SYNC-AUTH-FOR-PROFILES: For non-special role '${role}', app_metadata_payload updated to:`, JSON.stringify(app_metadata_payload));
+      // If no stores are assigned and no primary_store_id is provided, it remains null.
     }
     
     if ((role === 'staff' || role === 'store') && !app_metadata_payload.primary_store_id) {
@@ -119,29 +155,30 @@ Deno.serve(async (req) => {
     });
 
     if (inviteError) {
-      console.error("❌ Failed to send invitation (Step 1):", inviteError.message);
+      console.error("SYNC-AUTH-FOR-PROFILES: ❌ Failed to send invitation (Step 1):", inviteError.message);
       return new Response(JSON.stringify({ error: `Failed to send invitation: ${inviteError.message}` }), {
         status: 500,
         headers: corsHeaders,
       });
     }
-
     if (!inviteData || !inviteData.user || !inviteData.user.id) {
-      console.error("❌ Invitation sent but no user data returned from inviteUserByEmail.");
+      console.error("SYNC-AUTH-FOR-PROFILES: ❌ Invitation sent but no user data returned from inviteUserByEmail.");
       return new Response(JSON.stringify({ error: "Invitation sent but no user data returned from invite step." }), {
         status: 500,
         headers: corsHeaders,
       });
     }
+    console.log(`SYNC-AUTH-FOR-PROFILES: User invited successfully. User ID: ${inviteData.user.id}. Email: ${email}`);
 
     // Step 2: Update the invited user to set app_metadata
+    console.log(`SYNC-AUTH-FOR-PROFILES: Attempting to update user ${inviteData.user.id} with app_metadata:`, JSON.stringify(app_metadata_payload));
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       inviteData.user.id,
       { app_metadata: app_metadata_payload }
     );
 
     if (updateError) {
-      console.error(`❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
+      console.error(`SYNC-AUTH-FOR-PROFILES: ❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
       // Log this critical issue. The invite was sent, but profile creation via trigger will be incomplete.
       return new Response(JSON.stringify({ error: `Invitation sent, but failed to set user role/store: ${updateError.message}` }), {
         status: 500, 
@@ -149,14 +186,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`✅ Invitation sent to ${email} with role ${role}. User ID: ${inviteData.user.id}. App metadata updated.`);
+    console.log(`SYNC-AUTH-FOR-PROFILES: ✅ Invitation sent to ${email} with role ${role}. User ID: ${inviteData.user.id}. App metadata updated.`);
     return new Response(
       JSON.stringify({ message: `Invitation sent to ${email}`, user: inviteData.user }),
       { status: 200, headers: corsHeaders }
     );
 
   } catch (err: any) {
-    console.log("🔥 Uncaught error in invite-user:", err?.message || err);
+    console.error("SYNC-AUTH-FOR-PROFILES: 🔥 Uncaught error:", err?.message || err);
     return new Response(JSON.stringify({ error: "Unhandled server error" }), {
       status: 500,
       headers: corsHeaders,
