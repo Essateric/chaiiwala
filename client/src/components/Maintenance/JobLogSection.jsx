@@ -86,7 +86,8 @@ export default function JobLogSection() {
       }
       return jobLogs;
     }
-    return jobLogs.filter((log) => log.storeId === profile.store_id);
+    return jobLogs.filter((log) => profile.store_ids.includes(log.storeId));
+
   }, [jobLogs, selectedStoreId, profile]);
 
   const form = useForm({
@@ -135,6 +136,7 @@ export default function JobLogSection() {
       </Card>
     );
   }
+console.log("🔎 jobLogs returned from useJobLogs:", jobLogs);
 
   return (
     <Card className="mt-6">

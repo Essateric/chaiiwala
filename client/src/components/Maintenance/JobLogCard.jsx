@@ -18,7 +18,7 @@ import { MentionsInput, Mention } from "react-mentions";
 export default function JobLogCard({ log }) {
   const [open, setOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Get profile here
   const { comments, addComment, loading } = useJobLogComments(log.id);
   const [staffList, setStaffList] = useState([]);
 
@@ -26,7 +26,12 @@ export default function JobLogCard({ log }) {
     const fetchStaff = async () => {
       const { data, error } = await supabase.from("profiles").select("id, name");
       if (!error) {
-        setStaffList(data.map((u) => ({ id: u.id, display: u.name })));
+        // Ensure data is an array before mapping
+        if (Array.isArray(data)) {
+          setStaffList(data.map((u) => ({ id: u.id, display: u.name })));
+        } else {
+          setStaffList([]); // Set to empty array if data is not as expected
+        }
       }
     };
     fetchStaff();
@@ -35,7 +40,9 @@ export default function JobLogCard({ log }) {
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!user?.id || !newComment.trim()) return;
-    await addComment(user.id, newComment);
+    // Pass the commenter's name from the profile
+    const commenterName = profile?.name || user?.email || "Unknown User"; // Fallback if profile.name is not available
+    await addComment(user.id, newComment, commenterName);
     setNewComment("");
   };
 

@@ -1,16 +1,40 @@
+import { useAuth } from "@/hooks/UseAuth"; // Or your equivalent like useAuth from @/hooks/use-auth
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { WrenchIcon, ActivityIcon, CheckCircleIcon } from "lucide-react";
+import { WrenchIcon, Loader2 } from "lucide-react";
 import JobLogSection from "@/components/Maintenance/JobLogSection";
-import MaintenanceCalendar from "@/components/Maintenance/MaintenanceCalendar";
-import { useJobLogs } from "@/hooks/use-joblogs";
+// import MaintenanceCalendar from "@/components/Maintenance/MaintenanceCalendar"; // Uncomment if needed
+// import { useJobLogs } from "@/hooks/use-joblogs"; // This is used within JobLogSection
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 export default function MaintenancePage() {
-  const { jobLogs } = useJobLogs();
+  // const { jobLogs } = useJobLogs(); // jobLogs are fetched within JobLogSection based on user's scope
+  const { profile, isLoading: isLoadingAuth } = useAuth();
+
+  if (isLoadingAuth) {
+    return (
+      <DashboardLayout title="Maintenance">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
+          <p className="ml-2">Loading user data...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Check if the user has one of the allowed permissions
+  const allowedPermissions = ["admin", "regional", "maintenance", "store"];
+  if (!profile || !allowedPermissions.includes(profile.permissions)) {
+    return (
+      <DashboardLayout title="Maintenance">
+        <div className="p-6 text-center">
+          <h2 className="text-xl font-semibold">Access Denied</h2>
+          <p className="text-muted-foreground">You do not have permission to view this page.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -18,10 +42,13 @@ export default function MaintenancePage() {
     <DashboardLayout>
       <div className="grid gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>Maintenance Tasks</CardTitle>
+          <CardHeader className="pb-4"> {/* Adjusted padding */}
+            <CardTitle className="flex items-center">
+              <WrenchIcon className="mr-2 h-5 w-5 text-chai-gold" />
+              Maintenance
+            </CardTitle>
             <CardDescription>
-              Track and manage maintenance tasks for all equipment and facilities
+              Track and manage maintenance tasks for equipment and facilities.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -65,7 +92,6 @@ export default function MaintenancePage() {
           </CardContent>
         </Card>
 
-        {/* <MaintenanceCalendar jobLogs={jobLogs} /> */}
         <JobLogSection />
       </div>
     </DashboardLayout>

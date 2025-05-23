@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,12 +8,14 @@ import { useAuth } from "@/hooks/UseAuth";
 import { useStores } from "@/hooks/use-stores";
 import { useCategories } from "@/hooks/use-categories";
 import { useJobLogs } from "@/hooks/use-joblogs";
+import { useToast } from "@/hooks/use-toast"; // Step 1: Import useToast
 
-export default function MaintenanceWizard({ onClose }) {
-  const { user, profile } = useAuth();
+export default function MaintenanceWizard({ onClose, userProfile: propUserProfile }) { // Accept userProfile prop
+  const { user, profile, isLoading: isLoadingAuth } = useAuth(); // Add isLoadingAuth
   const { stores = [] } = useStores();
   const { categories = [] } = useCategories();
   const { createJobLog } = useJobLogs();
+  const { toast } = useToast(); // Step 2: Initialize useToast
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -21,8 +23,8 @@ export default function MaintenanceWizard({ onClose }) {
     description: "",
     category: "",
     flag: "normal",
-    storeId: profile?.store_id || 1,
-    comments: "",
+    storeId: '', // Initialize as empty string for select, or a valid default if possible
+    comments: ""
   });
   const [images, setImages] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,6 +35,30 @@ export default function MaintenanceWizard({ onClose }) {
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
+
+  // Determine if the current user is a store manager
+  const isStoreManager = profile?.permissions === 'store';
+  // Step 3: Define a helper for unrestricted store selection
+  const canSelectAnyStore = profile && ['admin', 'regional', 'maintenance'].includes(profile.permissions);
+
+  useEffect(() => {
+    // Step 4: Adjust useEffect for initial storeId setup
+    if (profile) {
+      // For store manager, use the first store_id from their array
+      if (isStoreManager && profile.store_ids && profile.store_ids.length > 0) {
+        // Auto-select for store manager if their storeId isn't already set or matches
+        if (formData.storeId !== profile.store_ids[0]) {
+          handleChange("storeId", profile.store_ids[0]);
+        }
+      } else if (canSelectAnyStore) {
+        // For admin, regional, maintenance: do not auto-select a store.
+        // formData.storeId is initialized to '', so this branch ensures it stays ''
+        // or a user-selected value, rather than being auto-selected by default.
+      }
+      // Other roles (e.g., staff) will also not have their store auto-selected by this effect,
+      // defaulting to '' and will be prompted to select from the dropdown.
+    }
+  }, [profile, isStoreManager, canSelectAnyStore]); // Updated dependencies
 
   const handleSubmit = async () => {
     try {
@@ -48,27 +74,50 @@ export default function MaintenanceWizard({ onClose }) {
       onClose();
     } catch (err) {
       console.error("Error submitting log:", err);
+      // Step 6: Enhance handleSubmit with error feedback
+      toast({ title: "Submission Failed", description: err.message || "Could not submit the maintenance log.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Show loading indicator if auth profile is still loading
+  if (isLoadingAuth) {
+    return (
+      <div className="flex justify-center items-center h-40">
+        <p>Loading user details...</p> {/* Or a spinner component */}
+      </div>
+    );
+  }
   const renderStep = () => {
     switch (step) {
       case 1:
         return (
           <div className="space-y-4">
-            <Label>Store</Label>
-            <select
-              className="w-full border p-2 rounded bg-white"
-              value={formData.storeId}
-              onChange={(e) => handleChange("storeId", parseInt(e.target.value))}
-            >
-              {stores.map((store) => (
-                <option key={store.id} value={store.id}>{store.name}</option>
-              ))}
-            </select>
-
+            <div>
+              {/* Step 5: Update the Store Selection UI */}
+              <Label>Store</Label>
+              {/* Condition: Show disabled input if user is a store manager AND they have assigned store_ids */}
+              {(isStoreManager && profile?.store_ids && profile.store_ids.length > 0) ? (
+                <Input
+                  value={stores.find(s => s.id === profile.store_ids[0])?.name || 'Your Store'}
+                  disabled
+                  className="bg-gray-100 mt-1"
+                />
+              ) : ( // For ALL other users (admin, regional, maintenance, staff, etc.), show the select dropdown
+                <select
+                  className="w-full border p-2 rounded bg-white mt-1"
+                  // Ensure value is a string for the select, or empty string for placeholder
+                  value={formData.storeId === null || formData.storeId === undefined ? '' : String(formData.storeId)}
+                  onChange={(e) => handleChange("storeId", e.target.value ? parseInt(e.target.value) : '')} // Handle empty string from placeholder
+                >
+                  <option value="">Select a store</option> {/* Default placeholder */}
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>{store.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             <Label>Title</Label>
             <Input
               value={formData.title}

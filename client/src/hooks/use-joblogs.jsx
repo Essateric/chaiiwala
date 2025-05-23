@@ -10,13 +10,13 @@ function useJobLogs(storeId) {
 
   // ✅ Fetch job logs based on storeId
   const { data: jobLogs = [], isLoading, error } = useQuery({
-    queryKey: ["joblogs", storeId],
+    queryKey: ["joblogs"],
     queryFn: async () => {
       let query = supabase.from("joblogs").select("*").order("created_at", { ascending: false });
 
-      if (typeof storeId === "number" && !isNaN(storeId)) {
-        query = query.eq("storeId", storeId);
-      }
+      // if (typeof storeId === "number" && !isNaN(storeId)) {
+      //   query = query.eq("storeId", storeId);
+      // }
       
 
       // if (storeId !== null && storeId !== undefined) {
