@@ -50,69 +50,59 @@ export function AuthProvider({ children }) {
     }
   }, []); // Empty dependency array: runs only once on mount.
 
-  useEffect(() => {
-    // This effect reacts to changes in session state from useSessionContext
-    if (isLoadingSessionHook) {
-      console.log("AuthProvider: Session is loading (from useSessionContext)...");
-      setUser(null); // Clear user/profile while session is resolving
-      setProfile(null);
-      setAccessToken(null);
-      // isInviteFlowContext remains as set by the initial mount effect
-      return;
-    }
+useEffect(() => {
+  // If the session is still loading, clear data and wait
+  if (isLoadingSessionHook) {
+    console.log("AuthProvider: Session is loading...");
+    setUser(null);
+    setProfile(null);
+    setAccessToken(null);
+    return;
+  }
 
-    // Log the state of isInviteFlowContext *before* checking sessionErrorHook
-    console.log("AuthProvider (Session Effect): Current isInviteFlowContext before error check:", isInviteFlowContext);
+  // If there's an error loading the session
+  if (sessionErrorHook) {
+    console.error("AuthProvider: Session error:", sessionErrorHook.message);
+    setUser(null);
+    setProfile(null);
+    setAccessToken(null);
+    return;
+  }
 
-    if (sessionErrorHook) {
-      // Log the error, but don't automatically reset isInviteFlowContext here.
-      // The AuthPage can decide how to handle an invite context with a session error.
-      console.error("AuthProvider (Session Effect): Error from useSessionContext:", sessionErrorHook.message, ". isInviteFlowContext remains:", isInviteFlowContext);
-      setUser(null);
-      setProfile(null);
-      setAccessToken(null);
-      // setIsInviteFlowContext(false); // Let AuthPage handle this state based on user actions
-      return;
-    }
+  const currentUser = session?.user ?? null;
+  const currentToken = session?.access_token ?? null;
 
-    const currentUser = session?.user ?? null;
-    const currentToken = session?.access_token ?? null;
+  // Only update user/token if changed
+  setUser((prev) => (prev?.id !== currentUser?.id ? currentUser : prev));
+  setAccessToken((prev) => (prev !== currentToken ? currentToken : prev));
 
-    console.log("AuthProvider (Session Effect): Session processed. User:", currentUser?.id, "isInviteFlowContext (final for this run):", isInviteFlowContext);
-    setUser(currentUser);
-    setAccessToken(currentToken);
+  // If there is a valid user and profile hasn't been fetched or mismatched
+  if (currentUser && profile?.auth_id !== currentUser.id) {
+    console.log("AuthProvider: Fetching profile for user:", currentUser.id);
+    setIsProfileLoading(true);
 
-    if (currentUser) {
-      setIsProfileLoading(true);
-      console.log("AuthProvider: Fetching profile for user:", currentUser.id);
-      supabaseClient // Use the renamed supabaseClient
-        .from("profiles")
-        .select("*")
-        .eq("auth_id", currentUser.id)
-        .single()
-        .then(({ data: profileData, error: profileError }) => {
-          if (profileError) {
-            console.error("AuthProvider: Error fetching profile:", profileError.message);
-            setProfile(null);
-            // setError(profileError); // Consider how to expose profile fetch errors if needed
-          } else {
-            console.log("AuthProvider: Profile fetched:", profileData);
-            setProfile(profileData);
-          }
-          setIsProfileLoading(false);
-        });
-    } else {
-      setProfile(null);
-      setIsProfileLoading(false); // No profile to load
-      // If isInviteFlowContext is true, but no session/user,
-      // it means the invite token in the URL didn't result in a valid session.
-      // The AuthPage will handle displaying an appropriate message or UI.
-      // We DO NOT reset isInviteFlowContext here.
-      if (isInviteFlowContext) { // This 'isInviteFlowContext' is the one from the current render scope
-        console.log("AuthProvider: Invite flow context is true, but no session/user established from tokens (yet or failed).");
-      }
-    }
-  }, [session, isLoadingSessionHook, sessionErrorHook, supabaseClient, isInviteFlowContext]); // isInviteFlowContext remains a dependency for logging purposes
+    supabaseClient
+      .from("profiles")
+      .select("*")
+      .eq("auth_id", currentUser.id)
+      .single()
+      .then(({ data: profileData, error: profileError }) => {
+        if (profileError) {
+          console.error("AuthProvider: Profile fetch error:", profileError.message);
+          setProfile(null);
+        } else {
+          setProfile(profileData);
+          console.log("AuthProvider: Profile fetched:", profileData);
+        }
+        setIsProfileLoading(false);
+      });
+  }
+
+  // If no user, reset profile state safely
+  if (!currentUser && profile !== null) {
+    setProfile(null);
+  }
+}, [session, isLoadingSessionHook, sessionErrorHook, supabaseClient]);
 
   const logoutMutation = useMutation({
     mutationFn: async () => {

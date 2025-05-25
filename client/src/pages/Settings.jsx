@@ -1,86 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { User as SelectUser, Permission as SelectPermission, Store as SelectStore, StockCategory as SelectStockCategory } from "@shared/schema";
+import { useQuery } from '@tanstack/react-query';
+import { getQueryFn } from "@/lib/queryClient";
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, Users, Check, UserCog, FileUp, Tags, Tag } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertCircle, Settings, Save, Plus, Edit, Trash2, Package, Shield, Lock, UserCog, FileUp, Tag } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usePermissions } from "@/hooks/use-permissions";
 import { useStockCategories } from "@/hooks/use-stock-categories";
 
-// Mock stock configuration data
-// Type declaration for stock items
-interface StockConfigItem {
-  id: number;
-  itemCode: string;
-  name: string;
-  lowStockThreshold: number;
-  category: string;
-  price: number;
-  sku: string;
-}
-
-const initialStockConfig: StockConfigItem[] = [
-  { 
-    id: 1, 
-    itemCode: "BP401", 
-    name: "Masala Beans", 
-    lowStockThreshold: 5, 
-    category: "Food",
-    price: 3.99,
-    sku: "CHW-MB-001"
-  },
-  { 
-    id: 2, 
-    itemCode: "BP402", 
-    name: "Daal", 
-    lowStockThreshold: 4, 
-    category: "Food",
-    price: 2.99,
-    sku: "CHW-DA-001"
-  },
-  { 
-    id: 3, 
-    itemCode: "BP440", 
-    name: "Mogo Sauce", 
-    lowStockThreshold: 6, 
-    category: "Food",
-    price: 1.99,
-    sku: "CHW-MS-001"
-  },
-  { 
-    id: 4, 
-    itemCode: "DP196", 
-    name: "Orange Juice (12x250ml)", 
-    lowStockThreshold: 3, 
-    category: "Drinks",
-    price: 6.99,
-    sku: "CHW-OJ-001"
-  },
-  { 
-    id: 5, 
-    itemCode: "FPFC204", 
-    name: "Karak Chaii Sugar free (50 per box)", 
-    lowStockThreshold: 2, 
-    category: "Drinks",
-    price: 24.99,
-    sku: "CHW-KC-001"
-  },
+// Dummy initial stock config
+const initialStockConfig = [
+  { id: 1, itemCode: "BP401", name: "Masala Beans", lowStockThreshold: 5, category: "Food", price: 3.99, sku: "CHW-MB-001" },
+  { id: 2, itemCode: "BP402", name: "Daal", lowStockThreshold: 4, category: "Food", price: 2.99, sku: "CHW-DA-001" },
+  { id: 3, itemCode: "BP440", name: "Mogo Sauce", lowStockThreshold: 6, category: "Food", price: 1.99, sku: "CHW-MS-001" },
+  { id: 4, itemCode: "DP196", name: "Orange Juice (12x250ml)", lowStockThreshold: 3, category: "Drinks", price: 6.99, sku: "CHW-OJ-001" },
+  { id: 5, itemCode: "FPFC204", name: "Karak Chaii Sugar free (50 per box)", lowStockThreshold: 2, category: "Drinks", price: 24.99, sku: "CHW-KC-001" },
 ];
 
 export default function SettingsPage() {
   const [stockConfig, setStockConfig] = useState(initialStockConfig);
   const [activeTab, setActiveTab] = useState("general");
-  const [editItem, setEditItem] = useState<StockConfigItem | null>(null);
+  const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({
     name: "",
@@ -89,89 +36,74 @@ export default function SettingsPage() {
     price: 0.00,
     sku: ""
   });
-  
-  // State for category management
   const [newCategory, setNewCategory] = useState({ name: "", prefix: "", description: "" });
-  const [editingCategory, setEditingCategory] = useState<SelectStockCategory | null>(null);
+  const [editingCategory, setEditingCategory] = useState(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  
-  // Fetch stock categories
-  const { 
-    categories, 
-    createCategory, 
-    updateCategory, 
-    deleteCategory, 
-    isCreating, 
-    isUpdating, 
-    isDeleting 
-  } = useStockCategories();
-  
-  // Fetch all stores for the store dropdown
-  const { data: allStores = [] } = useQuery<SelectStore[]>({
+
+  // Fetch stock categories (JS version)
+  const {
+    categories = [],
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    isCreating,
+    isUpdating,
+  } = useStockCategories() || {};
+
+  // Fetch user and staff data (replace generics with plain JS)
+  const { data: allStores = [] } = useQuery({
     queryKey: ['/api/stores'],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
-  
-  // Fetch all staff members with their assigned stores
-  const { data: allStaff = [] } = useQuery<{ id: number; name: string; role: string; color: string; storeId?: number; }[]>({
+
+  const { data: allStaff = [] } = useQuery({
     queryKey: ['/api/staff'],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
-  
-  // Function to generate item code based on category and name
-  const generateItemCode = (category: string, name: string) => {
-    const prefix = 
-      category === 'Food' ? 'BP' : 
-      category === 'Drinks' ? 'DP' : 
-      category === 'Packaging' ? 'FPFC' : 
-      category === 'Dry Food' ? 'DF' :
-      category === 'Miscellaneous' ? 'MS' :
-      category === 'Frozen Food' ? 'FZ' : 'IT';
-                  
-    // Generate a random 3-digit number
-    const suffix = Math.floor(100 + Math.random() * 900).toString();
-    
-    return `${prefix}${suffix}`;
-  };
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  
+
   const { toast } = useToast();
-  
-  // Fetch real authenticated user data
-  const { data: user } = useQuery<SelectUser | undefined, Error>({
+
+  const { data: user } = useQuery({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
-  
-  // Handle edit item
-  const handleEditItem = (item: StockConfigItem) => {
+
+  // Helper: Generate item code
+  const generateItemCode = (category, name) => {
+    const prefix =
+      category === "Food" ? "BP" :
+      category === "Drinks" ? "DP" :
+      category === "Packaging" ? "FPFC" :
+      category === "Dry Food" ? "DF" :
+      category === "Miscellaneous" ? "MS" :
+      category === "Frozen Food" ? "FZ" : "IT";
+    const suffix = Math.floor(100 + Math.random() * 900).toString();
+    return `${prefix}${suffix}`;
+  };
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  // Edit handlers
+  const handleEditItem = (item) => {
     setEditItem(item);
     setDialogOpen(true);
   };
-  
-  // Handle save changes
+
   const handleSaveChanges = () => {
     if (editItem) {
-      // In a real application, this would make an API call to update the database
-      const updatedConfig = stockConfig.map(item => 
+      const updatedConfig = stockConfig.map(item =>
         item.id === editItem.id ? editItem : item
       );
       setStockConfig(updatedConfig);
-      
       toast({
         title: "Settings Updated",
         description: `${editItem.name} threshold has been updated.`,
       });
-      
-      // Close the dialog
       setDialogOpen(false);
       setEditItem(null);
     }
   };
-  
-  // Handle add new item
+
   const handleAddItem = () => {
-    // Validate input
     if (!newItem.name) {
       toast({
         title: "Validation Error",
@@ -180,59 +112,36 @@ export default function SettingsPage() {
       });
       return;
     }
-    
-    // Generate item code based on category and name
     const itemCode = generateItemCode(newItem.category, newItem.name);
-    
-    // Create new item with a unique ID
     const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
-    const itemToAdd = {
-      ...newItem,
-      itemCode,
-      id: newId
-    };
-    
-    // Add to stock configuration
+    const itemToAdd = { ...newItem, itemCode, id: newId };
     setStockConfig([...stockConfig, itemToAdd]);
-    
-    // Reset form and close dialog
-    setNewItem({
-      name: "",
-      lowStockThreshold: 5,
-      category: "Food",
-      price: 0.00,
-      sku: ""
-    });
+    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "" });
     setIsAddDialogOpen(false);
-    
     toast({
       title: "Item Added",
       description: `${newItem.name} has been added to stock configuration.`,
     });
   };
-  
-  // Handle delete item
-  const handleDeleteItem = (id: number) => {
+
+  const handleDeleteItem = (id) => {
     const updatedConfig = stockConfig.filter(item => item.id !== id);
     setStockConfig(updatedConfig);
-    
     toast({
       title: "Item Removed",
       description: "Item has been removed from stock configuration.",
     });
   };
-  
-  // Handle CSV upload
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+
+  // Handle CSV upload (now plain JS, not TS)
+  const handleCsvUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    
-    const reader = new FileReader();
+    const reader = new window.FileReader();
     reader.onload = (e) => {
       try {
-        const csvData = e.target?.result as string;
+        const csvData = e.target?.result;
         const items = processCSV(csvData);
-        
         if (items.length === 0) {
           toast({
             title: "Error",
@@ -241,11 +150,8 @@ export default function SettingsPage() {
           });
           return;
         }
-        
-        // Add the items to stock config
         const currentIds = stockConfig.map(item => item.id);
         const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 1;
-        
         const newItems = items.map((item, index) => ({
           id: nextId + index,
           itemCode: generateItemCode(item.category, item.name),
@@ -255,17 +161,12 @@ export default function SettingsPage() {
           price: item.price,
           sku: item.sku
         }));
-        
         setStockConfig([...stockConfig, ...newItems]);
-        
-        // Reset file input
         event.target.value = '';
-        
         toast({
           title: "Import Successful",
           description: `${newItems.length} items were imported.`,
         });
-        
       } catch (error) {
         console.error('Error processing CSV:', error);
         toast({
@@ -275,19 +176,15 @@ export default function SettingsPage() {
         });
       }
     };
-    
     reader.readAsText(file);
   };
-  
-  // Process CSV data
-  const processCSV = (csvData: string) => {
+
+  // CSV processor
+  const processCSV = (csvData) => {
     const lines = csvData.split(/\r?\n/);
     const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
-    
-    // Validate headers based on Cleaned_Stock_Data.csv format
     const requiredColumns = ['item_code', 'product', 'price_box'];
     const missingColumns = requiredColumns.filter(col => !headers.includes(col));
-    
     if (missingColumns.length > 0) {
       toast({
         title: "CSV Format Error",
@@ -296,53 +193,27 @@ export default function SettingsPage() {
       });
       return [];
     }
-    
     const itemCodeIndex = headers.indexOf('item_code');
     const altItemCodeIndex = headers.indexOf('alt_item_code');
     const productIndex = headers.indexOf('product');
     const priceIndex = headers.indexOf('price_box');
-    
-    const items: { 
-      name: string; 
-      category: string; 
-      lowStockThreshold: number;
-      price: number;
-      sku: string;
-    }[] = [];
-    
-    // Skip header row and process data
+    const items = [];
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue; // Skip empty lines
-      
+      if (!lines[i].trim()) continue;
       const values = lines[i].split(',').map(val => val.trim());
-      
-      // Skip rows with insufficient data for required columns
       if (values.length < 3 || !values[itemCodeIndex] || !values[productIndex]) continue;
-      
       const itemCode = values[itemCodeIndex];
       const altItemCode = altItemCodeIndex >= 0 ? values[altItemCodeIndex] : "";
       const name = values[productIndex];
       const price = priceIndex >= 0 && values[priceIndex] ? parseFloat(values[priceIndex]) : 0.00;
-      
-      // Determine category from item code
       let category = 'Other';
-      if (itemCode.startsWith('BP')) {
-        category = 'Food';
-      } else if (itemCode.startsWith('DP')) {
-        category = 'Drinks';
-      } else if (itemCode.startsWith('PP')) {
-        category = 'Packaging';
-      } else if (itemCode.startsWith('MS')) {
-        category = 'Miscellaneous';
-      } else if (itemCode.startsWith('DF')) {
-        category = 'Dry Food';
-      } else if (itemCode.startsWith('FZ')) {
-        category = 'Frozen Food';
-      }
-      
-      // Default threshold based on category
+      if (itemCode.startsWith('BP')) category = 'Food';
+      else if (itemCode.startsWith('DP')) category = 'Drinks';
+      else if (itemCode.startsWith('PP')) category = 'Packaging';
+      else if (itemCode.startsWith('MS')) category = 'Miscellaneous';
+      else if (itemCode.startsWith('DF')) category = 'Dry Food';
+      else if (itemCode.startsWith('FZ')) category = 'Frozen Food';
       const threshold = 10;
-      
       if (name && itemCode) {
         items.push({
           name,
@@ -353,31 +224,11 @@ export default function SettingsPage() {
         });
       }
     }
-    
     return items;
   };
-  
-  // Map category string to valid category
-  const mapCategory = (category: string): string => {
-    const categoryMap: Record<string, string> = {
-      'food': 'Food',
-      'drinks': 'Drinks',
-      'packaging': 'Packaging',
-      'dry food': 'Dry Food',
-      'dry': 'Dry Food',
-      'frozen food': 'Frozen Food',
-      'frozen': 'Frozen Food',
-      'miscellaneous': 'Miscellaneous',
-      'misc': 'Miscellaneous',
-      'other': 'Other'
-    };
-    
-    return categoryMap[category.toLowerCase()] || 'Other';
-  };
-  
-  // Function to download a CSV template
+
+  // CSV template download
   const downloadCsvTemplate = () => {
-    // Create CSV header and example rows
     const csvContent = [
       'item_code,alt_item_code,product,price_box',
       'BP401,FPBC101,Masala Beans,52.91',
@@ -386,28 +237,22 @@ export default function SettingsPage() {
       'DP196,FF722,Orange Juice (12x250ml),127.62',
       'DP190,FPFC204,Karak Chaii Sugar free (50 per box),5.70'
     ].join('\n');
-    
-    // Create a Blob with the CSV content
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    // Create a download link and trigger the download
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
     link.setAttribute('href', url);
     link.setAttribute('download', 'stock_items_template.csv');
     link.style.visibility = 'hidden';
-    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
     toast({
       title: "Template Downloaded",
       description: "CSV template has been downloaded successfully.",
     });
   };
-  
+
+ 
   return (
     <DashboardLayout title="Settings">
       <div className="container max-w-7xl mx-auto py-6">
@@ -1002,13 +847,13 @@ export default function SettingsPage() {
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select store" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                  {allStores.map((store: SelectStore) => (
-                                    <SelectItem key={store.id} value={String(store.id)}>
-                                      {store.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
+                               <SelectContent>
+  {allStores.map((store) => (
+    <SelectItem key={store.id} value={String(store.id)}>
+      {store.name}
+    </SelectItem>
+  ))}
+</SelectContent>
                               </Select>
                             </div>
                           </div>

@@ -116,7 +116,8 @@ export default function StockManagementView() {
   const [sort, setSort] = useState({ field: '', direction: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState('all');
-  const [editItem, setEditItem] = useState<any | null>(null);
+const [editItem, setEditItem] = useState(null);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   
   const { toast } = useToast();

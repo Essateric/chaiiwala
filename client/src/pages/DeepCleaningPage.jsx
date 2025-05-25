@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { format } from 'date-fns';
-import { parse } from 'date-fns';
-import { startOfWeek } from 'date-fns';
-import { getDay } from 'date-fns';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { 
   Dialog, 
@@ -32,8 +29,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { Loader2, Plus, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
-import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/UseAuth';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // Deep cleaning tasks
@@ -80,46 +76,17 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-interface DeepCleaningEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  allDay?: boolean;
-  storeId?: number;
-  storeName?: string;
-  resource?: any;
-}
-
-interface AddEventFormValues {
-  task: string;
-  startTime: string;
-  endTime: string;
-  storeId?: string; // Added store selection
-}
-
-// Define interface for store locations
-interface StoreLocation {
-  id: number;
-  name: string;
-}
-
 export default function DeepCleaningPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [events, setEvents] = useState<DeepCleaningEvent[]>([]);
+  const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState<string>(user?.storeId ? String(user.storeId) : 'all');
-  
-  // In a real app, we would fetch locations from an API like this:
-  // const { data: locations = [] } = useQuery<StoreLocation[]>({
-  //   queryKey: ["/api/locations"],
-  // });
+  const [selectedStore, setSelectedStore] = useState(user?.storeId ? String(user.storeId) : 'all');
 
   // Mock store locations until API is ready
-  const mockLocations: StoreLocation[] = [
+  const mockLocations = [
     { id: 1, name: 'Cheetham Hill' },
     { id: 2, name: 'Oxford Road' },
     { id: 3, name: 'Old Trafford' },
@@ -131,20 +98,19 @@ export default function DeepCleaningPage() {
   ];
 
   // Create form
-  const form = useForm<AddEventFormValues>({
+  const form = useForm({
     defaultValues: {
       task: '',
       startTime: '09:00',
       endTime: '10:00',
-      storeId: user?.role === 'store' ? String(user.storeId) : 
-               selectedStore !== 'all' ? selectedStore : ''
+      storeId: user?.role === 'store' ? String(user.storeId) :
+        selectedStore !== 'all' ? selectedStore : ''
     }
   });
 
   // Mock loading events
   useEffect(() => {
-    // In a real app, you would fetch these from the API based on role and selected store
-    const mockEvents: DeepCleaningEvent[] = [
+    const mockEvents = [
       {
         id: '1',
         title: 'Clean Fridge Condensers',
@@ -182,30 +148,26 @@ export default function DeepCleaningPage() {
         storeName: 'Stockport Road'
       }
     ];
-    
-    // Filter events based on user role and selected store
+
     let filteredEvents = [...mockEvents];
-    
+
     if (user?.role === 'store' && user.storeId) {
-      // Store managers can only see their own store's events
       filteredEvents = filteredEvents.filter(event => event.storeId === user.storeId);
     } else if ((user?.role === 'admin' || user?.role === 'regional') && selectedStore !== 'all') {
-      // Admin and regional managers can filter by specific store
       filteredEvents = filteredEvents.filter(event => event.storeId === Number(selectedStore));
     }
-    
+
     setEvents(filteredEvents);
   }, [user, selectedStore]);
 
-  const handleSelectSlot = ({ start }: { start: Date }) => {
+  const handleSelectSlot = ({ start }) => {
     setSelectedDate(start);
     setIsModalOpen(true);
-    
-    // Reset form with appropriate store ID based on user role
-    const storeId = user?.role === 'store' 
-      ? String(user.storeId) 
-      : selectedStore !== 'all' 
-        ? selectedStore 
+
+    const storeId = user?.role === 'store'
+      ? String(user.storeId)
+      : selectedStore !== 'all'
+        ? selectedStore
         : '';
 
     form.reset({
@@ -216,44 +178,39 @@ export default function DeepCleaningPage() {
     });
   };
 
-  const handleEventSelect = (event: DeepCleaningEvent) => {
+  const handleEventSelect = (event) => {
     toast({
       title: event.title,
       description: `Scheduled for ${format(event.start, 'MMMM dd, yyyy')}`,
     });
   };
 
-  const onSubmit = (data: AddEventFormValues) => {
+  const onSubmit = (data) => {
     if (!selectedDate) return;
-    
+
     setIsLoading(true);
-    
+
     const startDate = new Date(selectedDate);
     const endDate = new Date(selectedDate);
-    
-    // Parse time strings
+
     const [startHours, startMinutes] = data.startTime.split(':').map(Number);
     const [endHours, endMinutes] = data.endTime.split(':').map(Number);
-    
+
     startDate.setHours(startHours, startMinutes, 0);
     endDate.setHours(endHours, endMinutes, 0);
-    
-    // Determine store ID and name based on user role and selection
-    let storeId: number | undefined;
-    let storeName: string | undefined;
-    
+
+    let storeId;
+    let storeName;
+
     if (user?.role === 'store' && user.storeId) {
-      // Store managers can only add tasks for their own store
       storeId = user.storeId;
       storeName = mockLocations.find(s => s.id === storeId)?.name;
     } else if (data.storeId) {
-      // Admin/regional managers can select a store
       storeId = Number(data.storeId);
       storeName = mockLocations.find(s => s.id === storeId)?.name;
     }
-    
-    // Create new event
-    const newEvent: DeepCleaningEvent = {
+
+    const newEvent = {
       id: Date.now().toString(),
       title: data.task,
       start: startDate,
@@ -261,13 +218,12 @@ export default function DeepCleaningPage() {
       storeId,
       storeName
     };
-    
-    // Wait briefly to simulate API call
+
     setTimeout(() => {
       setEvents([...events, newEvent]);
       setIsLoading(false);
       setIsModalOpen(false);
-      
+
       const storeInfo = storeName ? ` for ${storeName}` : '';
       toast({
         title: 'Deep cleaning task scheduled',
@@ -276,8 +232,7 @@ export default function DeepCleaningPage() {
     }, 500);
   };
 
-  // This function gets the store name for display based on event's storeId
-  const getEventTitle = (event: DeepCleaningEvent) => {
+  const getEventTitle = (event) => {
     if ((user?.role === 'admin' || user?.role === 'regional') && event.storeName) {
       return `${event.title} - ${event.storeName}`;
     }
@@ -294,7 +249,7 @@ export default function DeepCleaningPage() {
               Plan and schedule deep cleaning tasks for your store.
               Click on a date to add a new cleaning task.
             </p>
-            
+
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
               <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => {
                 const today = new Date();
@@ -302,12 +257,11 @@ export default function DeepCleaningPage() {
               }}>
                 <Plus className="mr-2 h-4 w-4" /> Add New Task
               </Button>
-              
-              {/* Store Filter - Only visible for admin and regional managers */}
+
               {(user?.role === 'admin' || user?.role === 'regional') && (
                 <div className="flex items-center">
-                  <Select 
-                    value={selectedStore} 
+                  <Select
+                    value={selectedStore}
                     onValueChange={setSelectedStore}
                   >
                     <SelectTrigger className="w-[200px]">
@@ -349,7 +303,7 @@ export default function DeepCleaningPage() {
           </div>
         </div>
       </DashboardLayout>
-      
+
       {/* New Task Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -359,7 +313,7 @@ export default function DeepCleaningPage() {
               {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
             </DialogDescription>
           </DialogHeader>
-          
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -388,8 +342,7 @@ export default function DeepCleaningPage() {
                   </FormItem>
                 )}
               />
-              
-              {/* Store selection field - Only visible for admin and regional managers */}
+
               {(user?.role === 'admin' || user?.role === 'regional') && (
                 <FormField
                   control={form.control}
@@ -421,7 +374,7 @@ export default function DeepCleaningPage() {
                   )}
                 />
               )}
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -439,7 +392,7 @@ export default function DeepCleaningPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="endTime"
@@ -457,7 +410,7 @@ export default function DeepCleaningPage() {
                   )}
                 />
               </div>
-              
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isLoading}>
                   Cancel

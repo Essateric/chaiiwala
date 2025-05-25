@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 
 export default function DatePickerField({ form, name, label }) {
-  const [selectedDate, setSelectedDate] = useState(undefined);
+  // Set "today" (midnight, so only today and future are allowed)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return (
     <FormField
@@ -25,22 +27,25 @@ export default function DatePickerField({ form, name, label }) {
                     !field.value ? "text-muted-foreground" : ""
                   }`}
                 >
-                  {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                  {field.value
+                    ? format(new Date(field.value), "PPP")
+                    : <span>Pick a date</span>}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </FormControl>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={field.value ? new Date(field.value) : undefined}
-                onSelect={(date) => {
-                  const formatted = date ? format(date, "yyyy-MM-dd") : "";
-                  field.onChange(formatted);
-                  setSelectedDate(date);
-                }}
-                initialFocus
-              />
+       <Calendar
+  mode="single"
+  selected={field.value ? new Date(field.value) : undefined}
+  onSelect={(date) => {
+    const formatted = date ? format(date, "yyyy-MM-dd") : "";
+    field.onChange(formatted);
+  }}
+  initialFocus
+  fromDate={today}    // <---- THIS IS IMPORTANT!
+/>
+
             </PopoverContent>
           </Popover>
           <FormMessage />

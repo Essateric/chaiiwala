@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Bell, Search, ChevronDown, Menu } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -15,9 +15,24 @@ import { useNavigate } from "react-router-dom";
 
 export default function TopBar({ title, onMenuClick, username, role }) {
   const [notificationCount, setNotificationCount] = useState(3);
+  const notificationRef = useRef();
   const [showNotifications, setShowNotifications] = useState(false);
   const { logoutMutation } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+  function handleClickOutside(event) {
+    if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+      setShowNotifications(false);
+    }
+  }
+
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
+
 
   return (
     <header className="bg-white shadow-sm z-10">
@@ -65,8 +80,8 @@ export default function TopBar({ title, onMenuClick, username, role }) {
 
             {showNotifications && (
               <div 
+              ref={notificationRef} 
                 className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50"
-                onBlur={() => setShowNotifications(false)}
               >
                 <div className="px-4 py-2 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>

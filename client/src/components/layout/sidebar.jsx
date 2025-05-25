@@ -66,7 +66,8 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional'] },
     { name: 'Deep Cleaning', icon: ClipboardCheckIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
     { name: 'Staff Schedule', icon: CalendarIcon, href: '/schedule', active: currentPage === 'schedule', roles: ['admin', 'regional', 'store', 'staff'] },
-    { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'store'] },
+    { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area'] },
+
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional', 'store'] }
   ];
@@ -139,6 +140,7 @@ export default function Sidebar({ isOpen, onClose }) {
             const canAccessStockOrders = 
               profile?.permissions === 'admin' || 
               profile.permissions === 'regional' ||
+              profile.permissions === 'area' ||
               // Check if profile.store_ids (array) has any common elements with allowedStoreIds
               (profile.permissions === 'store' && 
                profile.store_ids && 

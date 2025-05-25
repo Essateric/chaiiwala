@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/UseAuth";
 import { useStores } from "@/hooks/use-stores";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,19 +39,17 @@ import {
 
 export default function StockOrdersPage() {
   // Fetch user data for access control
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   
   // Access control check
   useEffect(() => {
     if (!user) return;
-    
-    const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // IDs of the 7 allowed store locations
+    const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7];
     const canAccessStockOrders = 
-      user.role === 'admin' || 
-      user.role === 'regional' || 
-      (user.role === 'store' && user.storeId && allowedStoreIds.includes(user.storeId));
-    
+      profile.permissions === 'admin' || 
+      profile.permissions === 'regional' || 
+      (profile.permissions === 'store' && profile.storeId && allowedStoreIds.includes(profile.storeId));
     if (!canAccessStockOrders) {
       // Redirect unauthorized users to dashboard
       console.log("Unauthorized access to Stock Orders page, redirecting to dashboard");
@@ -76,7 +74,6 @@ export default function StockOrdersPage() {
   
   // Initialize location with the user's assigned store
   const [receiptLocation, setReceiptLocation] = useState(() => {
-    // For this example, setting static store name as this is from a data row
     return 'Chaiiwala Stockport Road';
   });
   
@@ -84,7 +81,7 @@ export default function StockOrdersPage() {
   const { stores: storeLocations } = useStores();
   
   // State for Freshways order form with dynamic total calculation
-  const [selectedItems, setSelectedItems] = useState<{[key: string]: boolean}>({
+  const [selectedItems, setSelectedItems] = useState({
     milk: false,
     bread: false,
     buns: false,
@@ -104,7 +101,7 @@ export default function StockOrdersPage() {
   };
   
   // Calculate total price whenever selected items change
-  const calculateTotalPrice = (): number => {
+  const calculateTotalPrice = () => {
     return Object.entries(selectedItems).reduce((total, [key, isSelected]) => {
       if (isSelected && itemPrices[key]) {
         return total + itemPrices[key].price;
@@ -262,19 +259,9 @@ export default function StockOrdersPage() {
                     onSubmit={(e) => {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
-                      
-                      // Define the item structure type
-                      type OrderItem = {
-                        name: string;
-                        price: number;
-                        priceFormatted: string;
-                      };
-                      
                       // Collect all checked items with prices
-                      const orderItems: OrderItem[] = [];
+                      const orderItems = [];
                       let totalPrice = 0;
-                      
-                      // Use the selectedItems state to determine which items are checked
                       Object.entries(selectedItems).forEach(([key, isSelected]) => {
                         if (isSelected && itemPrices[key]) {
                           orderItems.push({
@@ -285,25 +272,20 @@ export default function StockOrdersPage() {
                           totalPrice += itemPrices[key].price;
                         }
                       });
-                      
                       // Format account number and delivery date
                       const accountNumber = formData.get('account-number');
                       const deliveryDate = formData.get('delivery-date');
-                      
                       // Generate order ID with user's initials
                       const currentDate = new Date();
                       const year = currentDate.getFullYear().toString().slice(-2);
                       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
                       const day = String(currentDate.getDate()).padStart(2, '0');
                       const dateStr = `${year}${month}${day}`;
-                      
                       // Get user initials from logged in user (or default to UA)
                       const userInitials = user?.username 
                         ? user.username.substring(0, 2).toUpperCase() 
                         : 'UA';
-                      
                       const orderId = `FW-${userInitials}${dateStr}-01`;
-                      
                       // Send order to webhook with hardcoded store information
                       fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
                         method: 'POST',
@@ -380,120 +362,27 @@ export default function StockOrdersPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              <tr>
-                                <td className="py-2">Milk (Pack of 6)</td>
-                                <td className="text-right">£5.49</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="milk" 
-                                    id="milk" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.milk}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        milk: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2">Bread (Item)</td>
-                                <td className="text-right">£1.99</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="bread" 
-                                    id="bread" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.bread}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        bread: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2">Buns (Pack of 6)</td>
-                                <td className="text-right">£2.49</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="buns" 
-                                    id="buns" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.buns}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        buns: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2">Yoghurt (Tub)</td>
-                                <td className="text-right">£3.29</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="yoghurt" 
-                                    id="yoghurt" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.yoghurt}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        yoghurt: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2">Eggs</td>
-                                <td className="text-right">£2.79</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="eggs" 
-                                    id="eggs" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.eggs}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        eggs: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2">Oat Milk (Carton)</td>
-                                <td className="text-right">£1.89</td>
-                                <td className="text-center">
-                                  <input 
-                                    type="checkbox" 
-                                    name="oatMilk" 
-                                    id="oatMilk" 
-                                    className="h-4 w-4"
-                                    checked={selectedItems.oatMilk}
-                                    onChange={(e) => {
-                                      setSelectedItems({
-                                        ...selectedItems,
-                                        oatMilk: e.target.checked
-                                      });
-                                    }}
-                                  />
-                                </td>
-                              </tr>
+                              {Object.entries(itemPrices).map(([key, item]) => (
+                                <tr key={key}>
+                                  <td className="py-2">{item.name}</td>
+                                  <td className="text-right">£{item.price.toFixed(2)}</td>
+                                  <td className="text-center">
+                                    <input 
+                                      type="checkbox" 
+                                      name={key} 
+                                      id={key} 
+                                      className="h-4 w-4"
+                                      checked={selectedItems[key]}
+                                      onChange={(e) => {
+                                        setSelectedItems({
+                                          ...selectedItems,
+                                          [key]: e.target.checked
+                                        });
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
@@ -862,16 +751,13 @@ export default function StockOrdersPage() {
                 const orderDate = orderRow.querySelector('td:nth-child(1)')?.textContent || 'Apr 10, 2025';
                 const orderId = orderRow.querySelector('td:nth-child(2)')?.textContent || 'FW-UA250410-01';
                 const supplier = orderRow.querySelector('td:nth-child(3)')?.textContent || 'Freshways';
-                
                 // Remove the row from the "pending" tab
                 orderRow.remove();
-                
                 // Add the order to the "received" tab with the updated status
                 const receivedOrdersTable = document.getElementById('received-orders-table');
                 if (receivedOrdersTable) {
                   const newRow = document.createElement('tr');
                   newRow.setAttribute('data-order-id', orderId);
-                  
                   // Format today's date
                   const today = new Date();
                   const formattedDate = today.toLocaleDateString('en-US', {
@@ -879,7 +765,6 @@ export default function StockOrdersPage() {
                     day: 'numeric',
                     year: 'numeric'
                   });
-                  
                   newRow.innerHTML = `
                     <td>${orderDate}</td>
                     <td class="font-medium">${orderId}</td>
@@ -897,18 +782,14 @@ export default function StockOrdersPage() {
                       </button>
                     </td>
                   `;
-                  
-                  // Add the new row to the received orders table
                   receivedOrdersTable.appendChild(newRow);
-                  
                   // Switch to the "received" tab
                   const receivedTab = document.querySelector('[value="received"]');
                   if (receivedTab) {
-                    (receivedTab as HTMLElement).click();
+                    receivedTab.click();
                   }
                 }
               }
-              
               setOpenReceiptDialog(false);
             }}
           >

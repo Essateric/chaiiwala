@@ -2,29 +2,28 @@ import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
-import { User as SelectUser } from "@shared/schema";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { StockWidget } from "@/components/dashboard/stock-widget";
-import { useInventory, InventoryWithBreakdown } from "@/hooks/use-inventory";
-import { 
+import { useInventory } from "@/hooks/use-inventory";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts';
-import { 
-  Store as StoreIcon, 
-  Users, 
+import {
+  Store as StoreIcon,
+  Users,
   AlertTriangle,
   Sparkles,
   Package,
@@ -57,29 +56,30 @@ const notifications = [
   { id: 3, title: 'Weekly sales report', description: 'All stores exceeded targets this week', time: '1 day ago', isHighlighted: false },
 ];
 
+// You must define or import StoreData and InventoryWithBreakdown shape in JSDoc or as comments if you want
 export default function DashboardBasic() {
   const { toast } = useToast();
   const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
-  const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(undefined);
-  const [selectedStoreName, setSelectedStoreName] = useState<string>("All Stores");
-  
+  const [selectedStoreId, setSelectedStoreId] = useState(undefined);
+  const [selectedStoreName, setSelectedStoreName] = useState("All Stores");
+
   // Fetch inventory data for the selected store
   const { inventory, isLoading: isLoadingInventory } = useInventory(selectedStoreId);
-  
+
   // Fetch user data directly - matches approach in ProtectedComponent
-  const { data: user } = useQuery<SelectUser | undefined, Error>({
+  const { data: user } = useQuery({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
-  
+
   // Fetch real store data from database
-  const { data: stores = [], isLoading } = useQuery<StoreData[]>({
+  const { data: stores = [], isLoading } = useQuery({
     queryKey: ['/api/stores'],
     // No custom queryFn needed as the default fetcher is set up to work with our backend
   });
-  
+
   // Get status color for inventory items
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status) => {
     switch (status) {
       case 'in_stock':
         return 'bg-green-100 text-green-800';
@@ -93,23 +93,24 @@ export default function DashboardBasic() {
         return 'bg-gray-100 text-gray-800';
     }
   };
-  
-  const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+
+  // Remove the type from event
+  const handleStoreChange = (e) => {
     const value = e.target.value;
     const storeId = value === "all" ? undefined : Number(value);
     setSelectedStoreId(storeId);
-    
+
     // Update the selected store name
     if (storeId) {
-      const store = stores.find((s: StoreData) => s.id === storeId);
-      setSelectedStoreName(store?.name || "Unknown Store");
+      const store = stores.find((s) => s.id === storeId);
+      setSelectedStoreName(store ? store.name : "Unknown Store");
     } else {
       setSelectedStoreName("All Stores");
     }
   };
 
   return (
-    <DashboardLayout title="Dashboard">
+    <div className="flex-1 min-h-screen bg-[#f5f6fa] p-6">
       <div className="py-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
@@ -139,10 +140,10 @@ export default function DashboardBasic() {
                   margin={{ top: 5, right: 5, left: 0, bottom: 55 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45} 
-                    textAnchor="end" 
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
                     height={60}
                     tick={{ fontSize: 10 }}
                   />
@@ -157,7 +158,7 @@ export default function DashboardBasic() {
               <span className="font-semibold">£{salesData.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}</span>
             </div>
           </div>
-          
+
           {/* 2. Upcoming Tasks */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -192,7 +193,7 @@ export default function DashboardBasic() {
               </button>
             </div>
           </div>
-          
+
           {/* 3. Stock Overview */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -223,20 +224,20 @@ export default function DashboardBasic() {
                     <span className="text-sm font-semibold text-gray-900">Loading...</span>
                   )}
                 </div>
-                <select 
+                <select
                   className="border rounded-md py-1 px-2 text-xs bg-white"
                   value={selectedStoreId?.toString() || "all"}
                   onChange={handleStoreChange}
                 >
                   <option value="all">All Stores</option>
-                  {stores.map((store: StoreData) => (
+                  {stores.map((store) => (
                     <option key={store.id} value={store.id.toString()}>
                       {store.name}
                     </option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="mt-3 space-y-3">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-gray-600">In Stock</span>
@@ -263,11 +264,11 @@ export default function DashboardBasic() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="mt-4 text-right">
-                <button 
+                <button
                   onClick={() => {
-                    handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } } as React.ChangeEvent<HTMLSelectElement>);
+                    handleStoreChange({ target: { value: selectedStoreId ? selectedStoreId.toString() : "all" } });
                     setIsStockDialogOpen(true);
                   }}
                   className="text-xs font-medium text-chai-gold hover:text-yellow-600"
@@ -277,7 +278,7 @@ export default function DashboardBasic() {
               </div>
             </div>
           </div>
-          
+
           {/* 4. Recent Notifications */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -315,11 +316,11 @@ export default function DashboardBasic() {
             </div>
           </div>
         </div>
-        
+
         {/* Additional bottom margin */}
         <div className="mb-6"></div>
       </div>
-      
+
       {/* Stock Dialog */}
       <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
@@ -328,25 +329,25 @@ export default function DashboardBasic() {
               <Package className="h-5 w-5 mr-2 text-chai-gold" />
               Stock Inventory - {selectedStoreName}
             </DialogTitle>
-            <button 
+            <button
               onClick={() => setIsStockDialogOpen(false)}
               className="rounded-full p-1 hover:bg-gray-100"
             >
               <X className="h-4 w-4 text-gray-500" />
             </button>
           </DialogHeader>
-          
+
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-4 p-1">
               {isLoadingInventory ? (
                 <div className="space-y-2">
-                  {[1,2,3,4].map((i) => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-gray-100 h-14 animate-pulse rounded"></div>
                   ))}
                 </div>
               ) : inventory && inventory.length > 0 ? (
                 <div className="space-y-2">
-                  {(inventory as InventoryWithBreakdown[]).map((item: InventoryWithBreakdown) => (
+                  {inventory.map((item) => (
                     <div key={item.id} className="flex justify-between p-3 rounded-md bg-gray-50 border border-gray-100">
                       <div>
                         <div className="font-medium">{item.name}</div>
@@ -394,6 +395,6 @@ export default function DashboardBasic() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </div>
   );
 }
