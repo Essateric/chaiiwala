@@ -1,49 +1,50 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabaseClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Main hook for event orders
 export function useEventOrders(storeId) {
   const { toast } = useToast();
 
+  // Fetch event orders (filtered by store if given)
   const {
     data: eventOrders = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: storeId ? ["/api/event-orders", "store", storeId] : ["/api/event-orders"],
+    queryKey: storeId ? ["event_orders", "store", storeId] : ["event_orders"],
     queryFn: async () => {
-      const endpoint = storeId 
-        ? `/api/event-orders/store/${storeId}` 
-        : '/api/event-orders';
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error('Failed to fetch event orders');
-      }
-      return response.json();
+      let query = supabase
+        .from("event_orders")
+        .select("*")
+        .order("event_date", { ascending: false });
+
+      if (storeId) query = query.eq("store_id", storeId);
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return data || [];
     },
     refetchOnWindowFocus: true,
   });
 
+  // Create event order mutation
   const { mutateAsync: createEventOrder, isPending: isCreating } = useMutation({
     mutationFn: async (eventOrder) => {
-      const response = await apiRequest("POST", "/api/event-orders", eventOrder);
-      return await response.json();
+      const { data, error } = await supabase
+        .from("event_orders")
+        .insert([eventOrder])
+        .select();
+      if (error) throw new Error(error.message);
+      return data?.[0];
     },
     onSuccess: (newOrder) => {
-      console.log("New event order created:", newOrder);
-
-      queryClient.setQueryData(["/api/event-orders"], (oldData = []) => {
-        return oldData ? [...oldData, newOrder] : [newOrder];
-      });
-
+      // Invalidate to refresh
+      queryClient.invalidateQueries({ queryKey: ["event_orders"] });
       if (storeId) {
-        queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData = []) => {
-          return oldData ? [...oldData, newOrder] : [newOrder];
-        });
+        queryClient.invalidateQueries({ queryKey: ["event_orders", "store", storeId] });
       }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
-
       toast({
         title: "Event Order Created",
         description: "The event order has been created successfully.",
@@ -58,32 +59,22 @@ export function useEventOrders(storeId) {
     },
   });
 
+  // Update event order mutation
   const { mutateAsync: updateEventOrder, isPending: isUpdating } = useMutation({
     mutationFn: async ({ id, data }) => {
-      const response = await apiRequest("PATCH", `/api/event-orders/${id}`, data);
-      return await response.json();
+      const { data: updated, error } = await supabase
+        .from("event_orders")
+        .update(data)
+        .eq("id", id)
+        .select();
+      if (error) throw new Error(error.message);
+      return updated?.[0];
     },
     onSuccess: (updatedOrder) => {
-      console.log("Event order updated:", updatedOrder);
-
-      queryClient.setQueryData(["/api/event-orders"], (oldData = []) => {
-        if (!oldData) return [updatedOrder];
-        return oldData.map(order =>
-          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
-        );
-      });
-
+      queryClient.invalidateQueries({ queryKey: ["event_orders"] });
       if (storeId) {
-        queryClient.setQueryData(["/api/event-orders", "store", storeId], (oldData = []) => {
-          if (!oldData) return [updatedOrder];
-          return oldData.map(order =>
-            order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
-          );
-        });
+        queryClient.invalidateQueries({ queryKey: ["event_orders", "store", storeId] });
       }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/event-orders"] });
-
       toast({
         title: "Event Order Updated",
         description: "The event order has been updated successfully.",
@@ -98,12 +89,15 @@ export function useEventOrders(storeId) {
     },
   });
 
+  // Fetch a single event order by ID
   const getEventOrder = async (id) => {
-    const response = await fetch(`/api/event-orders/${id}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch event order');
-    }
-    return response.json();
+    const { data, error } = await supabase
+      .from("event_orders")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
   };
 
   return {

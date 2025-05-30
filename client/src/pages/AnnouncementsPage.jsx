@@ -3,13 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectTrigger, SelectItem, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/UseAuth";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AnnouncementCard from "@/components/announcements/announcement-card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { MentionsInput, Mention } from "react-mentions";
+
 
 export default function AnnouncementsPage() {
   const { profile, user } = useAuth();
@@ -19,7 +20,6 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-
   // Form state
   const [message, setMessage] = useState("");
   const [targetRole, setTargetRole] = useState("all");
@@ -29,13 +29,6 @@ export default function AnnouncementsPage() {
   const [important, setImportant] = useState(false);
 
   // Users and stores queries
-  const { data: users = [] } = useQuery({
-    queryKey: ["profiles"],
-    queryFn: async () => {
-      const res = await fetch("/api/users");
-      return res.json();
-    },
-  });
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
@@ -44,8 +37,46 @@ export default function AnnouncementsPage() {
     },
   });
 
+  // USERS for MentionsInput: Fetch from Supabase
+  const [mentionUsers, setMentionUsers] = useState([]);
+  useEffect(() => {
+    async function fetchUsers() {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, name");
+      if (!error && data) {
+        setMentionUsers(
+          data
+            .filter(u => u.name)
+            .map(u => ({
+              id: u.id,
+              display: u.name,
+            }))
+        );
+      }
+    }
+    fetchUsers();
+  }, []);
+
+  // Also fetch users for the user select
+  const { data: users = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      const res = await fetch("/api/users");
+      return res.json();
+    },
+  });
+
   // Only allow these roles to send
-  const canSend = ["admin", "regional", "area"].includes(profile?.permissions);
+  const canSend = ["admin", "regional", "area", "store"].includes(profile?.permissions);
+  // Only allow full mention list for permitted roles
+const showAllMentions = ["admin", "regional", "area", "store"].includes(profile?.permissions);
+
+// Restrict mentionUsers if not permitted
+const filteredMentionUsers = showAllMentions
+  ? mentionUsers
+  : mentionUsers.filter(u => u.id === profile?.id);
+
 
   // Fetch announcements from Supabase directly
   async function fetchAnnouncements() {
@@ -59,47 +90,60 @@ export default function AnnouncementsPage() {
   }
 
   // Fetch on mount
-  useState(() => { fetchAnnouncements(); }, []); // Use useEffect if warning
+  useEffect(() => { fetchAnnouncements(); }, []); // Changed from useState to useEffect
 
-async function handleCreate(e) {
-  e.preventDefault();
-  if (!title || !message) {
-    toast({ title: "Title and message required", variant: "destructive" });
-    return;
+  // REVISED handleCreate
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!title || !message) {
+      toast({ title: "Title and message required", variant: "destructive" });
+      return;
+    }
+    setIsCreating(true);
+
+    // 1. Extract @names from message
+    const mentionedNames = Array.from(
+      message.matchAll(/@([a-zA-Z ]+)/g),
+      m => m[1].trim()
+    );
+
+    // 2. Find user IDs for these names
+    const taggedUserIds = mentionUsers
+      .filter(u => mentionedNames.includes(u.display))
+      .map(u => u.id);
+
+    // 3. Merge with selected users (avoid duplicates)
+    const manualUserIds = targetUser === "all" ? [] : [String(targetUser)];
+    const allTargetUserIds = Array.from(new Set([...manualUserIds, ...taggedUserIds]));
+
+    // 4. Prepare insert data
+    const insertData = {
+      title,
+      content: message,
+      from_user: profile?.id,
+      target_role: targetRole === "all" ? null : targetRole,
+      target_store_ids: targetStore === "all" ? [] : [String(targetStore)],
+      target_user_ids: allTargetUserIds,
+      important: !!important,
+    };
+
+    // 5. Save as before
+    const { error } = await supabase.from("announcements").insert([insertData]);
+    setIsCreating(false);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Announcement Sent", variant: "success" });
+      setTitle("");
+      setMessage("");
+      setTargetRole("all");
+      setTargetStore("all");
+      setTargetUser("all");
+      setImportant(false);
+      fetchAnnouncements();
+    }
   }
-  setIsCreating(true);
-
-  const insertData = {
-    title,
-    content: message,
-    from_user: user?.id,
-    target_role: targetRole === "all" ? null : targetRole, // null if All
-    target_store_ids: targetStore === "all" ? [] : [parseInt(targetStore, 10)], // array of ints
-    target_user_ids: targetUser === "all" ? [] : [targetUser], // array of uuids/texts
-    important: !!important,
-  };
-  // Remove any fields not in your table!
-  // If target_role is NOT nullable, use "all" or ""
-  // If target_store_ids is not array, adjust
-  // If from_user must be uuid, make sure it is
-
-  const { error } = await supabase.from("announcements").insert([insertData]);
-  setIsCreating(false);
-
-  if (error) {
-    toast({ title: "Error", description: error.message, variant: "destructive" });
-  } else {
-    toast({ title: "Announcement Sent", variant: "success" });
-    setTitle("");
-    setMessage("");
-    setTargetRole("all");
-    setTargetStore("all");
-    setTargetUser("all");
-    setImportant(false);
-    fetchAnnouncements();
-  }
-}
-
 
   // Filter for current user if not canSend
   let visibleAnnouncements = announcements;
@@ -127,12 +171,22 @@ async function handleCreate(e) {
                   onChange={e => setTitle(e.target.value)}
                   required
                 />
-                <Textarea
-                  placeholder="Message"
+                {/* MentionsInput replaces Textarea */}
+                <MentionsInput
                   value={message}
                   onChange={e => setMessage(e.target.value)}
-                  required
-                />
+                  placeholder="Type your message and use @ to tag users..."
+                  className="border p-2 rounded w-full"
+                  style={{ minHeight: 80 }}
+                >
+                 <Mention
+    trigger="@"
+    data={filteredMentionUsers}
+    markup="@__display__"
+    style={{ backgroundColor: "#DCF7C5", fontWeight: 500 }}
+  />
+                </MentionsInput>
+                {/* END MentionsInput */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Select value={targetRole} onValueChange={setTargetRole}>
                     <SelectTrigger><SelectValue placeholder="Target role (optional)" /></SelectTrigger>

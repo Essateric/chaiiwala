@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { EventOrderSchema } from "@/schemas/EventOrderSchema";
-// Remove FormFieldSet import as we're expanding store select inline
+import FormFieldSet from "./FormFieldSet";
 
 export default function EventOrderFormDialog({
   isFormOpen,
@@ -74,55 +74,16 @@ export default function EventOrderFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Store selection */}
-            <div>
-              <label className="block font-medium mb-1">
-                Store *
-              </label>
-              <select
-                {...form.register("storeId", { required: true })}
-                className="w-full border rounded p-2 bg-white"
-                defaultValue={form.getValues("storeId") || ""}
-              >
-                <option value="">Select a store</option>
-                {storeOptions.map(store => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
-              {form.formState.errors.storeId && (
-                <p className="text-red-500 text-xs mt-1">Please select a store</p>
-              )}
-            </div>
-
-            {/* The rest of your fields (use your own custom field components or basic inputs) */}
-            <div>
-              <label className="block font-medium mb-1">
-                Event Date *
-              </label>
-              <input
-                type="date"
-                {...form.register("eventDate", { required: true })}
-                className="w-full border rounded p-2 bg-white"
-              />
-              {form.formState.errors.eventDate && (
-                <p className="text-red-500 text-xs mt-1">Please select an event date</p>
-              )}
-            </div>
-
-            {/* Add all other fields in the same way: eventTime, venue, product, quantity, etc. */}
-
-            {/* Submit Button */}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isCreating}>
-                {isCreating ? "Creating..." : "Create Event Order"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <FormFieldSet form={form} profile={profile} stores={stores} />
+    <div className="flex justify-end">
+      <Button type="submit" disabled={isCreating}>
+        {isCreating ? "Creating..." : "Create Event Order"}
+      </Button>
+    </div>
+  </form>
+</Form>
       </DialogContent>
     </Dialog>
   );

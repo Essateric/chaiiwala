@@ -12,27 +12,54 @@ import { useAuth } from "@/hooks/UseAuth";
 import chaiiwalaLogo from "@assets/chaiiwala.png";
 import { useNavigate } from "react-router-dom";
 
+console.log("Current user profile.id:", profile?.id);
+console.log("All announcements:", announcements);
 
-export default function TopBar({ title, onMenuClick, username, role }) {
-  const [notificationCount, setNotificationCount] = useState(3);
+announcements.forEach(a => {
+  console.log("Announcement:", a.title, a.target_user_ids);
+});
+
+export default function TopBar({ title, onMenuClick, username, role, announcements = [], profile }) {
   const notificationRef = useRef();
   const [showNotifications, setShowNotifications] = useState(false);
   const { logoutMutation } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-  function handleClickOutside(event) {
-    if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-      setShowNotifications(false);
-    }
+  const userNotifications = announcements.filter(a => {
+  // Ensure target_user_ids is always an array
+  let ids = [];
+  if (Array.isArray(a.target_user_ids)) {
+    ids = a.target_user_ids;
+  } else if (typeof a.target_user_ids === "string" && a.target_user_ids.startsWith("[")) {
+    try {
+      ids = JSON.parse(a.target_user_ids);
+    } catch (e) {}
   }
+  // Now check if profile.id is in ids
+  return (ids.includes(profile?.id))
+    || ((a.target_role === "all" || a.target_role === profile?.permissions)
+      && ((a.target_store_ids?.length === 0) || (profile?.store_ids?.some(id => a.target_store_ids.includes(id)))));
+});
 
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, []);
 
+  // Sort notifications by time (assuming 'created_at')
+  const sortedNotifications = userNotifications
+    .slice() // shallow copy to avoid mutating original
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const notificationCount = sortedNotifications.length;
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <header className="bg-white shadow-sm z-10">
@@ -80,28 +107,35 @@ export default function TopBar({ title, onMenuClick, username, role }) {
 
             {showNotifications && (
               <div 
-              ref={notificationRef} 
+                ref={notificationRef} 
                 className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50"
               >
                 <div className="px-4 py-2 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  <a href="#" className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-red-500">
-                    <p className="text-sm font-medium text-gray-900">Low stock alert: Chai Masala</p>
-                    <p className="text-xs text-gray-600">Oxford Road location • 10 minutes ago</p>
-                  </a>
-                  <a href="#" className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-orange-500">
-                    <p className="text-sm font-medium text-gray-900">Task due today: Weekly inventory check</p>
-                    <p className="text-xs text-gray-600">Cheetham Hill location • 1 hour ago</p>
-                  </a>
-                  <a 
-                    onClick={() => navigate("/announcements")} 
-                    className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-chai-gold cursor-pointer"
-                  >
-                    <p className="text-sm font-medium text-gray-900">New announcement from Head Office</p>
-                    <p className="text-xs text-gray-600">Company-wide • 3 hours ago</p>
-                  </a>
+                  {sortedNotifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-gray-500">No notifications</div>
+                  ) : (
+                    sortedNotifications.map(a => (
+                      <a 
+                        key={a.id}
+                        onClick={() => navigate("/announcements")}
+                        className="block px-4 py-2 hover:bg-gray-100 border-l-4 border-chai-gold cursor-pointer"
+                      >
+                        <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                        {/* Example: show who it's from, show if tagged */}
+                        <p className="text-xs text-gray-600">
+                          {a.author_name || "Announcement"} 
+                          {Array.isArray(a.target_user_ids) && a.target_user_ids.includes(profile?.id) && (
+                            <span className="ml-2 inline-block text-green-700 bg-green-100 rounded px-1">You were tagged</span>
+                          )}
+                          {" • "}
+                          {a.created_at ? new Date(a.created_at).toLocaleString() : ""}
+                        </p>
+                      </a>
+                    ))
+                  )}
                 </div>
                 <a 
                   onClick={() => navigate("/announcements")} 

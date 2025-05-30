@@ -23,7 +23,7 @@ export default function DatePickerField({ form, name, label }) {
               <FormControl>
                 <Button
                   variant="outline"
-                  className={`w-full pl-3 text-left font-normal ${
+                  className={`w-full bg-white pl-3 text-left font-normal ${
                     !field.value ? "text-muted-foreground" : ""
                   }`}
                 >

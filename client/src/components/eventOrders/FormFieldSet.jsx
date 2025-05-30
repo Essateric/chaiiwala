@@ -57,7 +57,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Event Time*</FormLabel>
             <FormControl>
-              <Input type="time" {...field} />
+              <Input className="bg-white" type="time" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -71,7 +71,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Venue*</FormLabel>
             <FormControl>
-              <Input placeholder="Venue address/location" {...field} />
+              <Input className="bg-white" placeholder="Venue address/location" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -85,7 +85,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Product/Service*</FormLabel>
             <FormControl>
-              <Input placeholder="Food/beverage service description" {...field} />
+              <Input className="bg-white" placeholder="Food/beverage service description" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -101,6 +101,7 @@ export default function FormFieldSet({ form, profile, stores }) {
             <FormControl>
               <Input
                 type="number"
+                className="bg-white"
                 {...field}
                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
               />
@@ -117,7 +118,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Customer Name*</FormLabel>
             <FormControl>
-              <Input {...field} />
+              <Input className="bg-white" placeholder="Customer name" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -131,7 +132,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Customer Phone*</FormLabel>
             <FormControl>
-              <Input type="tel" {...field} />
+              <Input className="bg-white" type="tel" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -145,7 +146,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Customer Email</FormLabel>
             <FormControl>
-              <Input type="email" {...field} />
+              <Input className="bg-white" type="email" {...field} />
             </FormControl>
             <FormDescription>Optional</FormDescription>
             <FormMessage />
@@ -160,7 +161,7 @@ export default function FormFieldSet({ form, profile, stores }) {
           <FormItem>
             <FormLabel>Emergency Contact</FormLabel>
             <FormControl>
-              <Input type="tel" {...field} />
+              <Input className="bg-white" type="tel" {...field} />
             </FormControl>
             <FormDescription>Optional</FormDescription>
             <FormMessage />
@@ -176,7 +177,7 @@ export default function FormFieldSet({ form, profile, stores }) {
             <FormLabel>Payment Status*</FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white" >
                   <SelectValue placeholder="Select payment status" />
                 </SelectTrigger>
               </FormControl>
@@ -219,11 +220,10 @@ export default function FormFieldSet({ form, profile, stores }) {
         name="notes"
         render={({ field }) => (
           <FormItem className="md:col-span-2">
-            <FormLabel>Notes</FormLabel>
+            <FormLabel>Notes <FormDescription>(Optional)</FormDescription></FormLabel>
             <FormControl>
-              <Textarea placeholder="Any special requirements or additional info" className="resize-none" {...field} />
+              <Textarea placeholder="Any special requirements or additional info" className="resize-none bg-white" {...field} />
             </FormControl>
-            <FormDescription>Optional</FormDescription>
             <FormMessage />
           </FormItem>
         )}

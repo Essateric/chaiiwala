@@ -19,8 +19,7 @@ export default function EventOrdersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [filterStoreId, setFilterStoreId] = useState();
   const [filterStatus, setFilterStatus] = useState();
-
-  const { eventOrders, isLoading, error, updateEventOrder } = useEventOrders(filterStoreId);
+   const { eventOrders, isLoading, error, updateEventOrder } = useEventOrders(filterStoreId);
 
   const canCreateOrder = ALLOWED_ROLES.includes(profile?.permissions);
 

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from "@/lib/supabaseClient";
+
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
@@ -15,17 +17,55 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStockCategories } from "@/hooks/use-stock-categories";
 
-// Dummy initial stock config
-const initialStockConfig = [
-  { id: 1, itemCode: "BP401", name: "Masala Beans", lowStockThreshold: 5, category: "Food", price: 3.99, sku: "CHW-MB-001" },
-  { id: 2, itemCode: "BP402", name: "Daal", lowStockThreshold: 4, category: "Food", price: 2.99, sku: "CHW-DA-001" },
-  { id: 3, itemCode: "BP440", name: "Mogo Sauce", lowStockThreshold: 6, category: "Food", price: 1.99, sku: "CHW-MS-001" },
-  { id: 4, itemCode: "DP196", name: "Orange Juice (12x250ml)", lowStockThreshold: 3, category: "Drinks", price: 6.99, sku: "CHW-OJ-001" },
-  { id: 5, itemCode: "FPFC204", name: "Karak Chaii Sugar free (50 per box)", lowStockThreshold: 2, category: "Drinks", price: 24.99, sku: "CHW-KC-001" },
-];
-
 export default function SettingsPage() {
-  const [stockConfig, setStockConfig] = useState(initialStockConfig);
+  const [stockConfig, setStockConfig] = useState([]);
+  const [loadingStock, setLoadingStock] = useState(true);
+
+  // PAGINATION
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+  const totalPages = Math.ceil(stockConfig.length / itemsPerPage);
+
+  const paginatedItems = stockConfig.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const fetchStockItems = async () => {
+      setLoadingStock(true);
+      const { data, error } = await supabase
+        .from('stock_items')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error) {
+        setStockConfig([]);
+        // Optionally show a toast
+        // toast({ title: "Error loading stock", description: error.message, variant: "destructive" });
+      } else {
+        setStockConfig(data);
+      }
+      setLoadingStock(false);
+    };
+
+      const [stockLevels, setStockLevels] = useState([]);
+
+const fetchStockLevels = async () => {
+  const { data, error } = await supabase
+    .from('store_stock_levels')
+    .select('*');
+  if (!error) setStockLevels(data);
+  else setStockLevels([]);
+};
+
+
+
+useEffect(() => {
+  fetchStockItems();
+  fetchStockLevels();
+}, []);
+
+  // ... (all your other states and logic below)
   const [activeTab, setActiveTab] = useState("general");
   const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -39,6 +79,7 @@ export default function SettingsPage() {
   const [newCategory, setNewCategory] = useState({ name: "", prefix: "", description: "" });
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+
 
   // Fetch stock categories (JS version)
   const {
@@ -81,57 +122,6 @@ export default function SettingsPage() {
     return `${prefix}${suffix}`;
   };
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-
-  // Edit handlers
-  const handleEditItem = (item) => {
-    setEditItem(item);
-    setDialogOpen(true);
-  };
-
-  const handleSaveChanges = () => {
-    if (editItem) {
-      const updatedConfig = stockConfig.map(item =>
-        item.id === editItem.id ? editItem : item
-      );
-      setStockConfig(updatedConfig);
-      toast({
-        title: "Settings Updated",
-        description: `${editItem.name} threshold has been updated.`,
-      });
-      setDialogOpen(false);
-      setEditItem(null);
-    }
-  };
-
-  const handleAddItem = () => {
-    if (!newItem.name) {
-      toast({
-        title: "Validation Error",
-        description: "Product name is required.",
-        variant: "destructive"
-      });
-      return;
-    }
-    const itemCode = generateItemCode(newItem.category, newItem.name);
-    const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
-    const itemToAdd = { ...newItem, itemCode, id: newId };
-    setStockConfig([...stockConfig, itemToAdd]);
-    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "" });
-    setIsAddDialogOpen(false);
-    toast({
-      title: "Item Added",
-      description: `${newItem.name} has been added to stock configuration.`,
-    });
-  };
-
-  const handleDeleteItem = (id) => {
-    const updatedConfig = stockConfig.filter(item => item.id !== id);
-    setStockConfig(updatedConfig);
-    toast({
-      title: "Item Removed",
-      description: "Item has been removed from stock configuration.",
-    });
-  };
 
   // Handle CSV upload (now plain JS, not TS)
   const handleCsvUpload = (event) => {
@@ -188,13 +178,13 @@ export default function SettingsPage() {
     if (missingColumns.length > 0) {
       toast({
         title: "CSV Format Error",
-        description: `Missing required columns: ${missingColumns.join(', ')}. Expected format: item_code, alt_item_code, product, price_box`,
+        description: `Missing required columns: ${missingColumns.join(', ')}. Expected format: item_code, sku, product, price_box`,
         variant: "destructive"
       });
       return [];
     }
     const itemCodeIndex = headers.indexOf('item_code');
-    const altItemCodeIndex = headers.indexOf('alt_item_code');
+    const altItemCodeIndex = headers.indexOf('sku');
     const productIndex = headers.indexOf('product');
     const priceIndex = headers.indexOf('price_box');
     const items = [];
@@ -230,7 +220,7 @@ export default function SettingsPage() {
   // CSV template download
   const downloadCsvTemplate = () => {
     const csvContent = [
-      'item_code,alt_item_code,product,price_box',
+      'item_code,sku,product,price_box',
       'BP401,FPBC101,Masala Beans,52.91',
       'BP402,FPBC102,Daal,32.39',
       'BP440,FPBC105,Mogo Sauce,9.00',
@@ -251,6 +241,105 @@ export default function SettingsPage() {
       description: "CSV template has been downloaded successfully.",
     });
   };
+
+  // Add a new item to Supabase and refresh table
+const handleAddItem = async () => {
+  if (!newItem.name) {
+    toast({
+      title: "Validation Error",
+      description: "Product name is required.",
+      variant: "destructive"
+    });
+    return;
+  }
+  const { error } = await supabase
+    .from('stock_items')
+    .insert([{
+      item_code: generateItemCode(newItem.category, newItem.name),
+      name: newItem.name,
+      category: newItem.category,
+      low_stock_threshold: newItem.lowStockThreshold,
+      price: newItem.price,
+      sku: newItem.sku,
+    }]);
+  if (!error) {
+    toast({ title: "Item Added", description: `${newItem.name} added.` });
+    setIsAddDialogOpen(false);
+    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "" });
+    fetchStockItems();
+  } else {
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+  }
+};
+
+const handleEditItem = (item) => {
+  // Find stock level info for this item
+  const level = stockLevels.find(l => l.item_code === item.item_code);
+
+  // Merge the info for the modal (adjust field names as needed)
+  setEditItem({
+    item_code: item.item_code,
+    sku: item.sku || "", // Or whatever your alt code field is
+    product: item.name,
+    price_box: item.price,
+    low_stock_limit: level ? level.low_stock_limit : item.low_stock_threshold || "",
+  });
+
+  setDialogOpen(true);
+};
+
+const handleSaveChanges = async () => {
+  if (editItem) {
+    // 1. Find stock_item_id
+    const { data: item, error: itemError } = await supabase
+      .from('stock_items')
+      .select('id')
+      .eq('item_code', editItem.item_code)
+      .single();
+
+    if (!item) {
+      toast({ title: "Error", description: "Stock item not found.", variant: "destructive" });
+      return;
+    }
+
+    // 2. UPSERT into store_stock_levels (will insert if missing, update if exists)
+    const { error } = await supabase
+      .from('store_stock_levels')
+      .upsert({
+        stock_item_id: item.id,
+        low_stock_limit: editItem.low_stock_limit,
+        // Add other fields if needed, like store_id: null or 0
+      }, { onConflict: ['stock_item_id'] });
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Item Updated", description: `${editItem.product} updated.` });
+    setDialogOpen(false);
+    setEditItem(null);
+    fetchStockLevels();
+  }
+};
+
+
+// Delete an item from Supabase and refresh table
+const handleDeleteItem = async (id) => {
+  if (!window.confirm("Are you sure you want to delete this item?")) return;
+  const { error } = await supabase
+    .from('stock_items')
+    .delete()
+    .eq('id', id);
+
+  if (!error) {
+    toast({ title: "Item Removed", description: "Item deleted from stock." });
+    fetchStockItems();
+  } else {
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+  }
+};
+
 
  
   return (
@@ -323,20 +412,7 @@ export default function SettingsPage() {
                     </select>
                   </div>
                   
-                  <div className="grid gap-2">
-                    <Label htmlFor="language">Language</Label>
-                    <select 
-                      id="language" 
-                      className="w-full p-2 border rounded"
-                      defaultValue="en"
-                    >
-                      <option value="en">English</option>
-                      <option value="fr">French</option>
-                      <option value="es">Spanish</option>
-                      <option value="de">German</option>
-                    </select>
-                  </div>
-                </div>
+                                 </div>
               </CardContent>
               <CardFooter>
                 <Button className="bg-chai-gold hover:bg-amber-600">
@@ -404,53 +480,107 @@ export default function SettingsPage() {
                         <TableHead className="w-[10%] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
-                      {stockConfig.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono">{item.itemCode}</TableCell>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell className="text-center">
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                              No Stock
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-sm">
-                              {item.lowStockThreshold} units
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-sm">
-                              £{item.price.toFixed(2)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {item.sku || "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleEditItem(item)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleDeleteItem(item.id)}
-                                className="text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
+<TableBody>
+  {loadingStock ? (
+    <TableRow>
+      <TableCell colSpan={8} className="text-center py-8">Loading...</TableCell>
+    </TableRow>
+  ) : stockConfig.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+        No stock items found.
+      </TableCell>
+    </TableRow>
+  ) : (
+paginatedItems.map((item) => (
+  <TableRow key={item.id}>
+        <TableCell className="font-mono">{item.item_code}</TableCell>
+        <TableCell>{item.name}</TableCell>
+        <TableCell>{item.category}</TableCell>
+        <TableCell className="text-center">
+          <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            No Stock
+          </span>
+        </TableCell>
+        <TableCell className="text-center">
+          <span className="text-sm">
+            {item.low_stock_threshold || 0} units
+          </span>
+        </TableCell>
+        <TableCell className="text-center">
+          <span className="text-sm">
+            {Number(item.price).toFixed(2)}
+          </span>
+        </TableCell>
+        <TableCell className="font-mono text-sm">
+          {item.sku || "-"}
+        </TableCell>
+<TableCell className="text-right">
+  <div className="flex justify-end gap-2">
+    {/* Edit Button (always visible) */}
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={() => handleEditItem(item)}
+      title="Edit"
+    >
+      <Edit className="h-4 w-4" />
+    </Button>
+    {/* Delete Button (only for admin, regional, area) */}
+    {["admin", "regional", "area"].includes(user?.role) && (
+      <Button
+        variant="outline"
+        size="icon"
+        className="text-red-500"
+        onClick={() => handleDeleteItem(item.id)}
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    )}
+  </div>
+</TableCell>
+      </TableRow>
+    ))
+  )}
+</TableBody>
+
                   </Table>
+                  <div className="flex items-center justify-between mt-4">
+  {/* Item count summary */}
+  <div className="text-sm text-gray-600">
+    Showing{" "}
+    <b>
+      {stockConfig.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage + 1)}
+      {" - "}
+      {Math.min(currentPage * itemsPerPage, stockConfig.length)}
+    </b>
+    {" "}of <b>{stockConfig.length}</b> items
+  </div>
+  {/* Prev/Next buttons */}
+  <div className="flex gap-2">
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+    >
+      Previous
+    </Button>
+    <span className="text-xs text-gray-700">
+      Page {currentPage} of {totalPages || 1}
+    </span>
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={currentPage === totalPages || totalPages === 0}
+      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+    >
+      Next
+    </Button>
+  </div>
+</div>
+
                 </div>
                 
                 <div className="mt-4 space-y-4">
@@ -476,7 +606,7 @@ export default function SettingsPage() {
                         <p>To import stock items via CSV, your file should include the following columns:</p>
                         <ul className="ml-6 mt-1 list-disc">
                           <li><strong>item_code</strong> - The unique item code (e.g., BP401, DP196)</li>
-                          <li><strong>alt_item_code</strong> - Alternative item code or SKU reference</li>
+                          <li><strong>sku</strong> - Alternative item code or SKU reference</li>
                           <li><strong>product</strong> - The name of the product</li>
                           <li><strong>price_box</strong> - The price of the box/unit</li>
                         </ul>
@@ -496,6 +626,7 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            </TabsContent>
 
             {/* Categories Management Section */}
             <Card className="mt-6">
@@ -586,96 +717,92 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
             
-            {/* Category Add/Edit Dialog */}
-            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingCategory ? 'Edit Category' : 'Add New Category'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {editingCategory 
-                      ? 'Update the details of the existing category' 
-                      : 'Add a new category for stock item organization'}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="categoryName">Category Name</Label>
-                    <Input 
-                      id="categoryName" 
-                      value={newCategory.name} 
-                      onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                      placeholder="e.g. Drinks, Food, Packaging"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="categoryPrefix">Prefix Code</Label>
-                    <Input 
-                      id="categoryPrefix" 
-                      value={newCategory.prefix} 
-                      onChange={(e) => setNewCategory({ ...newCategory, prefix: e.target.value.toUpperCase() })}
-                      placeholder="e.g. DP, BP, FPFC"
-                      maxLength={5}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Short code used for generating item codes (max 5 characters)
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="categoryDescription">Description (Optional)</Label>
-                    <Input 
-                      id="categoryDescription" 
-                      value={newCategory.description} 
-                      onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                      placeholder="Brief description of this category"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    disabled={!newCategory.name || !newCategory.prefix || isCreating || isUpdating}
-                    onClick={() => {
-                      if (editingCategory) {
-                        updateCategory({
-                          id: editingCategory.id,
-                          data: {
-                            name: newCategory.name,
-                            prefix: newCategory.prefix,
-                            description: newCategory.description || null
-                          }
-                        });
-                      } else {
-                        createCategory({
-                          name: newCategory.name,
-                          prefix: newCategory.prefix,
-                          description: newCategory.description || null
-                        });
-                      }
-                      setCategoryDialogOpen(false);
-                      setEditingCategory(null);
-                    }}
-                    className="bg-chai-gold hover:bg-amber-600"
-                  >
-                    {isCreating || isUpdating ? (
-                      <span className="flex items-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        {editingCategory ? 'Updating...' : 'Creating...'}
-                      </span>
-                    ) : (
-                      <span>{editingCategory ? 'Update Category' : 'Create Category'}</span>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
+<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+  <DialogContent className="sm:max-w-md">
+    <DialogHeader>
+      <DialogTitle>Edit Stock Configuration</DialogTitle>
+      <DialogDescription>
+        {editItem ? (
+          <>Update low stock threshold for <b>{editItem.name}</b></>
+        ) : "Loading..."}
+      </DialogDescription>
+    </DialogHeader>
+{editItem ? (
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+    {/* Item Code (read-only, grey bg, grey text) */}
+    <div className="flex flex-col">
+      <Label htmlFor="item-code" className="mb-1 font-semibold text-sm">Item Code</Label>
+      <Input
+        id="item-code"
+        value={editItem.item_code || ""}
+        readOnly
+        className="bg-gray-100 text-gray-600 border-gray-300"
+      />
+    </div>
+    {/* Alt Item Code (read-only, grey bg, grey text) */}
+    <div className="flex flex-col">
+      <Label htmlFor="sku" className="mb-1 font-semibold text-sm">SKU</Label>
+      <Input
+        id="sku"
+        value={editItem.sku || ""}
+        readOnly
+        className="bg-gray-100 text-gray-600 border-gray-300"
+      />
+    </div>
+    {/* Product Name (read-only, grey bg, grey text) */}
+    <div className="flex flex-col">
+      <Label htmlFor="product" className="mb-1 font-semibold text-sm">Product</Label>
+      <Input
+        id="product"
+        value={editItem.product || ""}
+        readOnly
+        className="bg-gray-100 text-gray-600 border-gray-300"
+      />
+    </div>
+    {/* Price (read-only, grey bg, grey text) */}
+    <div className="flex flex-col">
+      <Label htmlFor="price_box" className="mb-1 font-semibold text-sm">Price (£)</Label>
+      <Input
+        id="price_box"
+        value={editItem.price_box ?? ""}
+        readOnly
+        className="bg-gray-100 text-gray-600 border-gray-300"
+      />
+    </div>
+    {/* Low Stock Limit (editable, white bg, black text) */}
+    <div className="flex flex-col">
+      <Label htmlFor="low-stock-limit" className="mb-1 font-semibold text-sm">Low Stock Limit</Label>
+      <Input
+        id="low-stock-limit"
+        type="number"
+        min={0}
+        value={editItem.low_stock_limit ?? ""}
+        onChange={e => setEditItem({...editItem, low_stock_limit: Number(e.target.value)})}
+        className="bg-white text-black border-gray-300"
+      />
+      <span className="text-xs text-gray-500 mt-1">
+        Items with stock at or below this number will be "Low Stock"
+      </span>
+    </div>
+  </div>
+) : (
+  <div className="p-4 text-center text-muted-foreground">Loading item data...</div>
+)}
+
+
+    <DialogFooter className="flex justify-between items-center mt-6">
+      <Button variant="outline" onClick={() => setDialogOpen(false)}>
+        Cancel
+      </Button>
+      <Button onClick={handleSaveChanges} className="bg-chai-gold hover:bg-amber-600 font-semibold">
+        Save Changes
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+
+
           
           {/* User Preferences Tab */}
           <TabsContent value="users">
@@ -955,7 +1082,7 @@ export default function SettingsPage() {
                 <Label className="text-right" htmlFor="item-code">Item Code</Label>
                 <Input 
                   id="item-code"
-                  value={editItem.itemCode} 
+                  value={editItem.item_code || ""}
                   className="col-span-3"
                   readOnly
                 />
@@ -973,20 +1100,19 @@ export default function SettingsPage() {
               
               <div className="grid grid-cols-4 items-center gap-4 w-full">
                 <Label className="text-right" htmlFor="item-category">Category</Label>
-                <select 
-                  id="item-category"
-                  value={editItem.category}
-                  className="col-span-3 w-full p-2 border rounded"
-                  onChange={(e) => setEditItem({...editItem, category: e.target.value})}
-                >
-                  <option value="Food">Food</option>
-                  <option value="Dry Food">Dry Food</option>
-                  <option value="Frozen Food">Frozen Food</option>
-                  <option value="Drinks">Drinks</option>
-                  <option value="Packaging">Packaging</option>
-                  <option value="Miscellaneous">Miscellaneous</option>
-                  <option value="Other">Other</option>
-                </select>
+               <select
+  id="item-category"
+  value={editItem.category}
+  onChange={(e) => setEditItem({ ...editItem, category: e.target.value })}
+  className="border rounded h-10 px-2 text-gray-700 bg-white border-gray-300"
+>
+  {categories.map((cat) => (
+    <option key={cat.id} value={cat.name}>
+      {cat.name}
+    </option>
+  ))}
+</select>
+
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4 w-full">
@@ -1055,20 +1181,19 @@ export default function SettingsPage() {
             
             <div className="grid grid-cols-4 items-center gap-4 w-full">
               <Label className="text-right" htmlFor="new-item-category">Category</Label>
-              <select 
-                id="new-item-category"
-                value={newItem.category}
-                className="col-span-3 w-full p-2 border rounded"
-                onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-              >
-                <option value="Food">Food</option>
-                <option value="Dry Food">Dry Food</option>
-                <option value="Frozen Food">Frozen Food</option>
-                <option value="Drinks">Drinks</option>
-                <option value="Packaging">Packaging</option>
-                <option value="Miscellaneous">Miscellaneous</option>
-                <option value="Other">Other</option>
-              </select>
+<select
+  id="new-item-category"
+  value={newItem.category}
+  className="col-span-3 w-full p-2 border rounded"
+  onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+>
+  {categories.map((cat) => (
+    <option key={cat.id} value={cat.name}>
+      {cat.name}
+    </option>
+  ))}
+</select>
+
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4 w-full">
@@ -1097,3 +1222,4 @@ export default function SettingsPage() {
     </DashboardLayout>
   );
 }
+

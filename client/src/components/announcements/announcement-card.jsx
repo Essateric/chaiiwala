@@ -4,6 +4,17 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { MentionsInput, Mention } from "react-mentions";
+
+
+function formatContent(content) {
+  // This finds all @mentions and highlights them
+  return content.replace(
+    /@([a-zA-Z ]+)/g,
+    '<span class="bg-green-100 text-green-900 px-1 rounded font-medium">@\$1</span>'
+  );
+}
+
 
 export default function AnnouncementCard({
   id,
@@ -25,6 +36,7 @@ export default function AnnouncementCard({
       onLike(id);
     }
   };
+  
 
   return (
     <Card className={important ? "border-l-4 border-l-chai-gold" : ""}>
@@ -48,9 +60,12 @@ export default function AnnouncementCard({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-sm whitespace-pre-line">{content}</div>
-      </CardContent>
+     <CardContent>
+  <div
+    className="text-sm whitespace-pre-line"
+    dangerouslySetInnerHTML={{ __html: formatContent(content) }}
+  />
+</CardContent>
       <CardFooter className="pt-0 flex justify-between">
         <Button
           variant="ghost"
