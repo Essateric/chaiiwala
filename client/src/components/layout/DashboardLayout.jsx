@@ -3,13 +3,16 @@ import Sidebar from "./sidebar";
 import TopBar from "./top-bar";
 import { useAuth } from "@/hooks/UseAuth";
 
-export default function DashboardLayout({ children, title }) {
+export default function DashboardLayout({ children, title, profile, announcements }) {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
+
+    console.log("DashboardLayout sending profile:", profile, "announcements:", announcements); 
+
 
   return (
     <div className="min-h-screen flex bg-chai-light">
@@ -20,10 +23,12 @@ export default function DashboardLayout({ children, title }) {
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
         <TopBar 
-          title={title} 
-          onMenuClick={toggleSidebar} 
-          username={user?.name || ""}
-          role={user?.role || "staff"} 
+  title={title} 
+  onMenuClick={toggleSidebar} 
+  username={profile?.first_name || profile?.name || user?.name || ""}
+  role={profile?.permissions || user?.role || "staff"} 
+  announcements={announcements}
+  profile={profile}
         />
         
         {/* Content Area */}

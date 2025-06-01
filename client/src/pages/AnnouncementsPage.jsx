@@ -11,16 +11,61 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { MentionsInput, Mention } from "react-mentions";
 
+// Helper for handling target_user_ids field
+function getTargetUserIds(field) {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  if (typeof field === "string") {
+    try { return JSON.parse(field); } catch { return []; }
+  }
+  return [];
+}
 
 export default function AnnouncementsPage() {
-  const { profile, user } = useAuth();
+  const { user, profile, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
 
-  // Announcements, users, stores state
+  // Dynamic roles dropdown
+  const { data: roles = [] } = useQuery({
+    queryKey: ["roles"],
+    queryFn: async () => {
+      const { data } = await supabase.from("user_roles").select("permissions");
+      const unique = Array.from(new Set((data || []).map(r => r.permissions).filter(Boolean)));
+      return unique.map(name => ({ name }));
+    },
+  });
+
+  // Dynamic stores dropdown
+  const { data: stores = [] } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => {
+      const { data } = await supabase.from("stores").select("id, name");
+      return data || [];
+    },
+  });
+
+  if (isLoadingAuth) {
+    return (
+      <DashboardLayout title="Announcements">
+        <div className="max-w-xl mx-auto py-16 flex items-center justify-center text-muted-foreground">
+          Loading profile...
+        </div>
+      </DashboardLayout>
+    );
+  }
+  if (!profile) {
+    return (
+      <DashboardLayout title="Announcements">
+        <div className="max-w-xl mx-auto py-16 text-center text-red-500">
+          Could not load profile. Please refresh or contact support.
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const [announcements, setAnnouncements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  // Form state
   const [message, setMessage] = useState("");
   const [targetRole, setTargetRole] = useState("all");
   const [targetStore, setTargetStore] = useState("all");
@@ -28,23 +73,17 @@ export default function AnnouncementsPage() {
   const [title, setTitle] = useState("");
   const [important, setImportant] = useState(false);
 
-  // Users and stores queries
-  const { data: stores = [] } = useQuery({
-    queryKey: ["stores"],
-    queryFn: async () => {
-      const res = await fetch("/api/stores");
-      return res.json();
-    },
-  });
-
-  // USERS for MentionsInput: Fetch from Supabase
+  const [filterUserId, setFilterUserId] = useState("all");
+  const [users, setUsers] = useState([]);
   const [mentionUsers, setMentionUsers] = useState([]);
+
   useEffect(() => {
     async function fetchUsers() {
       const { data, error } = await supabase
-        .from("users")
-        .select("id, name");
-      if (!error && data) {
+        .from("profiles")
+        .select("id, name, email, permissions, store_ids");
+      if (data) {
+        setUsers(data);
         setMentionUsers(
           data
             .filter(u => u.name)
@@ -58,27 +97,13 @@ export default function AnnouncementsPage() {
     fetchUsers();
   }, []);
 
-  // Also fetch users for the user select
-  const { data: users = [] } = useQuery({
-    queryKey: ["profiles"],
-    queryFn: async () => {
-      const res = await fetch("/api/users");
-      return res.json();
-    },
-  });
-
-  // Only allow these roles to send
   const canSend = ["admin", "regional", "area", "store"].includes(profile?.permissions);
-  // Only allow full mention list for permitted roles
-const showAllMentions = ["admin", "regional", "area", "store"].includes(profile?.permissions);
+  const showAllMentions = canSend;
 
-// Restrict mentionUsers if not permitted
-const filteredMentionUsers = showAllMentions
-  ? mentionUsers
-  : mentionUsers.filter(u => u.id === profile?.id);
+  const filteredMentionUsers = showAllMentions
+    ? mentionUsers
+    : mentionUsers.filter(u => u.id === profile?.id);
 
-
-  // Fetch announcements from Supabase directly
   async function fetchAnnouncements() {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -89,10 +114,9 @@ const filteredMentionUsers = showAllMentions
     setIsLoading(false);
   }
 
-  // Fetch on mount
-  useEffect(() => { fetchAnnouncements(); }, []); // Changed from useState to useEffect
+  useEffect(() => { fetchAnnouncements(); }, []);
 
-  // REVISED handleCreate
+  // Announcement creation handler
   async function handleCreate(e) {
     e.preventDefault();
     if (!title || !message) {
@@ -101,22 +125,26 @@ const filteredMentionUsers = showAllMentions
     }
     setIsCreating(true);
 
-    // 1. Extract @names from message
+    // 1. Extract all @names (case-insensitive)
     const mentionedNames = Array.from(
       message.matchAll(/@([a-zA-Z ]+)/g),
-      m => m[1].trim()
+      m => m[1].trim().toLowerCase()
     );
-
-    // 2. Find user IDs for these names
-    const taggedUserIds = mentionUsers
+    // 2. Map mentionUsers to [{id, display}]
+    const allUsers = mentionUsers.map(u => ({
+      id: u.id,
+      display: u.display?.toLowerCase().trim()
+    }));
+    // 3. Find all user IDs for the @mentions
+    const taggedUserIds = allUsers
       .filter(u => mentionedNames.includes(u.display))
       .map(u => u.id);
-
-    // 3. Merge with selected users (avoid duplicates)
+    // 4. Also include any manually selected user (from dropdown)
     const manualUserIds = targetUser === "all" ? [] : [String(targetUser)];
+    // 5. Remove duplicates (Set)
     const allTargetUserIds = Array.from(new Set([...manualUserIds, ...taggedUserIds]));
 
-    // 4. Prepare insert data
+    // 6. Prepare insert data
     const insertData = {
       title,
       content: message,
@@ -127,12 +155,15 @@ const filteredMentionUsers = showAllMentions
       important: !!important,
     };
 
-    // 5. Save as before
-    const { error } = await supabase.from("announcements").insert([insertData]);
+    // 7. Save to Supabase (announcements)
+    const { data: newAnnouncementArr, error: announcementError } = await supabase
+      .from("announcements")
+      .insert([insertData])
+      .select();
     setIsCreating(false);
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (announcementError) {
+      toast({ title: "Error", description: announcementError.message, variant: "destructive" });
     } else {
       toast({ title: "Announcement Sent", variant: "success" });
       setTitle("");
@@ -142,22 +173,62 @@ const filteredMentionUsers = showAllMentions
       setTargetUser("all");
       setImportant(false);
       fetchAnnouncements();
+
+      // --- Insert notifications ---
+      const newAnnouncement = newAnnouncementArr?.[0];
+      if (newAnnouncement && users.length) {
+        let usersToNotify = [];
+
+        if (allTargetUserIds.length > 0) {
+          usersToNotify = users.filter(u => allTargetUserIds.includes(u.id));
+        } else if (targetRole !== "all") {
+          usersToNotify = users.filter(u => u.permissions === targetRole);
+        } else if (targetStore !== "all") {
+          usersToNotify = users.filter(u =>
+            Array.isArray(u.store_ids) && u.store_ids.includes(Number(targetStore))
+          );
+        } else {
+          usersToNotify = users;
+        }
+
+        const notificationsToInsert = usersToNotify.map(u => ({
+          user_id: u.id,
+          announcement_id: newAnnouncement.id,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        }));
+
+        if (notificationsToInsert.length) {
+          await supabase.from("notifications").insert(notificationsToInsert);
+        }
+      }
     }
   }
 
-  // Filter for current user if not canSend
-  let visibleAnnouncements = announcements;
+  // User filter for announcement list
+  let filteredAnnouncements = announcements;
+  if (filterUserId !== "all") {
+    filteredAnnouncements = announcements.filter(a => {
+      const ids = getTargetUserIds(a.target_user_ids);
+      return ids.includes(filterUserId);
+    });
+  }
+
+  // Normal user visibility logic (for non-senders)
+  let visibleAnnouncements = filteredAnnouncements;
   if (!canSend) {
-    visibleAnnouncements = announcements.filter(a =>
+    visibleAnnouncements = filteredAnnouncements.filter(a =>
       (a.target_role === "all" || a.target_role === profile?.permissions) &&
       ((a.target_store_ids?.length === 0) || (profile?.store_ids?.some(id => a.target_store_ids.includes(id)))) &&
-      ((a.target_user_ids?.length === 0) || a.target_user_ids.includes(profile?.id))
+      ((a.target_user_ids?.length === 0) || getTargetUserIds(a.target_user_ids).includes(profile?.id))
     );
   }
 
   return (
     <DashboardLayout title="Announcements">
       <div className="max-w-xl mx-auto">
+
+        {/* Announcement Creation Form */}
         {canSend && (
           <form className="space-y-4 mb-10" onSubmit={handleCreate}>
             <Card>
@@ -171,7 +242,6 @@ const filteredMentionUsers = showAllMentions
                   onChange={e => setTitle(e.target.value)}
                   required
                 />
-                {/* MentionsInput replaces Textarea */}
                 <MentionsInput
                   value={message}
                   onChange={e => setMessage(e.target.value)}
@@ -179,41 +249,47 @@ const filteredMentionUsers = showAllMentions
                   className="border p-2 rounded w-full"
                   style={{ minHeight: 80 }}
                 >
-                 <Mention
-    trigger="@"
-    data={filteredMentionUsers}
-    markup="@__display__"
-    style={{ backgroundColor: "#DCF7C5", fontWeight: 500 }}
-  />
+                  <Mention
+                    trigger="@"
+                    data={filteredMentionUsers}
+                    markup="@__display__"
+                    style={{ backgroundColor: "#DCF7C5", fontWeight: 500 }}
+                  />
                 </MentionsInput>
-                {/* END MentionsInput */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {/* Dynamic Role Dropdown */}
                   <Select value={targetRole} onValueChange={setTargetRole}>
-                    <SelectTrigger><SelectValue placeholder="Target role (optional)" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Target role (optional)" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="store">Store Manager</SelectItem>
-                      <SelectItem value="area">Area Manager</SelectItem>
-                      <SelectItem value="regional">Regional</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={targetStore} onValueChange={setTargetStore}>
-                    <SelectTrigger><SelectValue placeholder="Target store (optional)" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Stores</SelectItem>
-                      {stores.map(s => (
-                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      {roles.map(role => (
+                        <SelectItem key={role.name} value={role.name}>{role.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* Dynamic Store Dropdown */}
+                  <Select value={targetStore} onValueChange={setTargetStore}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Target store (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Stores</SelectItem>
+                      {stores.map(store => (
+                        <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Users Dropdown (already works) */}
                   <Select value={targetUser} onValueChange={setTargetUser}>
-                    <SelectTrigger><SelectValue placeholder="Target user (optional)" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Target user (optional)" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Users</SelectItem>
                       {users.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

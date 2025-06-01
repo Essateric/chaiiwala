@@ -89,7 +89,7 @@ export default function DashboardPage() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("first_name, name, permissions, store_ids") // Select necessary fields for dashboard display/logic
+          .select("id, first_name, name, permissions, store_ids") // Select necessary fields for dashboard display/logic
           .eq("auth_id", user.id)
           .single();
 
@@ -111,6 +111,13 @@ export default function DashboardPage() {
 
   // --- Loading and Access Control ---
 
+  console.log(
+  "DASHBOARD PAGE: about to render DashboardLayout with",
+  "\n  profile:", dashboardProfile,
+  "\n  announcements:", announcements
+);
+
+
   // 1. Wait for useAuth to finish its initial loading
   if (isAuthLoading) {
     console.log("DashboardPage: Waiting for useAuth to complete initial load...");
@@ -130,39 +137,50 @@ export default function DashboardPage() {
     return <p className="p-4 text-center text-red-600">No active session. Please log in.</p>;
   }
 
-  // 3. If user is present (and auth is not loading), but dashboardProfile is still being fetched
-  if (!dashboardProfile) {
-    console.log("DashboardPage: User session active, waiting for dashboard profile...");
-    return (
-      <DashboardLayout title="Dashboard">
-        <div className="min-h-screen flex items-center justify-center"> {/* Centering the loader */}
-          <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
-          <p className="ml-2 text-gray-700">Loading dashboard data...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
+if (!dashboardProfile) {
+  return (
+    <DashboardLayout
+      title="Dashboard"
+      profile={dashboardProfile}
+      announcements={announcements || []}
+    >
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
+        <p className="ml-2 text-gray-700">Loading dashboard data...</p>
+      </div>
+    </DashboardLayout>
+  );
+}
 
   // --- Render Content Based on Profile ---
+if (dashboardProfile?.permissions === "maintenance") {
+  return (
+    <DashboardLayout
+      title="Maintenance Dashboard"
+      profile={dashboardProfile}
+      announcements={announcements || []}
+    >
+      <div className="p-4">
+        <h2 className="text-2xl font-montserrat font-bold mb-2">
+          Maintenance View
+        </h2>
+        <p className="mb-4 text-gray-700">
+          Welcome, {dashboardProfile?.first_name || dashboardProfile?.name || "Maintenance User"}.
+        </p>
+        <JobLogsGrid />
+      </div>
+    </DashboardLayout>
+  );
+}
 
-  // Handle Maintenance User View
-  if (dashboardProfile?.permissions === "maintenance") {
-    return (
-      <DashboardLayout title="Maintenance Dashboard">
-        <div className="p-4">
-          <h2 className="text-2xl font-montserrat font-bold mb-2">
-            Maintenance View
-          </h2>
-          <p className="mb-4 text-gray-700">Welcome, {dashboardProfile?.first_name || dashboardProfile?.name || "Maintenance User"}.</p>
-          <JobLogsGrid /> {/* Display maintenance-specific content */}
-        </div>
-      </DashboardLayout>
-    );
-  }
+
 
   // Regular Dashboard for other users
   return (
-    <DashboardLayout title="Dashboard">
+  <DashboardLayout 
+    title="Dashboard"
+    profile={dashboardProfile}
+    announcements={announcements || []}> 
       {/* Welcome Section */}
       <div className="mb-6">
       <h2 className="text-2xl font-montserrat font-bold mb-2">
