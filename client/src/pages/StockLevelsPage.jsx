@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -7,7 +7,6 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -30,60 +29,35 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Search, Save, Package, AlertTriangle, CheckCircle2, ShoppingCart } from 'lucide-react';
 import { format } from 'date-fns';
-
-type StockItem = {
-  id: number;
-  itemCode: string;
-  name: string;
-  category: string;
-  lowStockThreshold: number;
-  price: number;
-  sku: string;
-};
-
-type StockLevel = {
-  id: number;
-  storeId: number;
-  stockItemId: number;
-  quantity: number;
-  lastUpdated: string;
-  updatedBy: number;
-};
-
-type StockItemWithLevel = StockItem & {
-  quantity: number;
-  lastUpdated: string | null;
-};
 
 export default function StockLevelsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
-  const [editedItems, setEditedItems] = useState<{ [key: number]: number }>({});
-  
+  const [editedItems, setEditedItems] = useState({});
+
   // Get user's store
   const storeId = user?.storeId;
 
   // Fetch all stock items
-  const { data: stockItems = [], isLoading: isLoadingStockItems } = useQuery<StockItem[]>({
+  const { data: stockItems = [], isLoading: isLoadingStockItems } = useQuery({
     queryKey: ['/api/stock-config'],
     enabled: !!user,
   });
 
   // Fetch stock levels for this store
-  const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery<StockLevel[]>({
+  const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery({
     queryKey: ['/api/stock-levels', storeId],
     enabled: !!user && !!storeId,
   });
 
-  // Create combined data
-  const combinedStockData: StockItemWithLevel[] = stockItems.map(item => {
-    const stockLevel = stockLevels.find(level => level.stockItemId === item.id);
+  // Combine stock config and levels
+  const combinedStockData = stockItems.map((item) => {
+    const stockLevel = stockLevels.find((level) => level.stockItemId === item.id);
     return {
       ...item,
       quantity: stockLevel?.quantity || 0,
@@ -91,38 +65,49 @@ export default function StockLevelsPage() {
     };
   });
 
-  // Filter and search
+  // Filter and search logic
   const filteredStockItems = combinedStockData.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        item.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      || item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase())
+      || (item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+
     if (filter === 'all') return matchesSearch;
     if (filter === 'low') return matchesSearch && (item.quantity > 0 && item.quantity <= item.lowStockThreshold);
     if (filter === 'out') return matchesSearch && item.quantity === 0;
     if (filter === 'in') return matchesSearch && item.quantity > item.lowStockThreshold;
-    if (filter === filter) return matchesSearch && item.category.toLowerCase() === filter.toLowerCase();
-    
+    // Category filter
+    if (
+      filter &&
+      filter !== 'all' &&
+      filter !== 'low' &&
+      filter !== 'out' &&
+      filter !== 'in'
+    ) {
+      return matchesSearch && item.category?.toLowerCase() === filter.toLowerCase();
+    }
     return true;
   });
 
   // Handle quantity changes
-  const handleQuantityChange = (itemId: number, quantity: number) => {
-    setEditedItems({
-      ...editedItems,
+  const handleQuantityChange = (itemId, quantity) => {
+    setEditedItems(prev => ({
+      ...prev,
       [itemId]: quantity
-    });
+    }));
   };
 
   // Update stock level mutation
   const updateStockLevelMutation = useMutation({
-    mutationFn: async (data: { stockItemId: number, quantity: number }) => {
+    mutationFn: async (data) => {
       const response = await apiRequest('POST', '/api/stock-levels/update', {
         storeId: storeId,
         stockItemId: data.stockItemId,
         quantity: data.quantity,
         updatedBy: user?.id,
       });
+      if (!response.ok) {
+        throw new Error(await response.text() || "Unknown error");
+      }
       return await response.json();
     },
     onSuccess: () => {
@@ -142,18 +127,18 @@ export default function StockLevelsPage() {
     }
   });
 
-  // Save changes
+  // Save all changed quantities
   const handleSave = () => {
     Object.entries(editedItems).forEach(([itemId, quantity]) => {
       updateStockLevelMutation.mutate({
         stockItemId: parseInt(itemId),
-        quantity: quantity
+        quantity: Number(quantity)
       });
     });
   };
 
-  // Get stock status
-  const getStockStatus = (item: StockItemWithLevel) => {
+  // Get status badge
+  const getStockStatus = (item) => {
     if (item.quantity === 0) {
       return { status: 'Out of Stock', variant: 'destructive', icon: <AlertTriangle className="h-4 w-4" /> };
     } else if (item.quantity <= item.lowStockThreshold) {
@@ -207,7 +192,6 @@ export default function StockLevelsPage() {
                 </SelectContent>
               </Select>
             </div>
-
             {isLoading ? (
               <div className="flex justify-center items-center h-32">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -247,26 +231,26 @@ export default function StockLevelsPage() {
                             </TableCell>
                             <TableCell>{item.category}</TableCell>
                             <TableCell className="text-center">
-                              <Badge variant={variant as any} className="flex items-center justify-center gap-1 w-28 mx-auto">
+                              <Badge variant={variant} className="flex items-center justify-center gap-1 w-28 mx-auto">
                                 {icon}
                                 {status}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center">
-                              {item.quantity || "0"}
+                              {item.quantity ?? 0}
                             </TableCell>
                             <TableCell className="w-32">
                               <Input
                                 type="number"
                                 min="0"
-                                value={(editedItems[item.id] !== undefined) ? editedItems[item.id] : item.quantity}
+                                value={editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity}
                                 onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
                                 className="w-full text-center"
                               />
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {item.lastUpdated 
-                                ? format(new Date(item.lastUpdated), 'dd/MM/yyyy HH:mm') 
+                              {item.lastUpdated
+                                ? format(new Date(item.lastUpdated), 'dd/MM/yyyy HH:mm')
                                 : 'Never'}
                             </TableCell>
                           </TableRow>

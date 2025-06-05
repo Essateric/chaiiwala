@@ -25,44 +25,6 @@ export default function AnnouncementsPage() {
   const { user, profile, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
 
-  // Dynamic roles dropdown
-  const { data: roles = [] } = useQuery({
-    queryKey: ["roles"],
-    queryFn: async () => {
-      const { data } = await supabase.from("user_roles").select("permissions");
-      const unique = Array.from(new Set((data || []).map(r => r.permissions).filter(Boolean)));
-      return unique.map(name => ({ name }));
-    },
-  });
-
-  // Dynamic stores dropdown
-  const { data: stores = [] } = useQuery({
-    queryKey: ["stores"],
-    queryFn: async () => {
-      const { data } = await supabase.from("stores").select("id, name");
-      return data || [];
-    },
-  });
-
-  if (isLoadingAuth) {
-    return (
-      <DashboardLayout title="Announcements">
-        <div className="max-w-xl mx-auto py-16 flex items-center justify-center text-muted-foreground">
-          Loading profile...
-        </div>
-      </DashboardLayout>
-    );
-  }
-  if (!profile) {
-    return (
-      <DashboardLayout title="Announcements">
-        <div className="max-w-xl mx-auto py-16 text-center text-red-500">
-          Could not load profile. Please refresh or contact support.
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   const [announcements, setAnnouncements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -77,6 +39,25 @@ export default function AnnouncementsPage() {
   const [users, setUsers] = useState([]);
   const [mentionUsers, setMentionUsers] = useState([]);
 
+  // Store and roles data
+  const { data: stores = [] } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => {
+      const res = await fetch("/api/stores");
+      return res.json();
+    },
+  });
+
+  // Get roles dynamically from users
+  const [roles, setRoles] = useState([]);
+  useEffect(() => {
+    setRoles([
+      ...Array.from(new Set(users.map(u => u.permissions).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b))
+    ]);
+  }, [users]);
+
+  // --- Fetch all users for mentions and dropdowns ---
   useEffect(() => {
     async function fetchUsers() {
       const { data, error } = await supabase
@@ -98,12 +79,13 @@ export default function AnnouncementsPage() {
   }, []);
 
   const canSend = ["admin", "regional", "area", "store"].includes(profile?.permissions);
-  const showAllMentions = canSend;
+  const showAllMentions = ["admin", "regional", "area", "store"].includes(profile?.permissions);
 
   const filteredMentionUsers = showAllMentions
     ? mentionUsers
     : mentionUsers.filter(u => u.id === profile?.id);
 
+  // -------------- Fetch Announcements --------------
   async function fetchAnnouncements() {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -116,7 +98,11 @@ export default function AnnouncementsPage() {
 
   useEffect(() => { fetchAnnouncements(); }, []);
 
-  // Announcement creation handler
+  // ------------- Store Manager Logic --------------
+  const isStoreManager = profile?.permissions === "store";
+  const managerStoreIds = Array.isArray(profile?.store_ids) ? profile.store_ids : [];
+
+  // ------------- Announcement Creation Handler -------------
   async function handleCreate(e) {
     e.preventDefault();
     if (!title || !message) {
@@ -145,12 +131,18 @@ export default function AnnouncementsPage() {
     const allTargetUserIds = Array.from(new Set([...manualUserIds, ...taggedUserIds]));
 
     // 6. Prepare insert data
+    // If store manager, only target their own store(s)
+    let announcementStoreIds =
+      isStoreManager
+        ? managerStoreIds.map(String)
+        : (targetStore === "all" ? [] : [String(targetStore)]);
+
     const insertData = {
       title,
       content: message,
       from_user: profile?.id,
       target_role: targetRole === "all" ? null : targetRole,
-      target_store_ids: targetStore === "all" ? [] : [String(targetStore)],
+      target_store_ids: announcementStoreIds,
       target_user_ids: allTargetUserIds,
       important: !!important,
     };
@@ -174,23 +166,50 @@ export default function AnnouncementsPage() {
       setImportant(false);
       fetchAnnouncements();
 
-      // --- Insert notifications ---
+      // ------------ Notifications Logic ------------
       const newAnnouncement = newAnnouncementArr?.[0];
       if (newAnnouncement && users.length) {
         let usersToNotify = [];
 
-        if (allTargetUserIds.length > 0) {
-          usersToNotify = users.filter(u => allTargetUserIds.includes(u.id));
-        } else if (targetRole !== "all") {
-          usersToNotify = users.filter(u => u.permissions === targetRole);
-        } else if (targetStore !== "all") {
+        // ADMIN/REGIONAL/AREA: Notify everyone (except self)
+        if (["admin", "regional", "area"].includes(profile?.permissions)) {
+          usersToNotify = users.filter(u => u.id !== profile.id);
+        }
+        // STORE MANAGER: Only notify people in own store(s), except self
+        else if (isStoreManager) {
           usersToNotify = users.filter(u =>
-            Array.isArray(u.store_ids) && u.store_ids.includes(Number(targetStore))
+            Array.isArray(u.store_ids) &&
+            u.store_ids.some(id => managerStoreIds.includes(id)) &&
+            u.id !== profile.id
           );
-        } else {
-          usersToNotify = users;
+        }
+        // Else, use targeting (manual/mentions/role/store)
+        if (!usersToNotify.length) {
+          // 1. Start with explicit user mentions/manual select
+          if (allTargetUserIds.length > 0) {
+            usersToNotify = users.filter(u => allTargetUserIds.includes(u.id) && u.id !== profile.id);
+          }
+          // 2. Add users by role (if not "all")
+          else if (targetRole !== "all") {
+            usersToNotify = users.filter(u => u.permissions === targetRole && u.id !== profile.id);
+          }
+          // 3. Add users by store (if not "all")
+          else if (targetStore !== "all") {
+            usersToNotify = users.filter(u =>
+              Array.isArray(u.store_ids) && u.store_ids.includes(Number(targetStore)) && u.id !== profile.id
+            );
+          }
+          // 4. If no targeting, notify everyone except sender
+          else {
+            usersToNotify = users.filter(u => u.id !== profile.id);
+          }
         }
 
+        // Remove duplicates
+        usersToNotify = Array.from(new Set(usersToNotify.map(u => u.id)))
+          .map(id => users.find(u => u.id === id));
+
+        // Insert notification row for each user
         const notificationsToInsert = usersToNotify.map(u => ({
           user_id: u.id,
           announcement_id: newAnnouncement.id,
@@ -202,6 +221,7 @@ export default function AnnouncementsPage() {
           await supabase.from("notifications").insert(notificationsToInsert);
         }
       }
+      // ------------ End Notifications Logic ------------
     }
   }
 
@@ -257,35 +277,45 @@ export default function AnnouncementsPage() {
                   />
                 </MentionsInput>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {/* Dynamic Role Dropdown */}
-                  <Select value={targetRole} onValueChange={setTargetRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Target role (optional)" />
-                    </SelectTrigger>
+                  {/* Role dropdown */}
+                  <Select value={targetRole} onValueChange={setTargetRole} disabled={isStoreManager}>
+                    <SelectTrigger><SelectValue placeholder="Target role (optional)" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
                       {roles.map(role => (
-                        <SelectItem key={role.name} value={role.name}>{role.name}</SelectItem>
+                        <SelectItem key={role} value={role}>{role}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* Dynamic Store Dropdown */}
-                  <Select value={targetStore} onValueChange={setTargetStore}>
+                  {/* Store dropdown */}
+                  <Select
+                    value={isStoreManager ? (managerStoreIds[0]?.toString() || "all") : targetStore}
+                    onValueChange={setTargetStore}
+                    disabled={isStoreManager}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Target store (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Stores</SelectItem>
-                      {stores.map(store => (
-                        <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>
-                      ))}
+                      {isStoreManager ? (
+                        stores
+                          .filter(s => managerStoreIds.includes(s.id))
+                          .map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value="all">All Stores</SelectItem>
+                          {stores.map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
-                  {/* Users Dropdown (already works) */}
+                  {/* User dropdown */}
                   <Select value={targetUser} onValueChange={setTargetUser}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Target user (optional)" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Target user (optional)" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Users</SelectItem>
                       {users.map(u => (

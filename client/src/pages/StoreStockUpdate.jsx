@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { StockConfig, StoreStockLevel } from "@shared/schema";
 import { format } from 'date-fns';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
@@ -11,7 +10,6 @@ import {
   Save,
   ArrowUpDown,
   Package,
-  AlertTriangle,
   Plus,
   Minus,
   RefreshCw 
@@ -45,22 +43,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from '@/hooks/use-permissions';
 
-// Type definitions
-type StockItemWithLevel = {
-  id: number;
-  itemCode: string;
-  name: string;
-  lowStockThreshold: number;
-  category: string;
-  price: number;
-  sku: string | null;
-  quantity: number;
-  lastUpdated: Date | string | null;
-  isEdited: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
-};
-
 export default function StoreStockUpdatePage() {
   const { user } = useAuth();
   const { hasStoreAccess, canEditStockLevels } = usePermissions();
@@ -68,7 +50,7 @@ export default function StoreStockUpdatePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatus, setStockStatus] = useState('all');
-  const [editedItems, setEditedItems] = useState<{ [key: number]: number }>({});
+  const [editedItems, setEditedItems] = useState({});
   
   // Get user's store
   const storeId = user?.storeId;
@@ -93,19 +75,19 @@ export default function StoreStockUpdatePage() {
   }
 
   // Fetch all stock configuration items
-  const { data: stockItems = [], isLoading: isLoadingStockItems } = useQuery<StockConfig[]>({
+  const { data: stockItems = [], isLoading: isLoadingStockItems } = useQuery({
     queryKey: ['/api/stock-config'],
     enabled: !!user,
   });
 
   // Fetch stock levels for this store
-  const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery<StoreStockLevel[]>({
+  const { data: stockLevels = [], isLoading: isLoadingStockLevels } = useQuery({
     queryKey: ['/api/stock-levels', storeId],
     enabled: !!user && !!storeId,
   });
 
   // Create combined data for display
-  const combinedStockData: StockItemWithLevel[] = stockItems.map(item => {
+  const combinedStockData = stockItems.map(item => {
     const stockLevel = stockLevels.find(level => level.stockItemId === item.id);
     return {
       ...item,
@@ -117,7 +99,7 @@ export default function StoreStockUpdatePage() {
 
   // Update stock level mutation
   const updateStockLevelMutation = useMutation({
-    mutationFn: async (data: { storeId: number, stockItemId: number, quantity: number }) => {
+    mutationFn: async (data) => {
       const response = await apiRequest('PATCH', `/api/stock-levels/${data.storeId}/${data.stockItemId}`, {
         quantity: data.quantity,
       });
@@ -131,7 +113,7 @@ export default function StoreStockUpdatePage() {
       });
       setEditedItems({});
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Update Failed",
         description: "Failed to update stock quantities. Please try again.",
@@ -141,17 +123,17 @@ export default function StoreStockUpdatePage() {
   });
 
   // Handle quantity change
-  const handleQuantityChange = (itemId: number, newQuantity: number) => {
+  const handleQuantityChange = (itemId, newQuantity) => {
     if (newQuantity < 0) newQuantity = 0;
     setEditedItems(prev => ({...prev, [itemId]: newQuantity}));
   };
 
   // Quick increment/decrement functions
-  const incrementQuantity = (itemId: number, currentQuantity: number) => {
+  const incrementQuantity = (itemId, currentQuantity) => {
     handleQuantityChange(itemId, (editedItems[itemId] !== undefined ? editedItems[itemId] : currentQuantity) + 1);
   };
 
-  const decrementQuantity = (itemId: number, currentQuantity: number) => {
+  const decrementQuantity = (itemId, currentQuantity) => {
     handleQuantityChange(itemId, Math.max(0, (editedItems[itemId] !== undefined ? editedItems[itemId] : currentQuantity) - 1));
   };
 
@@ -159,7 +141,7 @@ export default function StoreStockUpdatePage() {
   const handleSaveChanges = async () => {
     const updatePromises = Object.entries(editedItems).map(([itemId, quantity]) => {
       return updateStockLevelMutation.mutateAsync({
-        storeId: storeId!,
+        storeId: storeId,
         stockItemId: parseInt(itemId),
         quantity
       });
@@ -168,7 +150,7 @@ export default function StoreStockUpdatePage() {
     try {
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error("Error updating stock levels:", error);
+      // Error toast already handled in onError
     }
   };
 
@@ -185,8 +167,8 @@ export default function StoreStockUpdatePage() {
   const filteredStockItems = combinedStockData.filter(item => {
     // Search filter
     const matchesSearch = searchTerm === '' || 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.sku ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) : false);
     
     // Category filter
@@ -212,9 +194,8 @@ export default function StoreStockUpdatePage() {
   const categories = Array.from(categoriesSet);
 
   // Helper to determine stock status for styling
-  const getStockStatusClass = (item: StockItemWithLevel) => {
+  const getStockStatusClass = (item) => {
     const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
-    
     if (quantity === 0) {
       return 'bg-red-100 text-red-800 border-red-200';
     } else if (quantity <= item.lowStockThreshold) {
@@ -225,9 +206,8 @@ export default function StoreStockUpdatePage() {
   };
 
   // Helper to get stock status text
-  const getStockStatusText = (item: StockItemWithLevel) => {
+  const getStockStatusText = (item) => {
     const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
-    
     if (quantity === 0) {
       return 'Out of Stock';
     } else if (quantity <= item.lowStockThreshold) {

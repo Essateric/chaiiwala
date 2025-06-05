@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/UseAuth";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/UseAuth"; // Make sure this import matches your file casing!
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Tabs,
@@ -26,15 +24,15 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Edit, Trash2, Plus, Save, FileUp, Shield, Tag, Package, Lock, UserCog, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Plus, Shield, Tag, Package } from 'lucide-react';
 
 // --- Stock Management State/Mocks (you would load from API/DB in real app)
 const initialStockConfig = [
-  { id: 1, itemCode: "BP401", name: "Masala Beans", lowStockThreshold: 5, category: "Food", price: 3.99, sku: "CHW-MB-001" },
-  { id: 2, itemCode: "BP402", name: "Daal", lowStockThreshold: 4, category: "Food", price: 2.99, sku: "CHW-DA-001" },
-  { id: 3, itemCode: "BP440", name: "Mogo Sauce", lowStockThreshold: 6, category: "Food", price: 1.99, sku: "CHW-MS-001" },
-  { id: 4, itemCode: "DP196", name: "Orange Juice (12x250ml)", lowStockThreshold: 3, category: "Drinks", price: 6.99, sku: "CHW-OJ-001" },
-  { id: 5, itemCode: "FPFC204", name: "Karak Chaii Sugar free (50 per box)", lowStockThreshold: 2, category: "Drinks", price: 24.99, sku: "CHW-KC-001" },
+  { id: 1, itemCode: "BP401", name: "Masala Beans", lowStockThreshold: 5, category: "Food", price: 3.99, sku: "CHW-MB-001", daily_check: false },
+  { id: 2, itemCode: "BP402", name: "Daal", lowStockThreshold: 4, category: "Food", price: 2.99, sku: "CHW-DA-001", daily_check: false },
+  { id: 3, itemCode: "BP440", name: "Mogo Sauce", lowStockThreshold: 6, category: "Food", price: 1.99, sku: "CHW-MS-001", daily_check: false },
+  { id: 4, itemCode: "DP196", name: "Orange Juice (12x250ml)", lowStockThreshold: 3, category: "Drinks", price: 6.99, sku: "CHW-OJ-001", daily_check: false },
+  { id: 5, itemCode: "FPFC204", name: "Karak Chaii Sugar free (50 per box)", lowStockThreshold: 2, category: "Drinks", price: 24.99, sku: "CHW-KC-001", daily_check: false },
 ];
 
 export default function SettingsPage() {
@@ -71,7 +69,8 @@ export default function SettingsPage() {
     lowStockThreshold: 5,
     category: "Food",
     price: 0.00,
-    sku: ""
+    sku: "",
+    daily_check: false,
   });
   // Categories mock (replace with your fetch logic)
   const [categories, setCategories] = useState([
@@ -127,10 +126,10 @@ export default function SettingsPage() {
       return;
     }
     const itemCode = generateItemCode(newItem.category, newItem.name);
-    const newId = Math.max(...stockConfig.map(item => item.id)) + 1;
+    const newId = Math.max(0, ...stockConfig.map(item => item.id)) + 1;
     const itemToAdd = { ...newItem, itemCode, id: newId };
     setStockConfig([...stockConfig, itemToAdd]);
-    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "" });
+    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "", daily_check: false });
     setIsAddDialogOpen(false);
     toast({ title: "Item Added", description: `${newItem.name} has been added to stock configuration.` });
   };
@@ -307,6 +306,7 @@ export default function SettingsPage() {
                         <TableHead>Threshold</TableHead>
                         <TableHead>Price</TableHead>
                         <TableHead>SKU</TableHead>
+                        <TableHead>Daily Check</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -319,6 +319,20 @@ export default function SettingsPage() {
                           <TableCell>{item.lowStockThreshold}</TableCell>
                           <TableCell>£{item.price.toFixed(2)}</TableCell>
                           <TableCell>{item.sku}</TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={!!item.daily_check}
+                              onCheckedChange={(checked) => {
+                                setStockConfig(prev =>
+                                  prev.map(row =>
+                                    row.id === item.id
+                                      ? { ...row, daily_check: checked }
+                                      : row
+                                  )
+                                );
+                              }}
+                            />
+                          </TableCell>
                           <TableCell className="text-right">
                             <Button variant="outline" size="sm" onClick={() => handleEditItem(item)}><Edit className="h-4 w-4" /></Button>
                             <Button variant="outline" size="sm" onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-600"><Trash2 className="h-4 w-4" /></Button>
@@ -342,6 +356,16 @@ export default function SettingsPage() {
                   <Input id="threshold" type="number" value={editItem?.lowStockThreshold || 0} min={1}
                     onChange={(e) => setEditItem({...editItem, lowStockThreshold: parseInt(e.target.value)})}
                   />
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="edit-daily-check">Daily Check</Label>
+                    <Switch
+                      id="edit-daily-check"
+                      checked={!!editItem?.daily_check}
+                      onCheckedChange={checked =>
+                        setEditItem({ ...editItem, daily_check: checked })
+                      }
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -380,6 +404,14 @@ export default function SettingsPage() {
                   />
                   <Label htmlFor="new-sku">SKU</Label>
                   <Input id="new-sku" value={newItem.sku} onChange={(e) => setNewItem({ ...newItem, sku: e.target.value })} />
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="add-daily-check">Daily Check</Label>
+                    <Switch
+                      id="add-daily-check"
+                      checked={!!newItem.daily_check}
+                      onCheckedChange={checked => setNewItem({ ...newItem, daily_check: checked })}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>

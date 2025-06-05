@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/UseAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from "@/lib/queryClient";
 import { 
   Search,
@@ -69,68 +70,66 @@ const chaiiwalaStores = [
   { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
 ];
 
-// User data with roles
-const users = [
-  { id: 1, name: 'Shabnam Essa', email: 'shabnam@chaiiwala.com', role: 'admin', storeId: null },
-  { id: 2, name: 'Usman Aftab', email: 'usman@chaiiwala.com', role: 'regional', regionId: 1 },
-  { id: 3, name: 'Jubayed Chowdhury', email: 'jubayed.chaiiwala@gmail.com', role: 'store', storeId: 5 },
-  { id: 4, name: 'Staff Member', email: 'staff@chaiiwala.com', role: 'staff', storeId: 5 }
-];
-
-// Choose one of the users for demo (0=admin, 1=regional, 2=store manager)
-const currentUser = users[2]; // Jubayed Chowdhury as store manager
-
-// Import inventory data from the stock file with store information
-const inventoryData = [
-  { itemCode: "BP401", secondaryCode: "FPBC101", product: "Masala Beans", price: 52.91, stock: 10, category: "Food", status: "in_stock", storeId: 1, storeName: "Cheetham Hill" },
-  { itemCode: "BP402", secondaryCode: "FPBC102", product: "Daal", price: 32.39, stock: 8, category: "Food", status: "in_stock", storeId: 2, storeName: "Oxford Road" },
-  { itemCode: "BP440", secondaryCode: "FPBC105", product: "Mogo Sauce", price: 9.00, stock: 15, category: "Food", status: "in_stock", storeId: 3, storeName: "Old Trafford" },
-  { itemCode: "BP460", secondaryCode: "FPBC106", product: "Paneer Sauce", price: 43.26, stock: 5, category: "Food", status: "low_stock", storeId: 4, storeName: "Trafford Centre" },
-  { itemCode: "BP461", secondaryCode: "FF709", product: "Chilli Chutney", price: 11.00, stock: 3, category: "Food", status: "low_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "BP447", secondaryCode: "FPBC107", product: "Pau Bhaji", price: 25.50, stock: 7, category: "Food", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "BP404", secondaryCode: "FF715", product: "Kunafa Pisatchio Mix", price: 16.10, stock: 12, category: "Food", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "DP127", secondaryCode: "FPFC208", product: "Gajar Halwa (1 piece)", price: 30.00, stock: 0, category: "Food", status: "out_of_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "BP405", secondaryCode: "FPFC209", product: "Gulab Jaman (1 piece)", price: 52.02, stock: 4, category: "Food", status: "low_stock", storeId: 1, storeName: "Cheetham Hill" },
-  { itemCode: "BP442", secondaryCode: "FPBC103", product: "Butter Chicken", price: 51.00, stock: 6, category: "Food", status: "in_stock", storeId: 2, storeName: "Oxford Road" },
-  { itemCode: "BP443", secondaryCode: "FPFC206", product: "Roti (50 per box)", price: 1.00, stock: 20, category: "Food", status: "in_stock", storeId: 3, storeName: "Old Trafford" },
-  { itemCode: "DP196", secondaryCode: "FF722", product: "Orange Juice (12x250ml)", price: 127.62, stock: 4, category: "Drinks", status: "low_stock", storeId: 4, storeName: "Trafford Centre" },
-  { itemCode: "DP197", secondaryCode: "FF686", product: "Mini Sugared Doughnuts 13.5g (4x1)", price: 1.00, stock: 30, category: "Food", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "BP462", secondaryCode: "FF690", product: "Triple Belgium Choclate (36 x 80g)", price: 120.00, stock: 2, category: "Food", status: "low_stock", storeId: 6, storeName: "Rochdale" },
-  { itemCode: "DP193", secondaryCode: "FF691", product: "Belgian Choclate Chunk Cookie (36x80g)", price: 120.00, stock: 0, category: "Food", status: "out_of_stock", storeId: 7, storeName: "Oldham" },
-  { itemCode: "FPBC109", secondaryCode: "FPBC109", product: "Limbu Pani (5L)", price: 5.00, stock: 15, category: "Drinks", status: "in_stock", storeId: 1, storeName: "Cheetham Hill" },
-  { itemCode: "FPFC210", secondaryCode: "FPFC210", product: "Pink Chaii Mix (50 per box)", price: 5.00, stock: 8, category: "Drinks", status: "in_stock", storeId: 2, storeName: "Oxford Road" },
-  { itemCode: "FPFC201", secondaryCode: "FPFC201", product: "Garam Choc (10 x 1 kg)", price: 5.00, stock: 10, category: "Drinks", status: "in_stock", storeId: 3, storeName: "Old Trafford" },
-  { itemCode: "DF409", secondaryCode: "DF409", product: "Karak Chaii (25 per box)", price: 10.00, stock: 3, category: "Drinks", status: "low_stock", storeId: 4, storeName: "Trafford Centre" },
-  { itemCode: "FPFC203", secondaryCode: "FPFC203", product: "Karak Coffee (50 per box)", price: 10.00, stock: 12, category: "Drinks", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "FPFC204", secondaryCode: "FPFC204", product: "Karak Chaii Sugar free (50 per box)", price: 5.70, stock: 5, category: "Drinks", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-  { itemCode: "FPFC205", secondaryCode: "FPFC205", product: "Chaii Latte (1kg)", price: 5.70, stock: 0, category: "Drinks", status: "out_of_stock", storeId: 6, storeName: "Rochdale" },
-  { itemCode: "DF427", secondaryCode: "DF427", product: "Vegan Chaii Powder", price: 5.70, stock: 8, category: "Drinks", status: "in_stock", storeId: 7, storeName: "Oldham" },
-  { itemCode: "FPG359", secondaryCode: "FPG359", product: "Chaiiwala Honey", price: 17.99, stock: 7, category: "Food", status: "in_stock", storeId: 5, storeName: "Stockport Road" },
-];
-
 export default function StockManagementView() {
+
+  // ⚠️ Move this *inside* the component
+  const { user, profile } = useAuth();
+  const currentUser = profile;
+  const [loading, setLoading] = useState(true);
+
+   useEffect(() => {
+    async function fetchStockItems() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stock_items')
+        .select('*');
+      if (error) {
+        setInventoryData([]);
+      } else {
+        // Map data to match your UI fields
+        setInventoryData((data || []).map(item => ({
+          sku: item.sku,
+          product: item.name,
+         price: Number(item.price),
+          stock: item.quantity,
+          category: item.category,
+          status: item.quantity === 0
+            ? "out_of_stock"
+            : item.quantity <= (item.low_stock_threshold || 5)
+              ? "low_stock"
+              : "in_stock",
+          storeId: item.store_id,
+        })));
+      }
+      setLoading(false);
+    }
+    fetchStockItems();
+  }, []);
+
+  // Replace this with your real inventory data (from props, state, context, or fetch)
+  const [inventoryData, setInventoryData] = useState([]); // Example: You should set actual data!
+
   const [search, setSearch] = useState('');
-  const [filteredData, setFilteredData] = useState(inventoryData);
+  const [filteredData, setFilteredData] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort] = useState({ field: '', direction: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState('all');
-const [editItem, setEditItem] = useState(null);
-
+  const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+const itemsPerPage = 10; // Show 10 per page
+
+const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+const paginatedRows = filteredData.slice(
+  (currentPage - 1) * itemsPerPage,
+  currentPage * itemsPerPage
+);
   
+
   const { toast } = useToast();
-  
-  // Fetch real authenticated user data
-  const { data: user } = useQuery({
-    queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-  
-  // Use authenticated user or fallback to demo data
-  const currentUser = user || users[2];
-  
+
   // Set store filter based on user role, once we have user data
   useEffect(() => {
     if (currentUser && currentUser.role === 'store' && currentUser.storeId) {
@@ -149,63 +148,58 @@ const [editItem, setEditItem] = useState(null);
     const store = chaiiwalaStores.find(store => store.id === storeId);
     return store ? store.name : 'Unknown Store';
   };
-  
+
   // Get current user's store name if applicable
-  const currentStoreName = currentUser.storeId ? getStoreName(currentUser.storeId) : 'Unknown Store';
-  
+  const currentStoreName = currentUser?.storeId ? getStoreName(currentUser.storeId) : 'Unknown Store';
+
   // Apply filters and search
   useEffect(() => {
-    // First apply role-based access restrictions
     let result = [...inventoryData];
-    
+
     // Add store name to each item for display
     result = result.map(item => ({
       ...item,
       storeName: getStoreName(item.storeId)
     }));
-    
+
     // Apply store filter based on user role
-    if (currentUser.role === 'store') {
-      // Store managers can only see their own store inventory
+    if (currentUser?.role === 'store') {
       result = result.filter(item => item.storeId === currentUser.storeId);
-    } else if (currentUser.role === 'regional') {
-      // Regional managers can see all stores but can filter by specific store
+    } else if (currentUser?.role === 'regional') {
       if (storeFilter !== 'all') {
         result = result.filter(item => item.storeId === Number(storeFilter));
       }
-    } else if (currentUser.role === 'admin') {
-      // Admins can see everything and filter by store
+    } else if (currentUser?.role === 'admin') {
       if (storeFilter !== 'all') {
         result = result.filter(item => item.storeId === Number(storeFilter));
       }
     }
-    
+
     // Apply search filter
     if (search) {
       const searchLower = search.toLowerCase();
-      result = result.filter(item => 
+      result = result.filter(item =>
         item.product.toLowerCase().includes(searchLower) ||
-        item.itemCode.toLowerCase().includes(searchLower) ||
-        item.secondaryCode.toLowerCase().includes(searchLower)
+        item.sku.toLowerCase().includes(searchLower) ||
+        (item.secondaryCode ? item.secondaryCode.toLowerCase().includes(searchLower) : false)
       );
     }
-    
+
     // Apply category filter
     if (categoryFilter !== 'all') {
       result = result.filter(item => item.category === categoryFilter);
     }
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       result = result.filter(item => item.status === statusFilter);
     }
-    
+
     // Apply sorting
     if (sort.field) {
       result.sort((a, b) => {
         const aValue = a[sort.field];
         const bValue = b[sort.field];
-        
         if (aValue && bValue) {
           if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
@@ -213,10 +207,9 @@ const [editItem, setEditItem] = useState(null);
         return 0;
       });
     }
-    
-    
+
     setFilteredData(result);
-  }, [search, categoryFilter, statusFilter, storeFilter, sort, currentUser]);
+  }, [inventoryData, search, categoryFilter, statusFilter, storeFilter, sort, currentUser]);
 
   const handleSort = (field) => {
     setSort({
@@ -254,21 +247,21 @@ const [editItem, setEditItem] = useState(null);
         return status;
     }
   };
-  
+
   // Handle edit item
   const handleEditItem = (item) => {
     setEditItem(item);
     setDialogOpen(true);
   };
-  
+
   // Handle save changes
   const handleSaveChanges = (updatedItem) => {
     // Find the index of the item being edited
-    const index = inventoryData.findIndex(item => 
-      item.itemCode === editItem?.itemCode && 
+    const index = inventoryData.findIndex(item =>
+      item.sku === editItem?.sku &&
       item.storeId === editItem?.storeId
     );
-    
+
     if (index !== -1) {
       // Update the item in the inventoryData array
       const updatedInventoryData = [...inventoryData];
@@ -276,22 +269,22 @@ const [editItem, setEditItem] = useState(null);
         ...updatedInventoryData[index],
         ...updatedItem
       };
-      
-      // In a real application, this would make an API call to update the database
+      setInventoryData(updatedInventoryData); // add this line to reflect changes globally
+
       // Update local state to reflect changes immediately
       const updatedFilteredData = filteredData.map(item => {
-        if (item.itemCode === editItem?.itemCode && item.storeId === editItem?.storeId) {
+        if (item.sku === editItem?.sku && item.storeId === editItem?.storeId) {
           return { ...item, ...updatedItem };
         }
         return item;
       });
       setFilteredData(updatedFilteredData);
-      
+
       toast({
         title: "Stock Updated",
         description: `${updatedItem.product} stock has been updated successfully.`,
       });
-      
+
       // Close the dialog
       setDialogOpen(false);
       setEditItem(null);
@@ -523,7 +516,7 @@ const [editItem, setEditItem] = useState(null);
               <div className="relative md:w-1/3">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                 <Input
-                  placeholder="Search products, item codes..."
+                  placeholder="Search products, sku..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-8"
@@ -584,9 +577,9 @@ const [editItem, setEditItem] = useState(null);
                       <TableHead className="w-[100px]">
                         <button 
                           className="flex items-center"
-                          onClick={() => handleSort('itemCode')}
+                          onClick={() => handleSort('sku')}
                         >
-                          Item Code
+                          SKU
                           <ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
@@ -651,48 +644,79 @@ const [editItem, setEditItem] = useState(null);
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {filteredData.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                          {currentUser.role === 'store' 
-                            ? `No products found for your store (${currentStoreName})`
-                            : 'No products found matching your criteria'}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredData.map((item) => (
-                        <TableRow key={item.itemCode}>
-                          <TableCell className="font-medium">{item.itemCode}</TableCell>
-                          <TableCell>{item.product}</TableCell>
-                          {/* Store column - only visible to admin and regional managers */}
-                          {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
-                            <TableCell>
-                              {item.storeName || '-'}
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right">£{item.price.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">{item.stock}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(item.status)}`}>
-                              {getStatusText(item.status)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleEditItem(item)}
-                            >
-                              Edit
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
+<TableBody>
+  {paginatedRows.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+        {currentUser.role === 'store' 
+          ? `No products found for your store (${currentStoreName})`
+          : 'No products found matching your criteria'}
+      </TableCell>
+    </TableRow>
+  ) : (
+    paginatedRows.map((item) => (
+      <TableRow key={item.sku + '-' + item.storeId}> {/* use storeId for uniqueness */}
+        <TableCell>{item.sku}</TableCell>
+        <TableCell>{item.product}</TableCell>
+        {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
+          <TableCell>{item.storeName || '-'}</TableCell>
+        )}
+        <TableCell className="text-right">£{item.price.toFixed(2)}</TableCell>
+        <TableCell className="text-center">{item.stock}</TableCell>
+        <TableCell>{item.category}</TableCell>
+        <TableCell>
+          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(item.status)}`}>
+            {getStatusText(item.status)}
+          </span>
+        </TableCell>
+        <TableCell className="text-right">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleEditItem(item)}
+          >
+            Edit
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))
+  )}
+</TableBody>
+
+
                 </Table>
+                <div className="flex justify-between items-center p-4 bg-white border-t">
+  <div>
+    Page {currentPage} of {totalPages || 1}
+  </div>
+  <div className="space-x-2">
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(1)}
+    >
+      Start
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={currentPage === 1}
+      onClick={() => setCurrentPage(currentPage - 1)}
+    >
+      Previous
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={currentPage === totalPages || totalPages === 0}
+      onClick={() => setCurrentPage(currentPage + 1)}
+    >
+      Next
+    </Button>
+  </div>
+</div>
+
               </div>
             </div>
           </div>
@@ -712,8 +736,8 @@ const [editItem, setEditItem] = useState(null);
             
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="text-right text-sm font-medium col-span-1">Item Code:</div>
-                <div className="col-span-3 font-mono">{editItem.itemCode}</div>
+                <div className="text-right text-sm font-medium col-span-1">SKU:</div>
+                <div className="col-span-3 font-mono">{editItem.sku}</div>
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
@@ -766,6 +790,26 @@ const [editItem, setEditItem] = useState(null);
                   }`}>
                     {getStatusText(editItem.status)}
                   </span>
+
+                  <div className="grid grid-cols-4 items-center gap-4">
+  <label className="text-right text-sm font-medium col-span-1">
+    Daily Check:
+  </label>
+  <div className="col-span-3 flex items-center">
+    <input
+      type="checkbox"
+      checked={!!editItem.daily_check}
+      onChange={e =>
+        setEditItem({ ...editItem, daily_check: e.target.checked })
+      }
+      className="mr-2"
+    />
+    <span className="text-xs text-gray-600">
+      Show on daily stock check list
+    </span>
+  </div>
+</div>
+
                   <div className="mt-1 text-xs text-gray-500">
                     Status is automatically updated based on stock quantity and configured thresholds
                   </div>

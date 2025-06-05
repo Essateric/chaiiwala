@@ -10,18 +10,18 @@ import SettingsPage from "@/pages/Settings";
 import ImportJobLogsPage from "@/pages/ImportJobLogs";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useAuth } from "@/hooks/UseAuth";
+import { useAuth, AuthProvider } from "@/hooks/UseAuth"; // <<-- make sure AuthProvider is exported!
 import UserManagementPage from "./pages/UserManagementPage";
 import EventOrdersPage from "./components/eventOrders/EventOrdersPage";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
-const ANNOUNCEMENTS_ALLOWED_ROLES = ["admin", "area", "regional"];
+const ANNOUNCEMENTS_ALLOWED_ROLES = ["admin", "area", "regional", "store"];
 const USER_MANAGEMENT_ROLES = ["admin", "regional"];
 const SETTINGS_ALLOWED_ROLES = ["admin", "regional"];
+const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 
-
-function App() {
+function AppRoutes() {
   const { user } = useAuth();
 
   return (
@@ -58,7 +58,7 @@ function App() {
         <Route
           path="/stock-management"
           element={
-            <ProtectedRoute feature="stock_management">
+            <ProtectedRoute roles={STOCK_MANAGEMENT_ALLOWED_ROLES}>
               <StockManagementPage />
             </ProtectedRoute>
           }
@@ -95,12 +95,11 @@ function App() {
             </ProtectedRoute>
           }
         />
-
-               <Route
+        <Route
           path="/settings"
           element={
             <ProtectedRoute roles={SETTINGS_ALLOWED_ROLES}>
-              <SettingsPage/>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
@@ -123,4 +122,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
+}

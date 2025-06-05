@@ -63,7 +63,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Maintenance', icon: WrenchIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
     { name: 'Event Orders', icon: CalendarDaysIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
-    { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional'] },
+    { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'Deep Cleaning', icon: ClipboardCheckIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
     { name: 'Staff Schedule', icon: CalendarIcon, href: '/schedule', active: currentPage === 'schedule', roles: ['admin', 'regional', 'store', 'staff'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area'] },
