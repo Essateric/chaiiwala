@@ -41,7 +41,7 @@ export default function UserManagementPage() {
   const [showInviteUserDialog, setShowInviteUserDialog] = useState(false);
   const [newInviteUser, setNewInviteUser] = useState({
     email: "",
-    role: "staff",
+    permissions: "staff",
     storeId: "",
     storeIds: [],
     full_name: "",
@@ -121,7 +121,7 @@ export default function UserManagementPage() {
   };
 
   const handleInviteUserClick = () => {
-    setNewInviteUser({ email: "", role: "staff", storeId: "", storeIds: [], full_name: "" });
+    setNewInviteUser({ email: "", permissions: "staff", storeId: "", storeIds: [], full_name: "" });
     setShowInviteUserDialog(true);
   };
 
@@ -156,6 +156,14 @@ export default function UserManagementPage() {
     try {
       // The sync-auth-for-profiles function expects 'email' in the body.
       // It seems to be designed to create an auth user if one doesn't exist for a profile.
+      console.log("Payload for invite-user:", {
+  email: newInviteUser.email,
+  role: newInviteUser.role,
+  full_name: newInviteUser.full_name,
+  primary_store_id: primaryStoreIdForInvite,
+  store_ids: storeIdsArrayForInvite,
+});
+console.log(typeof store_ids[0])
       const res = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/sync-auth-for-profiles", {
         method: "POST",
         headers: {
@@ -307,79 +315,79 @@ export default function UserManagementPage() {
     }
   };
 
-  const submitInviteUser = async () => {
-    if (!newInviteUser.email || !newInviteUser.role || !newInviteUser.full_name.trim()) {
-      return toast({ title: "Validation Error", description: "Email, Full Name, and Role are required.", variant: "destructive" });
-    }
-    if ((newInviteUser.role === "store" || newInviteUser.role === "staff") && !newInviteUser.storeId) {
-      return toast({ title: "Validation Error", description: "Please assign a store for Staff or Store Manager roles.", variant: "destructive" });
-    }
-     if (newInviteUser.role === "area" && (!newInviteUser.storeIds || newInviteUser.storeIds.length === 0)) {
-        return toast({ title: "Validation Error", description: "Please assign at least one store for Area Manager role.", variant: "destructive" });
-     }
+const submitInviteUser = async () => {
+  if (!newInviteUser.email || !newInviteUser.permissions || !newInviteUser.full_name.trim()) {
+    return toast({ title: "Validation Error", description: "Email, Full Name, and Role are required.", variant: "destructive" });
+  }
+  if ((newInviteUser.permissions === "store" || newInviteUser.permissions === "staff") && !newInviteUser.storeId) {
+    return toast({ title: "Validation Error", description: "Please assign a store for Staff or Store Manager roles.", variant: "destructive" });
+  }
+  if (newInviteUser.permissions === "area" && (!newInviteUser.storeIds || newInviteUser.storeIds.length === 0)) {
+    return toast({ title: "Validation Error", description: "Please assign at least one store for Area Manager role.", variant: "destructive" });
+  }
 
-    // Prepare payload for invite-user Edge Function
-    // The invite-user function expects primary_store_id and store_ids (array)
-    let primaryStoreIdForInvite = undefined;
-    let storeIdsArrayForInvite = [];
+  // Prepare payload for invite-user Edge Function
+  let primaryStoreIdForInvite = undefined;
+  let storeIdsArrayForInvite = [];
 
-    if ((newInviteUser.role === "store" || newInviteUser.role === "staff") && newInviteUser.storeId) {
-      const id = parseInt(newInviteUser.storeId, 10);
-      if (!isNaN(id)) {
-        primaryStoreIdForInvite = id;
-        storeIdsArrayForInvite = [id];
-      }
-    } else if (newInviteUser.role === "area" && newInviteUser.storeIds.length > 0) {
-      storeIdsArrayForInvite = newInviteUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
-       if (storeIdsArrayForInvite.length > 0) {
-        // invite-user function sets primary_store_id from the first element of store_ids if primary_store_id is not explicitly provided.
-        // So, we can either send it explicitly or let the function derive it.
-        primaryStoreIdForInvite = storeIdsArrayForInvite[0];
-      }
+  if ((newInviteUser.permissions === "store" || newInviteUser.permissions === "staff") && newInviteUser.storeId) {
+    const id = parseInt(newInviteUser.storeId, 10);
+    if (!isNaN(id)) {
+      primaryStoreIdForInvite = id;
+      storeIdsArrayForInvite = [id];
+    }
+  } else if (newInviteUser.permissions === "area" && newInviteUser.storeIds.length > 0) {
+    storeIdsArrayForInvite = newInviteUser.storeIds.map(idStr => parseInt(idStr, 10)).filter(idNum => !isNaN(idNum));
+    if (storeIdsArrayForInvite.length > 0) {
+      primaryStoreIdForInvite = storeIdsArrayForInvite[0];
+    }
+  }
+
+  try {
+    if (!accessToken) {
+      throw new Error("Authentication token not found. Please log in again.");
     }
 
-    try {
-      if (!accessToken) {
-         throw new Error("Authentication token not found. Please log in again.");
-      }
-      // CRUCIAL LOG: Inspect the payload before sending
-      console.log("UserManagementPage.jsx - Payload for invite-user:", {
+    // Log what is being sent
+    console.log("UserManagementPage.jsx - Payload for invite-user:", {
+      email: newInviteUser.email,
+      permissions: newInviteUser.permissions,    // <- THIS IS THE FIX!
+      full_name: newInviteUser.full_name,
+      primary_store_id: primaryStoreIdForInvite,
+      store_ids: storeIdsArrayForInvite,
+    });
+
+    const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/invite-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
         email: newInviteUser.email,
-        role: newInviteUser.role,
+        permissions: newInviteUser.permissions,    // <- THIS MATCHES THE EDGE FUNCTION AND DB
         full_name: newInviteUser.full_name,
         primary_store_id: primaryStoreIdForInvite,
         store_ids: storeIdsArrayForInvite,
-      });
+      }),
+    });
 
-      const response = await fetch("https://pjdycbnegzxzhauecrck.functions.supabase.co/invite-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          email: newInviteUser.email,
-          role: newInviteUser.role,
-          full_name: newInviteUser.full_name,
-          primary_store_id: primaryStoreIdForInvite, // Expected by invite-user
-          store_ids: storeIdsArrayForInvite,       // Expected by invite-user
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to send invitation');
-      toast({ title: "✅ Invitation Sent", description: `Invitation sent to ${newInviteUser.email}` });
-      setShowInviteUserDialog(false);
-      refetchprofiles();
-    } catch (err) {
-      console.error("❌ Failed to send invitation:", err.message);
-      toast({ title: "❌ Error Sending Invite", description: err.message, variant: "destructive" });
-    }
-  };
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Failed to send invitation');
+    toast({ title: "✅ Invitation Sent", description: `Invitation sent to ${newInviteUser.email}` });
+    setShowInviteUserDialog(false);
+    refetchprofiles();
+  } catch (err) {
+    console.error("❌ Failed to send invitation:", err.message);
+    toast({ title: "❌ Error Sending Invite", description: err.message, variant: "destructive" });
+  }
+};
+
 
   const renderStoreAssignment = () => {
     const activeFormState = showInviteUserDialog ? newInviteUser : newUser;
     const updateActiveFormState = showInviteUserDialog ? setNewInviteUser : setNewUser;
-    const roleField = showInviteUserDialog ? activeFormState.role : activeFormState.permissions;
+    const roleField = showInviteUserDialog ? activeFormState.permissions: activeFormState.permissions;
 
     if (roleField === "admin" || roleField === "regional" || roleField === "maintenance") {
         return <p className="text-sm text-muted-foreground">This role has access to all stores.</p>;
@@ -700,7 +708,7 @@ export default function UserManagementPage() {
             <div className="space-y-2">
               <Label htmlFor="invite-role">Role</Label>
               <Select
-                value={newInviteUser.role}
+                value={newInviteUser.permissions}
                 onValueChange={(value) => setNewInviteUser({ ...newInviteUser, role: value, storeId: "", storeIds: [] })}
               >
                 <SelectTrigger id="invite-role">

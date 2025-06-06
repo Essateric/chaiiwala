@@ -27,37 +27,15 @@ import { useAuth } from '@/hooks/UseAuth';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/lib/supabaseClient";
 
-// Tasks list
-const DEEP_CLEANING_TASKS = [
-  "Bins Area (Inside and Out)",
-  "Door Mats",
-  "Skirting Boards",
-  "Remove Chewing Gum from Under Tables/Chairs",
-  "Table Legs and Backs",
-  "Chair Legs and Backs",
-  "Booth Seating/Padded Seats",
-  "Mirrors",
-  "Outside Signage",
-  "Shop Front and Window",
-  "Outside Barriers and Poles",
-  "Outside Point of Sale (A-Frame, etc.)",
-  "Shutters",
-  "Fly Zapper",
-  "Cup Dispensers",
-  "Drinks Fridge (Remove Items and Clean)",
-  "Cake Fridge",
-  "Ice Machine",
-  "Behind Counter and Shelving",
-  "Fryer (Change Oil)",
-  "Canopy (Including Filters)",
-  "Air Vents",
-  "Team Areas",
-  "Behind Sink/Cookers and Tables",
-  "All Fridges in Kitchen",
-  "Clean Fridge Condensers (Scheduled Once Per Week)",
-  "Defrost Freezers (Scheduled Once Per Week)",
-  "Descale Steam Arm and Check Filters on All Water Dispensers"
-];
+// Calendar localizer setup
+const locales = { 'en-US': enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
 // Color logic for calendar cards
 function getTaskColor(task) {
@@ -69,51 +47,61 @@ function getTaskColor(task) {
   return 'blue';
 }
 
-// Locales for date-fns
-const locales = { 'en-US': enUS };
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-});
-
 export default function DeepCleaningPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
 
-  // Dialog/modal state
+  // State
+  const [stores, setStores] = useState([]);
+  const [cleaningTasks, setCleaningTasks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState(user?.storeId ? String(user.storeId) : 'all');
+  const [selectedStore, setSelectedStore] = useState('all');
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-
-  // EVENTS STATE
   const [events, setEvents] = useState([]);
 
-  // Replace this with Supabase fetch if you want
-  const mockLocations = [
-    { id: 1, name: 'Cheetham Hill' },
-    { id: 2, name: 'Oxford Road' },
-    { id: 3, name: 'Old Trafford' },
-    { id: 4, name: 'Fallowfield' },
-    { id: 5, name: 'Stockport Road' },
-    { id: 6, name: 'Rusholme' },
-    { id: 7, name: 'Great Moor Street Bolton' },
-    { id: 8, name: 'Bradford' }
-  ];
+  // Fetch stores from Supabase
+  useEffect(() => {
+    async function fetchStores() {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id, name');
+      if (!error) setStores(data || []);
+    }
+    fetchStores();
+  }, []);
 
-  // FORM
+  // Fetch deep cleaning tasks from Supabase (dc_task)
+  useEffect(() => {
+    async function fetchTasks() {
+      const { data, error } = await supabase
+        .from('deep_cleaning_tasks')
+        .select('id, dc_task');
+      if (!error) setCleaningTasks(data || []);
+    }
+    fetchTasks();
+  }, []);
+
+  // Only show relevant stores in dropdown for admin/regional
+  const visibleStores =
+    profile?.permissions === 'admin'
+      ? stores
+      : stores.filter(store => profile?.store_ids?.includes(store.id));
+
+  // Form setup
   const form = useForm({
     defaultValues: {
       task: '',
       startTime: '09:00',
       endTime: '10:00',
-      storeId: user?.role === 'store' ? String(user.storeId) :
-        selectedStore !== 'all' ? selectedStore : ''
+      storeId:
+        profile?.permissions === 'store'
+          ? String(profile?.store_ids?.[0])
+          : selectedStore !== 'all'
+            ? selectedStore
+            : ''
     }
   });
 
@@ -124,31 +112,42 @@ export default function DeepCleaningPage() {
         .from('deep_cleaning')
         .select('*');
       let filteredEvents = data || [];
-      // Filter by role/store
-      if (user?.role === 'store' && user.storeId) {
-        filteredEvents = filteredEvents.filter(event => event.store_id === user.storeId);
-      } else if ((user?.role === 'admin' || user?.role === 'regional') && selectedStore !== 'all') {
-        filteredEvents = filteredEvents.filter(event => event.store_id === Number(selectedStore));
+      // Store managers: only see their own store
+      if (profile?.permissions === 'store' && profile.store_ids?.[0]) {
+        filteredEvents = filteredEvents.filter(
+          event => event.store_id === profile.store_ids[0]
+        );
       }
-      // Convert string dates to Date objects for Calendar
-      setEvents(filteredEvents.map(ev => ({
-        ...ev,
-        start: new Date(ev.start),
-        end: new Date(ev.end_time) // <--- Important fix!
-      })));
+      // Regional/admin: filter by selected store
+      else if (
+        (profile?.permissions === 'admin' || profile?.permissions === 'regional') &&
+        selectedStore !== 'all'
+      ) {
+        filteredEvents = filteredEvents.filter(
+          event => event.store_id === Number(selectedStore)
+        );
+      }
+      setEvents(
+        filteredEvents.map(ev => ({
+          ...ev,
+          start: new Date(ev.start),
+          end: new Date(ev.end_time)
+        }))
+      );
     }
     fetchEvents();
-  }, [user, selectedStore, isLoading]);
+  }, [profile, selectedStore, isLoading, stores]);
 
-  // When clicking on calendar slot
+  // Calendar slot select handler
   const handleSelectSlot = ({ start }) => {
     setSelectedDate(start);
     setIsModalOpen(true);
-    const storeId = user?.role === 'store'
-      ? String(user.storeId)
-      : selectedStore !== 'all'
-        ? selectedStore
-        : '';
+    const storeId =
+      profile?.permissions === 'store'
+        ? String(profile.store_ids?.[0])
+        : selectedStore !== 'all'
+          ? selectedStore
+          : '';
     form.reset({
       task: '',
       startTime: '09:00',
@@ -157,13 +156,13 @@ export default function DeepCleaningPage() {
     });
   };
 
-  // When clicking on an event card
+  // Calendar event select handler
   const handleEventSelect = (event) => {
     setSelectedTask(event);
     setViewDialogOpen(true);
   };
 
-  // Create a new cleaning task
+  // Create new cleaning task
   const onSubmit = async (data) => {
     if (!selectedDate) return;
     setIsLoading(true);
@@ -176,42 +175,54 @@ export default function DeepCleaningPage() {
     startDate.setHours(startHours, startMinutes, 0, 0);
     endDate.setHours(endHours, endMinutes, 0, 0);
 
+    // Lookup correct store ID/name
     let storeId = null, storeName = '';
-    if (user?.role === 'store' && user.storeId) {
-      storeId = user.storeId;
-      storeName = mockLocations.find(s => s.id === storeId)?.name;
+    if (profile?.permissions === 'store' && profile.store_ids?.[0]) {
+      storeId = profile.store_ids[0];
+      storeName = stores.find(s => s.id === storeId)?.name || '';
     } else if (data.storeId) {
       storeId = Number(data.storeId);
-      storeName = mockLocations.find(s => s.id === storeId)?.name;
+      storeName = stores.find(s => s.id === storeId)?.name || '';
     }
 
-    // --- Save to Supabase ---
+    // The selected task (from dc_task) string
+    const taskName = data.task;
+
+    // Save to Supabase
     const { data: insertData, error } = await supabase
       .from('deep_cleaning')
-      .insert([{
-        task: data.task,
-        start: startDate.toISOString(),
-        end_time: endDate.toISOString(), // <-- This is the DB field
-        store_id: storeId,
-        store_name: storeName,
-        created_by: user?.id,
-        created_at: new Date().toISOString()
-      }])
+      .insert([
+        {
+          task: taskName, // Store the dc_task string!
+          start: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          store_id: storeId,
+          store_name: storeName,
+          created_by: profile?.id,
+          created_at: new Date().toISOString()
+        }
+      ])
       .select()
       .single();
 
     if (!error) {
       toast({
         title: 'Deep cleaning task scheduled',
-        description: `${data.task} scheduled for ${storeName} on ${format(startDate, 'MMMM dd, yyyy')}`,
+        description: `${taskName} scheduled for ${storeName} on ${format(
+          startDate,
+          'MMMM dd, yyyy'
+        )}`
       });
       setIsLoading(false);
       setIsModalOpen(false);
-      setEvents(prev => [...prev, {
-        ...insertData,
-        start: new Date(insertData.start),
-        end: new Date(insertData.end_time) // <-- calendar uses "end"
-      }]);
+      setEvents(prev => [
+        ...prev,
+        {
+          ...insertData,
+          start: new Date(insertData.start),
+          end: new Date(insertData.end_time)
+        }
+      ]);
     } else {
       toast({
         title: "Error",
@@ -222,7 +233,7 @@ export default function DeepCleaningPage() {
     }
   };
 
-  // Mark a task as complete
+  // Mark task as complete
   const markTaskComplete = async () => {
     if (!selectedTask) return;
     const now = new Date();
@@ -268,7 +279,7 @@ export default function DeepCleaningPage() {
 
   // Calendar event title logic
   const getEventTitle = (event) => {
-    if ((user?.role === 'admin' || user?.role === 'regional') && event.store_name) {
+    if ((profile?.permissions === 'admin' || profile?.permissions === 'regional') && event.store_name) {
       return `${event.task} - ${event.store_name}`;
     }
     return event.task;
@@ -285,13 +296,16 @@ export default function DeepCleaningPage() {
               Click on a date to add a new cleaning task.
             </p>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
-              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => {
-                const today = new Date();
-                handleSelectSlot({ start: today });
-              }}>
+              <Button
+                className="bg-chai-gold hover:bg-yellow-600"
+                onClick={() => {
+                  const today = new Date();
+                  handleSelectSlot({ start: today });
+                }}
+              >
                 <Plus className="mr-2 h-4 w-4" /> Add New Task
               </Button>
-              {(user?.role === 'admin' || user?.role === 'regional') && (
+              {(profile?.permissions === 'admin' || profile?.permissions === 'regional') && (
                 <div className="flex items-center">
                   <Select value={selectedStore} onValueChange={setSelectedStore}>
                     <SelectTrigger className="w-[200px]">
@@ -300,7 +314,7 @@ export default function DeepCleaningPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Stores</SelectItem>
-                      {mockLocations.map(store => (
+                      {visibleStores.map(store => (
                         <SelectItem key={store.id} value={String(store.id)}>
                           {store.name}
                         </SelectItem>
@@ -327,8 +341,8 @@ export default function DeepCleaningPage() {
                 showMultiDayTimes
                 className="rounded-md border"
                 eventPropGetter={eventPropGetter}
-                min={new Date(1980, 1, 1, 9, 0, 0)}   // 9:00 AM
-                max={new Date(1980, 1, 1, 21, 0, 0)}   // 9:00 PM
+                min={new Date(1980, 1, 1, 9, 0, 0)}
+                max={new Date(1980, 1, 1, 21, 0, 0)}
                 step={60}
                 timeslots={1}
                 scrollToTime={new Date(1980, 1, 1, 9, 0)}
@@ -361,18 +375,22 @@ export default function DeepCleaningPage() {
                           <SelectValue placeholder="Select a task" />
                         </SelectTrigger>
                         <SelectContent>
-                          {DEEP_CLEANING_TASKS.map(task => (
-                            <SelectItem key={task} value={task}>
-                              {task}
-                            </SelectItem>
-                          ))}
+                          {cleaningTasks.length === 0 ? (
+                            <SelectItem value="No tasks available" disabled>No tasks available</SelectItem>
+                          ) : (
+                            cleaningTasks.map(task => (
+                              <SelectItem key={task.id} value={task.dc_task}>
+                                {task.dc_task}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </FormControl>
                   </FormItem>
                 )}
               />
-              {(user?.role === 'admin' || user?.role === 'regional') && (
+              {(profile?.permissions === 'admin' || profile?.permissions === 'regional') && (
                 <FormField
                   control={form.control}
                   name="storeId"
@@ -385,7 +403,7 @@ export default function DeepCleaningPage() {
                             <SelectValue placeholder="Select a store" />
                           </SelectTrigger>
                           <SelectContent>
-                            {mockLocations.map(store => (
+                            {visibleStores.map(store => (
                               <SelectItem key={store.id} value={String(store.id)}>
                                 {store.name}
                               </SelectItem>

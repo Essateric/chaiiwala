@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/UseAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getQueryFn } from "@/lib/queryClient";
-import { 
+import {
   Search,
   Filter,
   ArrowUpDown,
-  Coffee, 
+  Coffee,
   Store,
   ShoppingBasket,
   AlertTriangle,
@@ -25,18 +24,18 @@ import {
   WrenchIcon,
   PackageIcon
 } from 'lucide-react';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -54,7 +53,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -70,147 +68,129 @@ const chaiiwalaStores = [
   { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
 ];
 
+// Get store name by id
+const getStoreName = (storeId) => {
+  const store = chaiiwalaStores.find(store => store.id === storeId);
+  return store ? store.name : 'Unknown Store';
+};
+
+const getStatusFromQty = (qty, threshold = 5) => {
+  if (qty === 0) return "out_of_stock";
+  if (qty <= threshold) return "low_stock";
+  return "in_stock";
+};
+
 export default function StockManagementView() {
-
-  // ⚠️ Move this *inside* the component
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const currentUser = profile;
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-   useEffect(() => {
-    async function fetchStockItems() {
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [storeFilter, setStoreFilter] = useState('all');
+  const [sort, setSort] = useState({ field: '', direction: '' });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Area permissions (assume currentUser.store_ids is array of ids for area managers)
+  const isStoreManager = currentUser?.role === 'store';
+  const isArea = currentUser?.role === 'area';
+  const isAdminOrRegional = currentUser?.role === 'admin' || currentUser?.role === 'regional';
+
+  // Fetch inventory data (per-store, not global)
+  useEffect(() => {
+    async function fetchStock() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('stock_items')
-        .select('*');
+      let query = supabase
+        .from('store_stock_levels')
+        .select(`
+          *,
+          stock_items:stock_item_id (
+            sku,
+            name,
+            price,
+            category
+          )
+        `);
+
+      // Apply filters for store, area, admin/regional
+      if (isStoreManager) {
+        query = query.eq('store_id', currentUser.store_id || currentUser.storeId);
+      } else if (isArea && Array.isArray(currentUser.store_ids) && currentUser.store_ids.length > 0) {
+        query = query.in('store_id', currentUser.store_ids);
+      } else if (isAdminOrRegional && storeFilter !== 'all') {
+        query = query.eq('store_id', Number(storeFilter));
+      }
+      const { data, error } = await query;
       if (error) {
         setInventoryData([]);
       } else {
-        // Map data to match your UI fields
-        setInventoryData((data || []).map(item => ({
-          sku: item.sku,
-          product: item.name,
-         price: Number(item.price),
-          stock: item.quantity,
-          category: item.category,
-          status: item.quantity === 0
-            ? "out_of_stock"
-            : item.quantity <= (item.low_stock_threshold || 5)
-              ? "low_stock"
-              : "in_stock",
-          storeId: item.store_id,
+        setInventoryData((data || []).map(row => ({
+          id: row.id,
+          storeId: row.store_id,
+          storeName: getStoreName(row.store_id),
+          sku: row.stock_items?.sku,
+          product: row.stock_items?.name,
+          price: Number(row.stock_items?.price),
+          category: row.stock_items?.category,
+          stock: row.quantity,
+          status: getStatusFromQty(row.quantity),
+          daily_check: !!row.daily_check,
         })));
       }
       setLoading(false);
     }
-    fetchStockItems();
-  }, []);
+    fetchStock();
+    // eslint-disable-next-line
+  }, [currentUser, storeFilter]); // fetches again if user or filter changes
 
-  // Replace this with your real inventory data (from props, state, context, or fetch)
-  const [inventoryData, setInventoryData] = useState([]); // Example: You should set actual data!
+  // Filter and search
+  let filteredData = inventoryData;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredData = filteredData.filter(item =>
+      (item.product || '').toLowerCase().includes(searchLower) ||
+      (item.sku || '').toLowerCase().includes(searchLower)
+    );
+  }
+  if (categoryFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.category === categoryFilter);
+  }
+  if (statusFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.status === statusFilter);
+  }
+  // Sorting
+  if (sort.field) {
+    filteredData = [...filteredData].sort((a, b) => {
+      const aValue = a[sort.field];
+      const bValue = b[sort.field];
+      if (aValue && bValue) {
+        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
 
-  const [search, setSearch] = useState('');
-  const [filteredData, setFilteredData] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sort, setSort] = useState({ field: '', direction: '' });
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [storeFilter, setStoreFilter] = useState('all');
-  const [editItem, setEditItem] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-const itemsPerPage = 10; // Show 10 per page
+  // Pagination
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const paginatedRows = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-const paginatedRows = filteredData.slice(
-  (currentPage - 1) * itemsPerPage,
-  currentPage * itemsPerPage
-);
-  
-
-  const { toast } = useToast();
-
-  // Set store filter based on user role, once we have user data
-  useEffect(() => {
-    if (currentUser && currentUser.role === 'store' && currentUser.storeId) {
-      setStoreFilter(String(currentUser.storeId));
-    }
-  }, [currentUser]);
-
-  // Count stats
+  // Stats
   const lowStockCount = inventoryData.filter(item => item.status === 'low_stock').length;
   const outOfStockCount = inventoryData.filter(item => item.status === 'out_of_stock').length;
   const drinksCount = inventoryData.filter(item => item.category === 'Drinks').length;
-  const foodCount = inventoryData.filter(item => item.category === 'Food').length;
 
-  // Function to get store name from store ID
-  const getStoreName = (storeId) => {
-    const store = chaiiwalaStores.find(store => store.id === storeId);
-    return store ? store.name : 'Unknown Store';
-  };
-
-  // Get current user's store name if applicable
-  const currentStoreName = currentUser?.storeId ? getStoreName(currentUser.storeId) : 'Unknown Store';
-
-  // Apply filters and search
-  useEffect(() => {
-    let result = [...inventoryData];
-
-    // Add store name to each item for display
-    result = result.map(item => ({
-      ...item,
-      storeName: getStoreName(item.storeId)
-    }));
-
-    // Apply store filter based on user role
-    if (currentUser?.role === 'store') {
-      result = result.filter(item => item.storeId === currentUser.storeId);
-    } else if (currentUser?.role === 'regional') {
-      if (storeFilter !== 'all') {
-        result = result.filter(item => item.storeId === Number(storeFilter));
-      }
-    } else if (currentUser?.role === 'admin') {
-      if (storeFilter !== 'all') {
-        result = result.filter(item => item.storeId === Number(storeFilter));
-      }
-    }
-
-    // Apply search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      result = result.filter(item =>
-        item.product.toLowerCase().includes(searchLower) ||
-        item.sku.toLowerCase().includes(searchLower) ||
-        (item.secondaryCode ? item.secondaryCode.toLowerCase().includes(searchLower) : false)
-      );
-    }
-
-    // Apply category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(item => item.category === categoryFilter);
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(item => item.status === statusFilter);
-    }
-
-    // Apply sorting
-    if (sort.field) {
-      result.sort((a, b) => {
-        const aValue = a[sort.field];
-        const bValue = b[sort.field];
-        if (aValue && bValue) {
-          if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-          if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    setFilteredData(result);
-  }, [inventoryData, search, categoryFilter, statusFilter, storeFilter, sort, currentUser]);
-
+  // Sorting UI
   const handleSort = (field) => {
     setSort({
       field,
@@ -218,82 +198,73 @@ const paginatedRows = filteredData.slice(
     });
   };
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'in_stock':
-        return 'bg-green-100 text-green-800';
-      case 'low_stock':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'out_of_stock':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'in_stock':
-        return 'In Stock';
-      case 'low_stock':
-        return 'Low Stock';
-      case 'out_of_stock':
-        return 'Out of Stock';
-      default:
-        return status;
-    }
-  };
-
-  // Handle edit item
+  // Edit logic
   const handleEditItem = (item) => {
     setEditItem(item);
     setDialogOpen(true);
   };
 
-  // Handle save changes
   const handleSaveChanges = (updatedItem) => {
-    // Find the index of the item being edited
+    // Optionally: push changes to supabase here!
     const index = inventoryData.findIndex(item =>
       item.sku === editItem?.sku &&
       item.storeId === editItem?.storeId
     );
-
     if (index !== -1) {
-      // Update the item in the inventoryData array
       const updatedInventoryData = [...inventoryData];
       updatedInventoryData[index] = {
         ...updatedInventoryData[index],
         ...updatedItem
       };
-      setInventoryData(updatedInventoryData); // add this line to reflect changes globally
-
-      // Update local state to reflect changes immediately
-      const updatedFilteredData = filteredData.map(item => {
-        if (item.sku === editItem?.sku && item.storeId === editItem?.storeId) {
-          return { ...item, ...updatedItem };
-        }
-        return item;
-      });
-      setFilteredData(updatedFilteredData);
+      setInventoryData(updatedInventoryData);
 
       toast({
         title: "Stock Updated",
         description: `${updatedItem.product} stock has been updated successfully.`,
       });
 
-      // Close the dialog
       setDialogOpen(false);
       setEditItem(null);
-
     }
   };
 
+  // UI helpers
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'in_stock': return 'bg-green-100 text-green-800';
+      case 'low_stock': return 'bg-yellow-100 text-yellow-800';
+      case 'out_of_stock': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'in_stock': return 'In Stock';
+      case 'low_stock': return 'Low Stock';
+      case 'out_of_stock': return 'Out of Stock';
+      default: return status;
+    }
+  };
+
+  // Store name for current user (used in UI)
+  const currentStoreName =
+    isStoreManager && currentUser?.store_id
+      ? getStoreName(currentUser.store_id)
+      : (isStoreManager && currentUser?.storeId)
+      ? getStoreName(currentUser.storeId)
+      : '';
+
+  // Only show store filter for admin/regional
+  const showStoreFilter = isAdminOrRegional;
+
+  // Only show store column for admin/regional/area
+  const showStoreColumn = isAdminOrRegional || isArea;
+
+  const toggleMobileMenu = () => setIsMobileMenuOpen((v) => !v);
+
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Sidebar - desktop only */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
         <div className="flex flex-col flex-grow pt-5 bg-[#1c1f2a] overflow-y-auto">
@@ -363,7 +334,7 @@ const paginatedRows = filteredData.slice(
             </div>
             <h1 className="text-white font-bold text-lg">Chaiiwala</h1>
           </div>
-          <button 
+          <button
             onClick={toggleMobileMenu}
             className="text-white focus:outline-none"
           >
@@ -435,9 +406,7 @@ const paginatedRows = filteredData.slice(
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
               <div>
                 <h1 className="text-2xl font-semibold text-gray-900">Stock Management</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Manage your Chaiiwala product stock
-                </p>
+                <p className="mt-1 text-sm text-gray-500">Manage your Chaiiwala product stock</p>
               </div>
               <div className="mt-4 md:mt-0 flex flex-col items-end">
                 <div className="bg-gray-100 px-3 py-1 rounded-md flex items-center">
@@ -447,9 +416,8 @@ const paginatedRows = filteredData.slice(
               </div>
             </div>
 
-            {/* Stats Cards */}
             {/* Store-specific indicator for store managers */}
-            {currentUser.role === 'store' && currentUser.storeId && (
+            {isStoreManager && currentStoreName && (
               <div className="mb-4 p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
                 <div className="flex items-center">
                   <Store className="h-5 w-5 text-chai-gold mr-2" />
@@ -459,7 +427,8 @@ const paginatedRows = filteredData.slice(
                 </div>
               </div>
             )}
-            
+
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -546,9 +515,8 @@ const paginatedRows = filteredData.slice(
                     <SelectItem value="out_of_stock">Out of Stock</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                {/* Store filter - only visible to admin and regional managers */}
-                {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
+                {/* Store filter - only visible to admin/regional */}
+                {showStoreFilter && (
                   <Select value={storeFilter} onValueChange={setStoreFilter}>
                     <SelectTrigger className="w-[170px]">
                       <Store className="mr-2 h-4 w-4" />
@@ -575,154 +543,98 @@ const paginatedRows = filteredData.slice(
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[100px]">
-                        <button 
-                          className="flex items-center"
-                          onClick={() => handleSort('sku')}
-                        >
-                          SKU
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center" onClick={() => handleSort('sku')}>
+                          SKU<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
-
                       <TableHead>
-                        <button 
-                          className="flex items-center"
-                          onClick={() => handleSort('product')}
-                        >
-                          Product Name
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center" onClick={() => handleSort('product')}>
+                          Product Name<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
-                      {/* Store column - only visible to admin and regional managers */}
-                      {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
+                      {showStoreColumn && (
                         <TableHead>
-                          <button 
-                            className="flex items-center"
-                            onClick={() => handleSort('storeName')}
-                          >
-                            Store
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          <button className="flex items-center" onClick={() => handleSort('storeName')}>
+                            Store<ArrowUpDown className="ml-2 h-4 w-4" />
                           </button>
                         </TableHead>
                       )}
                       <TableHead className="text-right">
-                        <button 
-                          className="flex items-center ml-auto"
-                          onClick={() => handleSort('price')}
-                        >
-                          Price
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center ml-auto" onClick={() => handleSort('price')}>
+                          Price<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
                       <TableHead className="text-center">
-                        <button 
-                          className="flex items-center justify-center"
-                          onClick={() => handleSort('stock')}
-                        >
-                          Quantity
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center mx-auto" onClick={() => handleSort('stock')}>
+                          Quantity<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
                       <TableHead>
-                        <button 
-                          className="flex items-center"
-                          onClick={() => handleSort('category')}
-                        >
-                          Category
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center" onClick={() => handleSort('category')}>
+                          Category<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
                       <TableHead>
-                        <button 
-                          className="flex items-center"
-                          onClick={() => handleSort('status')}
-                        >
-                          Status
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        <button className="flex items-center" onClick={() => handleSort('status')}>
+                          Status<ArrowUpDown className="ml-2 h-4 w-4" />
                         </button>
                       </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
-<TableBody>
-  {paginatedRows.length === 0 ? (
-    <TableRow>
-      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-        {currentUser.role === 'store' 
-          ? `No products found for your store (${currentStoreName})`
-          : 'No products found matching your criteria'}
-      </TableCell>
-    </TableRow>
-  ) : (
-    paginatedRows.map((item) => (
-      <TableRow key={item.sku + '-' + item.storeId}> {/* use storeId for uniqueness */}
-        <TableCell>{item.sku}</TableCell>
-        <TableCell>{item.product}</TableCell>
-        {(currentUser.role === 'admin' || currentUser.role === 'regional') && (
-          <TableCell>{item.storeName || '-'}</TableCell>
-        )}
-        <TableCell className="text-right">£{item.price.toFixed(2)}</TableCell>
-        <TableCell className="text-center">{item.stock}</TableCell>
-        <TableCell>{item.category}</TableCell>
-        <TableCell>
-          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(item.status)}`}>
-            {getStatusText(item.status)}
-          </span>
-        </TableCell>
-        <TableCell className="text-right">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => handleEditItem(item)}
-          >
-            Edit
-          </Button>
-        </TableCell>
-      </TableRow>
-    ))
-  )}
-</TableBody>
-
-
+                  <TableBody>
+                    {paginatedRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                          {isStoreManager
+                            ? `No products found for your store (${currentStoreName})`
+                            : 'No products found matching your criteria'}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedRows.map((item) => (
+                        <TableRow key={item.sku + '-' + item.storeId}>
+                          <TableCell>{item.sku}</TableCell>
+                          <TableCell>{item.product}</TableCell>
+                          {showStoreColumn && (
+                            <TableCell>{item.storeName || '-'}</TableCell>
+                          )}
+                          <TableCell className="text-right">£{item.price?.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{item.stock}</TableCell>
+                          <TableCell>{item.category}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(item.status)}`}>
+                              {getStatusText(item.status)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditItem(item)}
+                            >
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
                 </Table>
                 <div className="flex justify-between items-center p-4 bg-white border-t">
-  <div>
-    Page {currentPage} of {totalPages || 1}
-  </div>
-  <div className="space-x-2">
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={currentPage === 1}
-      onClick={() => setCurrentPage(1)}
-    >
-      Start
-    </Button>
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={currentPage === 1}
-      onClick={() => setCurrentPage(currentPage - 1)}
-    >
-      Previous
-    </Button>
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={currentPage === totalPages || totalPages === 0}
-      onClick={() => setCurrentPage(currentPage + 1)}
-    >
-      Next
-    </Button>
-  </div>
-</div>
-
+                  <div>Page {currentPage} of {totalPages || 1}</div>
+                  <div className="space-x-2">
+                    <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>Start</Button>
+                    <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>Previous</Button>
+                    <Button variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(currentPage + 1)}>Next</Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </main>
       </div>
-      
+
       {/* Edit Inventory Item Dialog */}
       {dialogOpen && editItem && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -730,98 +642,70 @@ const paginatedRows = filteredData.slice(
             <DialogHeader>
               <DialogTitle>Edit Inventory Item</DialogTitle>
               <DialogDescription>
-                Update stock quantity and status for {editItem.product}
+                Update quantity and status for {editItem.product}
               </DialogDescription>
             </DialogHeader>
-            
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="text-right text-sm font-medium col-span-1">SKU:</div>
                 <div className="col-span-3 font-mono">{editItem.sku}</div>
               </div>
-              
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="text-right text-sm font-medium col-span-1">Product:</div>
                 <div className="col-span-3 font-semibold">{editItem.product}</div>
               </div>
-              
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="text-right text-sm font-medium col-span-1">Price:</div>
-                <div className="col-span-3">£{editItem.price.toFixed(2)}</div>
+                <div className="col-span-3">£{editItem.price?.toFixed(2)}</div>
               </div>
-              
               <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">
-                  Quantity:
-                </label>
+                <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">Quantity:</label>
                 <div className="col-span-3">
-                  <Input 
-                    id="stock" 
-                    type="number" 
-                    className="col-span-3" 
-                    defaultValue={editItem.stock}
+                  <Input
+                    id="stock"
+                    type="number"
+                    className="col-span-3"
+                    value={editItem.stock}
                     min={0}
-                    onChange={(e) => {
+                    onChange={e => {
+                      const qty = parseInt(e.target.value) || 0;
                       setEditItem({
                         ...editItem,
-                        stock: parseInt(e.target.value),
-                        status: parseInt(e.target.value) === 0 
-                          ? 'out_of_stock' 
-                          : parseInt(e.target.value) <= 5 
-                            ? 'low_stock' 
-                            : 'in_stock'
+                        stock: qty,
+                        status: getStatusFromQty(qty)
                       });
                     }}
                   />
                 </div>
               </div>
-              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="text-right text-sm font-medium col-span-1">Daily Check:</div>
+                <div className="col-span-3 flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={!!editItem.daily_check}
+                    onChange={e => setEditItem({ ...editItem, daily_check: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-xs text-gray-600">Show on daily stock check list</span>
+                </div>
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="text-right text-sm font-medium col-span-1">Status:</div>
                 <div className="col-span-3">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    editItem.status === 'out_of_stock' 
-                      ? 'bg-red-100 text-red-800' 
-                      : editItem.status === 'low_stock' 
-                        ? 'bg-yellow-100 text-yellow-800' 
-                        : editItem.status === 'on_order'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(editItem.status)}`}>
                     {getStatusText(editItem.status)}
                   </span>
-
-                  <div className="grid grid-cols-4 items-center gap-4">
-  <label className="text-right text-sm font-medium col-span-1">
-    Daily Check:
-  </label>
-  <div className="col-span-3 flex items-center">
-    <input
-      type="checkbox"
-      checked={!!editItem.daily_check}
-      onChange={e =>
-        setEditItem({ ...editItem, daily_check: e.target.checked })
-      }
-      className="mr-2"
-    />
-    <span className="text-xs text-gray-600">
-      Show on daily stock check list
-    </span>
-  </div>
-</div>
-
                   <div className="mt-1 text-xs text-gray-500">
                     Status is automatically updated based on stock quantity and configured thresholds
                   </div>
                 </div>
               </div>
-              
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="text-right text-sm font-medium col-span-1">Store:</div>
                 <div className="col-span-3">{editItem.storeName}</div>
               </div>
             </div>
-            
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel

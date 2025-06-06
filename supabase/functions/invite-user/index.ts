@@ -1,10 +1,9 @@
-/// <reference types="jsr:@supabase/functions-js/edge-runtime" />
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Supabase admin client using service role
 const supabaseAdmin = createClient(
-  Deno.env.get("PROJECT_URL")!,
-  Deno.env.get("SERVICE_ROLE_KEY")!
+  Deno.env.get("PROJECT_URL"),
+  Deno.env.get("SERVICE_ROLE_KEY")
 );
 
 const corsHeaders = {
@@ -23,7 +22,7 @@ Deno.serve(async (req) => {
 
     // Authenticate the caller (should be admin or regional)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: corsHeaders,
@@ -32,14 +31,15 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const supabaseClient = createClient(
-      Deno.env.get("PROJECT_URL")!,
-      Deno.env.get("ANON_KEY")!,
+      Deno.env.get("PROJECT_URL"),
+      Deno.env.get("ANON_KEY"),
       {
         global: { headers: { Authorization: `Bearer ${token}` } },
       }
     );
 
-    const { data: { user: inviter }, error: userError } = await supabaseClient.auth.getUser();
+    const { data, error: userError } = await supabaseClient.auth.getUser();
+    const inviter = data?.user;
     if (userError || !inviter) {
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
         status: 401,
@@ -62,29 +62,26 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    // Removed unused store_location from destructuring
-    const { email, role, full_name, store_ids, primary_store_id  } = body;
+    const { email, permissions, full_name, store_ids, primary_store_id } = body;
 
-    if (!email || !role || !full_name || !full_name.trim()) {
-      return new Response(JSON.stringify({ error: "Missing required fields: email, role, and full_name are required." }), {
+    if (!email || !permissions || !full_name || !full_name.trim()) {
+      return new Response(JSON.stringify({ error: "Missing required fields: email, permissions, and full_name are required." }), {
         status: 400,
         headers: corsHeaders,
       });
     }
 
     // Prepare user_metadata
-    const user_metadata_payload: Record<string, any> = {};
+    const user_metadata_payload = {};
     const trimmed_full_name = full_name.trim();
-    user_metadata_payload.name = trimmed_full_name; // Full name
-    const nameParts = trimmed_full_name.split(" ");
-    user_metadata_payload.first_name = nameParts[0] || ''; 
-    user_metadata_payload.last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : null;
+    user_metadata_payload.name = trimmed_full_name;
+const nameParts = trimmed_full_name.split(" ");
+user_metadata_payload.first_name = nameParts[0] || '';
+user_metadata_payload.last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : '';
+
 
     // Prepare app_metadata
-    const app_metadata_payload: Record<string, any> = {
-      user_role: role,
-    };
-
+    const app_metadata_payload = { user_role: permissions };
     const numericStoreIds = (store_ids && Array.isArray(store_ids))
       ? store_ids.map(Number).filter(id => !isNaN(id))
       : [];
@@ -97,25 +94,25 @@ Deno.serve(async (req) => {
     if (numericPrimaryStoreId) {
       app_metadata_payload.primary_store_id = numericPrimaryStoreId;
       if (!app_metadata_payload.user_store_ids.includes(numericPrimaryStoreId)) {
-           app_metadata_payload.user_store_ids.push(numericPrimaryStoreId);
+        app_metadata_payload.user_store_ids.push(numericPrimaryStoreId);
       }
     } else if (app_metadata_payload.user_store_ids.length > 0) {
-       app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
+      app_metadata_payload.primary_store_id = app_metadata_payload.user_store_ids[0];
     } else {
-       app_metadata_payload.primary_store_id = null;
+      app_metadata_payload.primary_store_id = null;
     }
-    
-    if ((role === 'staff' || role === 'store') && !app_metadata_payload.primary_store_id) {
-        return new Response(JSON.stringify({ error: `A store must be assigned for role: ${role}.` }), {
-            status: 400,
-            headers: corsHeaders,
-        });
+
+    if ((permissions === 'staff' || permissions === 'store') && !app_metadata_payload.primary_store_id) {
+      return new Response(JSON.stringify({ error: `A store must be assigned for role: ${permissions}.` }), {
+        status: 400,
+        headers: corsHeaders,
+      });
     }
 
     // Step 1: Send the invitation email, this sets user_metadata
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: user_metadata_payload, 
-      redirectTo: `${Deno.env.get("https://chaiiwala.essateric.com")}/auth`, // Correctly use SITE_URL environment variable
+      data: user_metadata_payload,
+      redirectTo: `${Deno.env.get("SITE_URL")}/auth`
     });
 
     if (inviteError) {
@@ -142,20 +139,19 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error(`❌ Failed to update app_metadata for invited user ${inviteData.user.id}:`, updateError.message);
-      // Log this critical issue. The invite was sent, but profile creation via trigger will be incomplete.
       return new Response(JSON.stringify({ error: `Invitation sent, but failed to set user role/store: ${updateError.message}` }), {
-        status: 500, 
+        status: 500,
         headers: corsHeaders,
       });
     }
 
-    console.log(`✅ Invitation sent to ${email} with role ${role}. User ID: ${inviteData.user.id}. App metadata updated.`);
+    console.log(`✅ Invitation sent to ${email} with role ${permissions}. User ID: ${inviteData.user.id}. App metadata updated.`);
     return new Response(
       JSON.stringify({ message: `Invitation sent to ${email}`, user: inviteData.user }),
       { status: 200, headers: corsHeaders }
     );
 
-  } catch (err: any) {
+  } catch (err) {
     console.log("🔥 Uncaught error in invite-user:", err?.message || err);
     return new Response(JSON.stringify({ error: "Unhandled server error" }), {
       status: 500,
