@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
+    console.log("Received body in invite-user:", body);
     const { email, permissions, full_name, store_ids, primary_store_id } = body;
 
     if (!email || !permissions || !full_name || !full_name.trim()) {

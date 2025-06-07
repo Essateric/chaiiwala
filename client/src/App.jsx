@@ -23,6 +23,7 @@ const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 
 function AppRoutes() {
   const { user } = useAuth();
+  
 
   return (
     <Router>

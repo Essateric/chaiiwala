@@ -19,6 +19,8 @@ import { PlusCircle, Search, Edit, UserPlus, Lock } from "lucide-react"; // Remo
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/UseAuth";
+window.supabase = supabase;
+
 
 export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
