@@ -1,17 +1,17 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient } from "../lib/queryClient.js";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "./use-toast.jsx";
 import { useSupabaseClient, useSessionContext } from "@supabase/auth-helpers-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+import { Input } from "../components/ui/input.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card.jsx";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form.jsx";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom"; // Assuming react-router-dom for navigation
 
@@ -35,11 +35,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Check for invite flow from URL hash when the component mounts.
     // This effect runs once on mount.
-    const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+    const currentHash = typeof globalThis !== 'undefined' ? globalThis.location.hash : '';
     console.log("AuthProvider (Mount Effect): Checking for invite. Hash:", currentHash);
 
     if (currentHash.includes('type=invite')) {
-      const urlParams = new URLSearchParams(window.location.hash.substring(1));
+      const urlParams = new URLSearchParams(globalThis.location.hash.substring(1));
       if (urlParams.get('type') === 'invite') {
         console.log("AuthProvider (Mount Effect): Invite token detected. Setting isInviteFlowContext to true.");
         setIsInviteFlowContext(true);
@@ -163,7 +163,7 @@ useEffect(() => {
 // Assuming this component is defined and exported from this file
 // If your AuthPage component is in a different file, this logic needs to go there.
 export default function AuthPage() { // Assuming AuthPage is the default export
-  const { user, isLoading, profile, accessToken, isInviteFlowContext } = useAuth(); // Get isInviteFlowContext
+  const { user, isLoading, profile, _accessToken, isInviteFlowContext } = useAuth(); // Get isInviteFlowContext
   const supabaseClient = useSupabaseClient();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -285,7 +285,7 @@ export default function AuthPage() { // Assuming AuthPage is the default export
     // isLoading from useAuth indicates that both session AND initial profile are loaded (or attempted)
     // We only want to redirect if useAuth is *not* loading AND a user exists AND we are currently on the /auth page.
     // We also don't redirect if we are in the invite flow, as the user needs to set their password first.
-    if (!isLoading && user && window.location.pathname === "/auth" && !isInviteFlow) {
+    if (!isLoading && user && globalThis.location.pathname === "/auth" && !isInviteFlow) {
       console.log("AuthPage: useAuth finished loading, user exists, currently on /auth. Checking profile for redirect.");
       // Use profile from useAuth hook
       if (profile) {
@@ -310,7 +310,7 @@ export default function AuthPage() { // Assuming AuthPage is the default export
         console.warn("AuthPage: User logged in but no profile found. Redirecting to default dashboard.");
         navigate("/dashboard");
       }
-    } else if (!isLoading && !user && window.location.pathname !== "/auth") {
+    } else if (!isLoading && !user && globalThis.location.pathname !== "/auth") {
        // If useAuth is NOT loading and no user exists, and we are NOT on the /auth page,
        // consider redirecting to /auth.
        console.log("AuthPage: useAuth finished loading, no user, not on /auth. Redirecting to /auth.");

@@ -1,18 +1,18 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import AuthPage from "@/pages/AuthPage";
-import DashboardPage from "@/pages/DashboardPage";
-import AnnouncementsPage from "@/pages/AnnouncementsPage";
-import MaintenancePage from "@/pages/MaintenancePage";
-import StockManagementPage from "@/pages/StockManagement";
-import StockOrdersPage from "@/pages/StockOrdersPage";
-import DeepCleaningPage from "@/pages/DeepCleaningPage";
-import SettingsPage from "@/pages/Settings";
-import ImportJobLogsPage from "@/pages/ImportJobLogs";
-import NotFound from "@/pages/NotFound";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import { useAuth, AuthProvider } from "@/hooks/UseAuth"; // <<-- make sure AuthProvider is exported!
-import UserManagementPage from "./pages/UserManagementPage";
-import EventOrdersPage from "./components/eventOrders/EventOrdersPage";
+import AuthPage from "./pages/AuthPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
+import AnnouncementsPage from "./pages/AnnouncementsPage.jsx";
+import MaintenancePage from "./pages/MaintenancePage.jsx";
+import StockManagementPage from "./pages/StockManagement.jsx";
+import StockOrdersPage from "./pages/StockOrdersPage.jsx";
+import DeepCleaningPage from "./pages/DeepCleaningPage.jsx";
+import SettingsPage from "./pages/Settings.jsx";
+import ImportJobLogsPage from "./pages/ImportJobLogs.jsx";
+import NotFound from "./pages/NotFound.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { useAuth, AuthProvider } from "./hooks/UseAuth.jsx"; // <<-- make sure AuthProvider is exported!
+import UserManagementPage from "./pages/UserManagementPage.jsx";
+import EventOrdersPage from "./components/eventOrders/EventOrdersPage.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];

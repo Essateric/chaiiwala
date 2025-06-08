@@ -1,25 +1,26 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import { supabase } from "../lib/supabaseClient.js";
+
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "../components/ui/table.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Input } from "../components/ui/input.jsx";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+} from "../components/ui/dialog.jsx";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+} from "../components/ui/select.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Badge } from "../components/ui/badge.jsx";
 import { PlusCircle, Search, Edit, UserPlus, Lock } from "lucide-react"; // Removed unused Trash icon
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../hooks/use-toast.jsx";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/UseAuth";
-window.supabase = supabase;
+import { useAuth } from "../hooks/UseAuth.jsx";
+globalThis.supabase = supabase;
 
 
 export default function UserManagementPage() {

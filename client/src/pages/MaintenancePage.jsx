@@ -1,8 +1,8 @@
-import { useAuth } from "@/hooks/UseAuth"; // Or your equivalent like useAuth from @/hooks/use-auth
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "../hooks/UseAuth.jsx"; // Or your equivalent like useAuth from @/hooks/use-auth
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.jsx";
 import { WrenchIcon, Loader2 } from "lucide-react";
-import JobLogSection from "@/components/Maintenance/JobLogSection";
+import JobLogSection from "../components/Maintenance/JobLogSection.jsx";
 // import MaintenanceCalendar from "@/components/Maintenance/MaintenanceCalendar"; // Uncomment if needed
 // import { useJobLogs } from "@/hooks/use-joblogs"; // This is used within JobLogSection
 import { DndProvider } from 'react-dnd';

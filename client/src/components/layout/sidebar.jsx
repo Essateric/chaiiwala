@@ -1,6 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/UseAuth";
-import { cn } from "@/lib/utils";
+import { useAuth } from "../../hooks/UseAuth.jsx";
+import { cn } from "../../lib/utils.js";
+
+
 import {
   HomeIcon,
   ClipboardListIcon,
@@ -16,9 +18,9 @@ import {
   WrenchIcon,
   PackageIcon
 } from "lucide-react";
-import chaiiwalaLogo from "@assets/chaiiwala.png";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient.js";
+
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logoutMutation } = useAuth();
@@ -66,7 +68,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'Deep Cleaning', icon: ClipboardCheckIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
     { name: 'Staff Schedule', icon: CalendarIcon, href: '/schedule', active: currentPage === 'schedule', roles: ['admin', 'regional', 'store', 'staff'] },
-    { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area'] },
+    { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
 
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional'] }
@@ -97,10 +99,10 @@ export default function Sidebar({ isOpen, onClose }) {
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
         <div className="flex items-center">
           <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
-            <img src={chaiiwalaLogo} alt="Chaiiwala Logo" className="h-7 sm:h-7 w-auto" />
+           <img src="/assets/chaiiwala.png" alt="Chaiiwala Logo"  className="h-7 sm:h-7 w-auto" />
           </div>
         </div>
-        <button 
+        <button type="button"
           onClick={onClose} 
           className="lg:hidden text-gray-400 hover:text-white focus:outline-none"
         >
@@ -157,7 +159,7 @@ export default function Sidebar({ isOpen, onClose }) {
               onClick={(e) => {
                 e.preventDefault();
                 navigate(item.href);
-                if (window.innerWidth < 1024) onClose();
+                if (globalThis.innerWidth < 1024) onClose();
               }}
               className={cn(
                 "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
@@ -177,6 +179,7 @@ export default function Sidebar({ isOpen, onClose }) {
       <div className="absolute bottom-0 w-full p-4 border-t border-gray-700">
         <button
           onClick={() => logoutMutation.mutate()}
+          type="submit"
           className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-md transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
