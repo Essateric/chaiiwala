@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import ChecklistItem from "../components/checklists/checklist-item.jsx";
-import { useAuth } from "../hooks/UseAuth.jsx";
 import { Badge } from "../components/ui/badge.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { Loader2 } from "lucide-react";

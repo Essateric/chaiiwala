@@ -1,38 +1,80 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card.jsx";
 import { Button } from "../../components/ui/button.jsx";
 import { Input } from "../../components/ui/input.jsx";
+import { useAuth } from "../../hooks/UseAuth.jsx";
 
-function DailyStockCheck() {
+export default function DailyStockCheck() {
+  const { profile } = useAuth();
+  const storeId = Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null;
+
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
   const itemsPerPage = 10;
+  const [search, setSearch] = useState('');
 
-  // Fetch all stock items with daily_check = true
+
+  // Fetch all daily_check stock items + their store-specific levels
   useEffect(() => {
+    if (!storeId) return;
+    setLoading(true);
     async function fetchStock() {
-      setLoading(true);
-      const { data, error } = await supabase
+      // 1. Get all daily_check items
+      const { data: items, error: itemError } = await supabase
         .from("stock_items")
         .select("*")
         .eq("daily_check", true)
         .order("name", { ascending: true });
-      if (error) {
+      if (itemError) {
         setStockItems([]);
-      } else {
-        setStockItems(data || []);
+        setLoading(false);
+        return;
       }
+
+      const itemIds = items.map(i => i.id);
+
+      // 2. Get store_stock_levels for this store
+      let levels = [];
+      if (itemIds.length > 0) {
+        const { data: levelData, error: levelsError } = await supabase
+          .from("store_stock_levels")
+          .select("*")
+          .in("stock_item_id", itemIds)
+          .eq("store_id", storeId);
+
+        if (!levelsError && levelData) levels = levelData;
+      }
+
+      // 3. Merge
+      const levelsByItem = {};
+      levels.forEach(level => { levelsByItem[level.stock_item_id] = level; });
+
+      const merged = items.map(item => ({
+        ...item,
+        current_qty: levelsByItem[item.id]?.quantity ?? 0,
+        store_stock_level_id: levelsByItem[item.id]?.id ?? null,
+      }));
+
+      setStockItems(merged);
       setLoading(false);
     }
     fetchStock();
-  }, []);
+  }, [storeId]);
 
-  // Pagination logic
-  const totalPages = Math.ceil(stockItems.length / itemsPerPage);
-  const pageItems = stockItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Pagination
+const filteredStockItems = search
+  ? stockItems.filter(item =>
+      (item.name?.toLowerCase().includes(search.toLowerCase()) ||
+      item.sku?.toLowerCase().includes(search.toLowerCase()))
+    )
+  : stockItems;
+
+const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage);
+const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
 
   // Editing logic for quantity
   const handleEditChange = (id, value) => {
@@ -42,38 +84,92 @@ function DailyStockCheck() {
     }));
   };
 
-  // Save quantity to DB
+  // Save (update or insert) to store_stock_levels, not stock_items
   const handleSave = async (item) => {
     const newQty = editing[item.id];
     if (typeof newQty === "undefined" || newQty === "" || isNaN(Number(newQty))) return;
 
-    // Optionally, show loading/disable UI here
-    await supabase
-      .from("stock_items")
-      .update({ quantity_per_unit: Number(newQty), updated_at: new Date().toISOString() })
-      .eq("id", item.id);
-
-    // Re-fetch updated data
-    const { data } = await supabase
-      .from("stock_items")
-      .select("*")
-      .eq("daily_check", true)
-      .order("name", { ascending: true });
-    setStockItems(data || []);
+    setLoading(true);
+    if (item.store_stock_level_id) {
+      // Update existing row
+      await supabase
+        .from("store_stock_levels")
+        .update({
+          quantity: Number(newQty),
+          last_updated: new Date().toISOString(),
+          updated_by: profile?.id ?? null,
+        })
+        .eq("id", item.store_stock_level_id);
+    } else {
+      // Insert new row for this store & stock item
+      await supabase
+        .from("store_stock_levels")
+        .insert({
+          stock_item_id: item.id,
+          store_id: storeId,
+          quantity: Number(newQty),
+          last_updated: new Date().toISOString(),
+          updated_by: profile?.id ?? null,
+        });
+    }
     setEditing((prev) => ({ ...prev, [item.id]: undefined }));
-  };
-  console.log('stockItems:', stockItems);
-console.log('pageItems:', pageItems);
-console.log('currentPage:', currentPage, 'totalPages:', totalPages);
+    setLoading(false);
 
+    // Refetch stock for updated quantities
+    // (You could optimize by only updating the single item, but this is safer for now)
+    if (storeId) {
+      setLoading(true);
+      // Re-fetch like in useEffect
+      const { data: items, error: itemError } = await supabase
+        .from("stock_items")
+        .select("*")
+        .eq("daily_check", true)
+        .order("name", { ascending: true });
+
+      const itemIds = items?.map(i => i.id) ?? [];
+      let levels = [];
+      if (itemIds.length > 0) {
+        const { data: levelData, error: levelsError } = await supabase
+          .from("store_stock_levels")
+          .select("*")
+          .in("stock_item_id", itemIds)
+          .eq("store_id", storeId);
+        if (!levelsError && levelData) levels = levelData;
+      }
+      const levelsByItem = {};
+      levels.forEach(level => { levelsByItem[level.stock_item_id] = level; });
+
+      const merged = (items ?? []).map(item => ({
+        ...item,
+        current_qty: levelsByItem[item.id]?.quantity ?? 0,
+        store_stock_level_id: levelsByItem[item.id]?.id ?? null,
+      }));
+
+      setStockItems(merged);
+      setLoading(false);
+    }
+    
+  };
+
+  
 
   return (
+    
     <Card className="mb-6">
       <CardHeader>
         <CardTitle>Daily Stock Check</CardTitle>
         <p className="text-sm text-gray-500">Update today’s stock levels for all daily-check items.</p>
       </CardHeader>
       <CardContent>
+         <div className="mb-4 flex items-center">
+    <Input
+      placeholder="Search by name or SKU..."
+      value={search}
+      onChange={e => setSearch(e.target.value)}
+      className="w-64"
+    />
+  </div>
+        
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading stock items...</div>
         ) : (
@@ -81,7 +177,10 @@ console.log('currentPage:', currentPage, 'totalPages:', totalPages);
             {pageItems.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No daily stock items found.</div>
             ) : (
+              
               <div className="overflow-x-auto">
+                <div className="mb-4 flex items-center">
+</div>
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead>
                     <tr className="bg-gray-50">
@@ -99,7 +198,7 @@ console.log('currentPage:', currentPage, 'totalPages:', totalPages);
                         <td className="px-4 py-2">{item.sku}</td>
                         <td className="px-4 py-2">{item.name}</td>
                         <td className="px-4 py-2">{item.category}</td>
-                        <td className="px-4 py-2 text-right">{item.quantity_per_unit}</td>
+                        <td className="px-4 py-2 text-right">{item.current_qty}</td>
                         <td className="px-4 py-2 text-right">
                           <Input
                             type="number"
@@ -129,7 +228,9 @@ console.log('currentPage:', currentPage, 'totalPages:', totalPages);
                   </tbody>
                 </table>
                 {/* Pagination controls */}
+                
                 <div className="flex justify-between items-center mt-4">
+                  
                   <span>
                     Page {currentPage} of {totalPages || 1}
                   </span>
@@ -160,5 +261,3 @@ console.log('currentPage:', currentPage, 'totalPages:', totalPages);
     </Card>
   );
 }
-
-export default DailyStockCheck;
