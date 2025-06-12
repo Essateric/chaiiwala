@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/UseAuth";
-import { useStores } from "@/hooks/use-stores";
+import { Input } from "../components/ui/input.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { useToast } from "../hooks/use-toast.jsx";
+import { useAuth } from "../hooks/UseAuth.jsx";
+import { useStores } from "../hooks/use-stores.jsx";
 // import { supabase } from "@/lib/supabaseClient"; // No longer needed for direct admin calls
 
 export default function AddEmployeePage() {
+  console.log("DEBUG: AddEmployeePage mounted!");
+
   const { profile, accessToken } = useAuth(); // Get accessToken
   const { stores } = useStores();
   const { toast } = useToast();

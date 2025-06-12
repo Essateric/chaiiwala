@@ -45,17 +45,6 @@ import {
 } from "../components/ui/card.jsx"; 
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 
-// Store data for reference
-const chaiiwalaStores = [
-  { id: 1, name: 'Cheetham Hill', address: '74 Bury Old Rd, Manchester M8 5BW', area: 1, manager: 'MGR_CH' },
-  { id: 2, name: 'Oxford Road', address: '149 Oxford Rd, Manchester M1 7EE', area: 1, manager: 'MGR_OX' },
-  { id: 3, name: 'Old Trafford', address: 'Ayres Rd, Old Trafford, Stretford, 89 M16 7GS', area: 1, manager: 'MGR_OT' },
-  { id: 4, name: 'Trafford Centre', address: 'Kiosk K14, The Trafford Centre, Trafford Blvd, Trafford', area: 2, manager: 'MGR_TC' },
-  { id: 5, name: 'Stockport Road', address: '884-886 Stockport Rd, Levenshulme, Manchester', area: 1, manager: 'Jubayed Chowdhury', managerEmail: 'jubayed.chaiiwala@gmail.com' },
-  { id: 6, name: 'Rochdale', address: '35 Milkstone Rd, Rochdale OL11 1EB', area: 2, manager: 'MGR_RD' },
-  { id: 7, name: 'Oldham', address: '66 George St, Oldham OL1 1LS', area: 2, manager: 'MGR_OL' },
-];
-
 // Get store name by id
 const getStoreName = (storeId) => {
   const store = chaiiwalaStores.find(store => store.id === storeId);

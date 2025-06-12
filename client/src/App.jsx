@@ -13,6 +13,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { useAuth, AuthProvider } from "./hooks/UseAuth.jsx"; // <<-- make sure AuthProvider is exported!
 import UserManagementPage from "./pages/UserManagementPage.jsx";
 import EventOrdersPage from "./components/eventOrders/EventOrdersPage.jsx";
+import DailyChecklist from "./pages/DailyChecklist.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -20,6 +21,7 @@ const ANNOUNCEMENTS_ALLOWED_ROLES = ["admin", "area", "regional", "store"];
 const USER_MANAGEMENT_ROLES = ["admin", "regional"];
 const SETTINGS_ALLOWED_ROLES = ["admin", "regional"];
 const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
+const DAILY_CHECKLIST_ALLOWED_ROLES = ["area", "store"];
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -107,6 +109,15 @@ function AppRoutes() {
 
         {/* Developer import logs page (NO sidebar) */}
         <Route path="/dev/import-joblogs" element={<ImportJobLogsPage />} />
+
+          <Route
+    path="/daily-checklist"
+    element={
+      <ProtectedRoute roles={DAILY_CHECKLIST_ALLOWED_ROLES}>
+        <DailyChecklist />
+      </ProtectedRoute>
+    }
+  />
 
         {/* NotFound page for non-matching nested routes */}
         <Route path="/not-found" element={<NotFound />} />

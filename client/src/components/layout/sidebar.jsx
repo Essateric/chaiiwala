@@ -6,20 +6,22 @@ import { cn } from "../../lib/utils.js";
 import {
   HomeIcon,
   ClipboardListIcon,
-  CalendarIcon,
-  ArchiveIcon,
+  MicVocalIcon,
+  // CalendarIcon,
+  // ArchiveIcon,
   BellIcon,
   UsersIcon,
   SettingsIcon,
   XIcon,
   ClipboardCheckIcon,
   ShoppingCartIcon,
-  CalendarDaysIcon,
   WrenchIcon,
-  PackageIcon
+  PackageIcon,
+  HammerIcon
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
+
 
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -62,16 +64,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const navItems = [
     { name: 'Dashboard', icon: HomeIcon, href: '/', active: currentPage === 'dashboard', roles: ['admin', 'regional', 'area','store', 'staff'] },
-    { name: 'Maintenance', icon: WrenchIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
-    { name: 'Event Orders', icon: CalendarDaysIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
+    { name: 'Maintenance', icon: HammerIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
+    { name: 'Event Orders', icon: MicVocalIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
-    { name: 'Stock Management', icon: ArchiveIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
-    { name: 'Deep Cleaning', icon: ClipboardCheckIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
-    { name: 'Staff Schedule', icon: CalendarIcon, href: '/schedule', active: currentPage === 'schedule', roles: ['admin', 'regional', 'store', 'staff'] },
+    { name: 'Stock Management', icon: ShoppingCartIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
+    { name: 'Deep Cleaning', icon: ClipboardListIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
+    { name: 'Daily Checklist', icon: ClipboardCheckIcon, href: '/daily-checklist', active: currentPage === 'daily-checklist', roles: ['area','store', 'staff'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
-
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
-    { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional'] }
+    { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional'] },
+    { name: 'Support', icon: WrenchIcon, href: '/support', active: currentPage === 'support', roles: ['admin', 'regional', 'area','store', 'staff'] }
   ];
 
   if (loading) {

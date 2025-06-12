@@ -6,14 +6,13 @@ import {
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/UseAuth";
-import chaiiwalaLogo from "@assets/chaiiwala.png";
+} from "../../components/ui/dropdown-menu.jsx";
+import { Input } from "../../components/ui/input.jsx";
+import { Button } from "../../components/ui/button.jsx";
+import { useAuth } from "../../hooks/UseAuth.jsx";
 import { useNavigate } from "react-router-dom";
-import NotificationPanel from "@/components/announcements/NotificationPanel";
-import { supabase } from "@/lib/supabaseClient";
+import NotificationPanel from "../../components/announcements/NotificationPanel.jsx";
+import { supabase } from "../../lib/supabaseClient.js";
 
 export default function TopBar({ title, onMenuClick, username, role, announcements = [], profile }) {
   const notificationRef = useRef();
@@ -59,6 +58,7 @@ export default function TopBar({ title, onMenuClick, username, role, announcemen
           <button 
             onClick={onMenuClick} 
             className="text-gray-500 lg:hidden focus:outline-none"
+            type="button"
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -122,11 +122,7 @@ export default function TopBar({ title, onMenuClick, username, role, announcemen
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center border-2 border-chai-gold overflow-hidden">
-                  <img 
-                    src={chaiiwalaLogo} 
-                    alt="Chaiiwala Logo" 
-                    className="h-6 w-auto"
-                  />
+                  <img src="/assets/chaiiwala.png" alt="Chaiiwala Logo" className="h-7 w-auto" />
                 </div>
                 <span className="hidden md:inline-block text-sm font-medium">{username}</span>
                 <ChevronDown className="h-5 w-5 text-gray-400" />

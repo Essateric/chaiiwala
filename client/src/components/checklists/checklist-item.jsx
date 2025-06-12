@@ -4,11 +4,11 @@ import {
   CardContent, 
   CardHeader, 
   CardTitle 
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+} from "../../components/ui/card.jsx";
+import { Badge } from "../../components/ui/badge.jsx";
+import { Checkbox } from "../../components/ui/checkbox.jsx";
+import { Progress } from "../../components/ui/progress.jsx";
+import { cn } from "../../lib/utils.js";
 
 export default function ChecklistItem({
   id,

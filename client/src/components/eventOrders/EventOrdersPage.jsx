@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/UseAuth";
-import { supabase } from "@/lib/supabaseClient"; // Make sure this is correct
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import EventOrderTable from "./EventOrderTable";
-import EventOrderFormDialog from "./EventOrderFormDialog";
-import { useEventOrders } from "@/hooks/use-event-orders";
-import { useStores } from "@/hooks/use-stores";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "../../hooks/UseAuth.jsx";
+import { supabase } from "../../lib/supabaseClient.js"; // Make sure this is correct
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card.jsx";
+import EventOrderTable from "./EventOrderTable.jsx";
+import EventOrderFormDialog from "./EventOrderFormDialog.jsx";
+import { useEventOrders } from "../../hooks/use-event-orders.jsx";
+import { useStores } from "../../hooks/use-stores.jsx";
+import { Button } from "../../components/ui/button.jsx";
 import { CalendarDays } from "lucide-react";
-import DashboardLayout from "../layout/DashboardLayout";
+import DashboardLayout from "../layout/DashboardLayout.jsx";
 
 const ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 
