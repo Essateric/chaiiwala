@@ -14,6 +14,8 @@ import { useAuth, AuthProvider } from "./hooks/UseAuth.jsx"; // <<-- make sure A
 import UserManagementPage from "./pages/UserManagementPage.jsx";
 import EventOrdersPage from "./components/eventOrders/EventOrdersPage.jsx";
 import DailyChecklist from "./pages/DailyChecklist.jsx";
+import SupportPage from "./pages/SupportPage.jsx";
+import  NotificationListener  from "./components/Support/NotificationListener.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -22,6 +24,7 @@ const USER_MANAGEMENT_ROLES = ["admin", "regional"];
 const SETTINGS_ALLOWED_ROLES = ["admin", "regional"];
 const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 const DAILY_CHECKLIST_ALLOWED_ROLES = ["area", "store"];
+
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -118,6 +121,14 @@ function AppRoutes() {
       </ProtectedRoute>
     }
   />
+       <Route
+          path="/support"
+          element={
+            <ProtectedRoute>
+              <SupportPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* NotFound page for non-matching nested routes */}
         <Route path="/not-found" element={<NotFound />} />
@@ -137,6 +148,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <NotificationListener />
       <AppRoutes />
     </AuthProvider>
   );

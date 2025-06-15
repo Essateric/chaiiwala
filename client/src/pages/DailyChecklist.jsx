@@ -1,68 +1,116 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import ChecklistItem from "../components/checklists/checklist-item.jsx";
-import { Badge } from "../components/ui/badge.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
-import { Loader2 } from "lucide-react";
 import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
-
-
-const ALLOWED_ROLES = ["store"]; // Sample checklist data (replace with DB later)
-const sampleChecklists = [
-  {
-    id: 1,
-    title: "Daily Cleaning",
-    description: "All the essential cleaning tasks for your store.",
-    dueDate: "Today",
-    category: "Cleaning",
-    assignedTo: "Store Manager",
-    tasks: [
-      { id: 101, title: "Wipe all tables", completed: false },
-      { id: 102, title: "Sweep and mop floor", completed: true },
-      { id: 103, title: "Sanitise till area", completed: false },
-    ]
-  },
-  {
-    id: 2,
-    title: "Event Orders",
-    description: "Prepare for today's booked events.",
-    dueDate: "Today",
-    category: "Orders",
-    assignedTo: "Store Manager",
-    tasks: [
-      { id: 301, title: "Pack event 123 - 10am", completed: false },
-      { id: 302, title: "Double-check order details", completed: true },
-    ]
-  }
-];
+import { useAuth } from "../hooks/UseAuth.jsx"; // Make sure you have this hook
 
 export default function DailyChecklist() {
-  // Use state if you want to toggle checkboxes for demo
-  const [checklists, setChecklists] = useState(sampleChecklists);
-  
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [checklists, setChecklists] = useState([]);
 
-  // Toggle logic for demo only
-  const handleTaskToggle = (checklistId, taskId, completed) => {
+  // Fetch today's checklist from Supabase
+  useEffect(() => {
+    async function fetchChecklist() {
+      if (!user?.id) {
+        setChecklists([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+
+      const today = new Date().toISOString().split("T")[0];
+
+      // Fetch all checklist rows for today/user/store
+      const { data, error } = await supabase
+        .from("daily_checklist")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("checklist_date", today)
+        .order("id");
+
+      if (error) {
+        console.error("Error loading checklist:", error);
+        setChecklists([]);
+      } else if (data && data.length > 0) {
+        setChecklists([
+          {
+            id: 1,
+            title: "Daily Store Checklist",
+            description: "Key actions for managers to complete every day.",
+            dueDate: "Today",
+            category: "Operations",
+            assignedTo: "Store Manager",
+            tasks: data.map((task) => ({
+              id: task.id,
+              title: task.title,
+              status: task.status || "pending",
+              completed_at: task.completed_at,
+              completed_by: task.completed_by,
+            }))
+          }
+        ]);
+      } else {
+        setChecklists([]);
+      }
+      setLoading(false);
+    }
+
+    fetchChecklist();
+  }, [user]);
+
+  // Cycle status: pending -> in progress -> completed -> pending
+  const nextStatus = (current) => {
+    if (current === "pending") return "in progress";
+    if (current === "in progress") return "completed";
+    return "pending";
+  };
+
+  // Handles a status cycle and DB update
+  const handleTaskToggle = async (checklistId, taskId) => {
+    const checklist = checklists.find((c) => c.id === checklistId);
+    const task = checklist?.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const newStatus = nextStatus(task.status);
+    const completed_at = newStatus === "completed" ? new Date().toISOString() : null;
+    const completed_by = newStatus === "completed" ? user?.id : null;
+
+    // Update UI instantly
     setChecklists((prev) =>
-      prev.map((checklist) =>
-        checklist.id === checklistId
+      prev.map((cl) =>
+        cl.id === checklistId
           ? {
-              ...checklist,
-              tasks: checklist.tasks.map((task) =>
-                task.id === taskId ? { ...task, completed } : task
+              ...cl,
+              tasks: cl.tasks.map((t) =>
+                t.id === taskId
+                  ? { ...t, status: newStatus, completed_at, completed_by }
+                  : t
               )
             }
-          : checklist
+          : cl
       )
     );
+
+    // Update DB always (no sample/demo tasks anymore)
+    await supabase
+      .from("daily_checklist")
+      .update({
+        status: newStatus,
+        completed_at,
+        completed_by
+      })
+      .eq("id", taskId);
   };
-  
 
   return (
     <DashboardLayout title="Daily Checklist">
       <div className="max-w-3xl mx-auto py-8 px-4">
         <h1 className="text-2xl font-bold mb-6">Daily Checklist</h1>
-        {checklists.length === 0 ? (
+        {loading ? (
+          <div className="p-4 text-center text-gray-500">Loading...</div>
+        ) : checklists.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             No daily tasks found for today.
           </div>
@@ -77,13 +125,12 @@ export default function DailyChecklist() {
               dueDate={checklist.dueDate}
               category={checklist.category}
               assignedTo={checklist.assignedTo}
-              onTaskToggle={handleTaskToggle}
+              onTaskToggle={(clId, taskId) => handleTaskToggle(clId, taskId)}
             />
           ))
         )}
-            <DailyStockCheck />
+        <DailyStockCheck />
       </div>
-      
     </DashboardLayout>
   );
 }

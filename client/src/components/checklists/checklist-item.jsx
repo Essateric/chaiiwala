@@ -1,14 +1,8 @@
-import { useState } from "react";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from "../../components/ui/card.jsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card.jsx";
 import { Badge } from "../../components/ui/badge.jsx";
-import { Checkbox } from "../../components/ui/checkbox.jsx";
 import { Progress } from "../../components/ui/progress.jsx";
 import { cn } from "../../lib/utils.js";
+import { useState } from "react";
 
 export default function ChecklistItem({
   id,
@@ -20,13 +14,9 @@ export default function ChecklistItem({
   assignedTo,
   onTaskToggle
 }) {
-  const completedCount = tasks.filter(task => task.completed).length;
+  const completedCount = tasks.filter(task => task.status === "completed").length;
   const progress = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
   const [expanded, setExpanded] = useState(false);
-
-  const handleTaskToggle = (taskId, completed) => {
-    onTaskToggle(id, taskId, completed);
-  };
 
   return (
     <Card className="mb-4">
@@ -61,22 +51,35 @@ export default function ChecklistItem({
         <CardContent className="pt-4">
           <div className="space-y-3">
             {tasks.map(task => (
-              <div key={task.id} className="flex items-start">
-                <Checkbox 
-                  id={`task-${id}-${task.id}`}
-                  checked={task.completed}
-                  onCheckedChange={(checked) => handleTaskToggle(task.id, !!checked)}
-                  className="mt-1 h-4 w-4 text-chai-gold rounded border-gray-300 focus:ring-chai-gold"
-                />
-                <label 
-                  htmlFor={`task-${id}-${task.id}`}
-                  className={cn(
-                    "ml-3 text-sm font-medium cursor-pointer",
-                    task.completed ? "text-gray-500 line-through" : "text-gray-900"
-                  )}
+              <div
+                key={task.id}
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => onTaskToggle(id, task.id)}
+              >
+                {/* Status color dot */}
+                <span
+                  className={
+                    task.status === "completed"
+                      ? "inline-block w-3 h-3 rounded-full bg-green-500"
+                      : task.status === "in progress"
+                      ? "inline-block w-3 h-3 rounded-full bg-yellow-400"
+                      : "inline-block w-3 h-3 rounded-full bg-gray-300"
+                  }
+                  title={task.status}
+                ></span>
+                <span
+                  className={
+                    "ml-2 text-sm" +
+                    (task.status === "completed" ? " text-gray-500 line-through" : "")
+                  }
                 >
                   {task.title}
-                </label>
+                  <span className="ml-2 text-xs font-medium">
+                    {task.status === "pending" && "Pending"}
+                    {task.status === "in progress" && "In Progress"}
+                    {task.status === "completed" && "Completed"}
+                  </span>
+                </span>
               </div>
             ))}
           </div>

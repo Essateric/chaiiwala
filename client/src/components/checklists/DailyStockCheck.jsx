@@ -85,35 +85,67 @@ const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, cur
   };
 
   // Save (update or insert) to store_stock_levels, not stock_items
-  const handleSave = async (item) => {
-    const newQty = editing[item.id];
-    if (typeof newQty === "undefined" || newQty === "" || isNaN(Number(newQty))) return;
+const handleSave = async (item) => {
+  const newQty = editing[item.id];
+  if (typeof newQty === "undefined" || newQty === "" || isNaN(Number(newQty))) return;
 
-    setLoading(true);
-    if (item.store_stock_level_id) {
-      // Update existing row
-      await supabase
-        .from("store_stock_levels")
-        .update({
-          quantity: Number(newQty),
-          last_updated: new Date().toISOString(),
-          updated_by: profile?.id ?? null,
-        })
-        .eq("id", item.store_stock_level_id);
-    } else {
-      // Insert new row for this store & stock item
-      await supabase
-        .from("store_stock_levels")
-        .insert({
-          stock_item_id: item.id,
-          store_id: storeId,
-          quantity: Number(newQty),
-          last_updated: new Date().toISOString(),
-          updated_by: profile?.id ?? null,
-        });
+  setLoading(true);
+
+  if (item.store_stock_level_id) {
+    // Update existing row
+    const { error: updateError } = await supabase
+      .from("store_stock_levels")
+      .update({
+        quantity: Number(newQty),
+        last_updated: new Date().toISOString(),
+        updated_by: profile?.id ?? null,
+      })
+      .eq("id", item.store_stock_level_id);
+    if (updateError) {
+      alert("Update error: " + updateError.message);
+      setLoading(false);
+      return;
     }
-    setEditing((prev) => ({ ...prev, [item.id]: undefined }));
-    setLoading(false);
+
+    const { error } = await supabase
+  .from("store_stock_levels")
+  .update({
+    quantity: Number(newQty),
+    last_updated: new Date().toISOString(),
+    updated_by: profile?.id ?? null,
+  })
+  .eq("id", item.store_stock_level_id);
+
+if (error) {
+  console.error("Failed to update stock level:", error);
+  alert("Error updating stock: " + error.message);
+}
+  } else {
+    // Insert new row
+    console.log("Trying to insert new stock row:", {
+      stock_item_id: item.id,
+      store_id: storeId,
+      quantity: Number(newQty),
+      last_updated: new Date().toISOString(),
+      updated_by: profile?.id ?? null,
+    });
+    const { error: insertError } = await supabase
+      .from("store_stock_levels")
+      .insert([{
+        stock_item_id: item.id,
+        store_id: storeId,
+        quantity: Number(newQty),
+        last_updated: new Date().toISOString(),
+        updated_by: profile?.id ?? null,
+      }]);
+    if (insertError) {
+      alert("Insert error: " + insertError.message);
+      setLoading(false);
+      return;
+    }
+  }
+  setEditing((prev) => ({ ...prev, [item.id]: undefined }));
+  setLoading(false);
 
     // Refetch stock for updated quantities
     // (You could optimize by only updating the single item, but this is safer for now)
@@ -125,6 +157,7 @@ const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, cur
         .select("*")
         .eq("daily_check", true)
         .order("name", { ascending: true });
+        
 
       const itemIds = items?.map(i => i.id) ?? [];
       let levels = [];
