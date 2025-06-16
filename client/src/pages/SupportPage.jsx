@@ -1,89 +1,116 @@
 import React, { useEffect, useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import TicketForm from "../components/Support/TicketForm.jsx"; // Adjust path if needed
-import DashboardLayout from "../components/layout/DashboardLayout.jsx";
-
-// Simple Task Timer for each card (if you already have one, import yours)
-function TaskTimer({ ticket, refresh }) {
-  // ... you can paste your own TaskTimer code here or use the example from before ...
-  return null; // Remove and use real TaskTimer!
-}
-
-function KanbanColumn({ title, status, tickets, onMove, refresh }) {
-  return (
-    <div className="flex-1 min-w-[250px] bg-gray-50 p-2 rounded shadow">
-      <h3 className="font-semibold mb-2">{title}</h3>
-      <div className="space-y-2">
-        {tickets.filter(t => t.status === status).map(ticket => (
-          <div key={ticket.id} className="p-2 bg-white rounded border shadow flex flex-col gap-1">
-            <div className="font-bold">{ticket.page} <span className="text-xs text-gray-500">({ticket.store})</span></div>
-            <div className="text-xs text-gray-700">{ticket.error_message}</div>
-            {Array.isArray(ticket.replication_steps) && (
-              <div className="text-xs">
-                Steps:
-                <ol className="list-decimal ml-5">
-                  {ticket.replication_steps.map((step, idx) => <li key={idx}>{step}</li>)}
-                </ol>
-              </div>
-            )}
-            {ticket.screenshot_url && <img src={ticket.screenshot_url} alt="screenshot" className="max-w-[100px] rounded" />}
-            <TaskTimer ticket={ticket} refresh={refresh} />
-            <div className="text-xs text-gray-400">By: {ticket.user_name}</div>
-            <div className="flex gap-2">
-              {/* Move buttons */}
-              {["todo", "in_progress", "pending", "completed"]
-                .filter(s => s !== ticket.status)
-                .map(st =>
-                  <button key={st} className="text-xs underline" onClick={() => onMove(ticket, st)}>{st.replace("_", " ")}</button>
-                )
-              }
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+import KanbanColumn from "../components/Support/KanbanColumn.jsx"; // Adjust path if needed
+import DashboardLayout from "../components/layout/DashboardLayout.jsx"; // Or wherever your layout lives
 
 export default function SupportPage() {
   const supabase = useSupabaseClient();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Load all tickets from Supabase
+  // Fetch all tickets
   async function fetchTickets() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("support_tickets")
       .select("*")
       .order("created_at", { ascending: false });
-    setTickets(data || []);
+    if (error) {
+      console.error("Error fetching tickets:", error.message);
+      setTickets([]);
+    } else {
+      setTickets(data || []);
+      // Debug: Log all tickets and status counts
+      console.log("All fetched tickets:", data);
+      // Print a summary count by status
+      const counts = data.reduce((acc, t) => {
+        acc[t.status] = (acc[t.status] || 0) + 1;
+        return acc;
+      }, {});
+      console.log("Ticket status counts:", counts);
+      // Show any tickets with unknown status
+      const unknown = data.filter(
+        (t) =>
+          !["todo", "in progress", "completed"].includes(
+            (t.status || "").toLowerCase()
+          )
+      );
+      if (unknown.length > 0) {
+        console.warn("Tickets with unknown status:", unknown);
+      }
+    }
     setLoading(false);
   }
 
+  // Call fetchTickets on mount
   useEffect(() => {
     fetchTickets();
-    // (Optional) add real-time subscription for live updates
   }, []);
-
-  async function handleMove(ticket, newStatus) {
-    await supabase.from("support_tickets").update({ status: newStatus }).eq("id", ticket.id);
-    fetchTickets();
-  }
 
   return (
     <DashboardLayout>
-    <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold mb-4">Support & Technical Issues</h1>
-      <TicketForm onCreated={fetchTickets} />
-      <div className="flex gap-4 mt-8">
-        <KanbanColumn title="To Do" status="todo" tickets={tickets} onMove={handleMove} refresh={fetchTickets} />
-        <KanbanColumn title="In Progress" status="in_progress" tickets={tickets} onMove={handleMove} refresh={fetchTickets} />
-        <KanbanColumn title="Pending" status="pending" tickets={tickets} onMove={handleMove} refresh={fetchTickets} />
-        <KanbanColumn title="Completed" status="completed" tickets={tickets} onMove={handleMove} refresh={fetchTickets} />
+      <div className="p-4">
+        <h1 className="text-xl font-bold mb-4">Support & Technical Issues</h1>
+        {/* DEBUG: Visual list of ticket statuses */}
+        <div className="mb-4 bg-gray-100 rounded p-2 text-xs">
+          <span className="font-bold">Debug: </span>
+          Total tickets: {tickets.length} |{" "}
+          {["todo", "in progress", "completed"].map((status) => (
+            <span key={status} className="mr-3">
+              {status}: {tickets.filter((t) => (t.status || "").toLowerCase() === status).length}
+            </span>
+          ))}
+          {/* Unknown status tickets */}
+          <span className="text-red-600">
+            Unknown status: {tickets.filter(
+              (t) =>
+                !["todo", "in progress", "completed"].includes(
+                  (t.status || "").toLowerCase()
+                )
+            ).length}
+          </span>
+        </div>
+        {/* Ticket Form */}
+        <div className="mb-8">
+          <TicketForm onCreated={fetchTickets} />
+        </div>
+        {/* Kanban Columns */}
+        {loading ? (
+          <div className="text-center text-gray-500">Loading tickets...</div>
+        ) : (
+          <div className="flex flex-col md:flex-row gap-4">
+            <KanbanColumn
+              title="To Do"
+              status="todo"
+              tickets={tickets}
+              refresh={fetchTickets}
+              showRoleAndStore // Pass this as a prop!
+            />
+            <KanbanColumn
+              title="In Progress"
+              status="in progress"
+              tickets={tickets}
+              refresh={fetchTickets}
+              showRoleAndStore
+            />
+            <KanbanColumn
+              title="Completed"
+              status="completed"
+              tickets={tickets}
+              refresh={fetchTickets}
+              showRoleAndStore
+            />
+          </div>
+        )}
+        {/* DEBUG: See all ticket objects in browser (for developers) */}
+        <details className="mt-4 bg-gray-50 p-2 rounded">
+          <summary className="cursor-pointer text-xs text-gray-500">
+            Debug: View all tickets JSON
+          </summary>
+          <pre className="overflow-x-auto text-xs">{JSON.stringify(tickets, null, 2)}</pre>
+        </details>
       </div>
-      {loading && <div>Loading…</div>}
-    </div>
     </DashboardLayout>
   );
 }

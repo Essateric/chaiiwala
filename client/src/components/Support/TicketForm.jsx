@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { useAuth } from "../../hooks/UseAuth.jsx";
 
 export default function TicketForm({ onCreated }) {
   const supabase = useSupabaseClient();
-  const user = useUser();
-  const [store, setStore] = useState("");
+  const { user, profile } = useAuth();
   const [page, setPage] = useState("");
   const [description, setDescription] = useState("");
   const [repSteps, setRepSteps] = useState([""]);
@@ -14,53 +14,75 @@ export default function TicketForm({ onCreated }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
+
     let screenshot_url = "";
-    if (screenshot) {
-      // Upload screenshot
-      const { data, error } = await supabase.storage
-        .from("screenshots")
-        .upload(`${user.id}/${Date.now()}_${screenshot.name}`, screenshot);
-      if (error) {
-        alert("Screenshot upload error!");
-        setLoading(false);
-        return;
-      }
-      screenshot_url = supabase.storage.from("screenshots").getPublicUrl(data.path).publicUrl;
-    }
-await supabase.from("support_tickets").insert([{
-  user_id: user.id,
-  user_name: user.user_metadata?.name || user.email,
-  user_role: user.user_metadata?.role || "user",
-  store: user.user_metadata?.store_id || "", // <<-- use the logged-in user's store
-  page,
-  error_message: description,
-  replication_steps: repSteps.filter(Boolean),
-  screenshot_url,
-  status: "todo",
-}]);
-    setStore("");
+    // Upload screenshot if present
+if (screenshot) {
+  const filePath = `${user.id}/${Date.now()}_${screenshot.name}`;
+  const { data, error } = await supabase.storage
+    .from("screenshots")
+    .upload(filePath, screenshot);
+
+  if (error) {
+    alert("Screenshot upload error: " + error.message);
+    setLoading(false);
+    return;
+  }
+
+  // Log the data for debugging
+  console.log("Upload result:", data);
+
+  // Always get the public URL after a successful upload
+  const { publicUrl } = supabase
+    .storage
+    .from("screenshots")
+    .getPublicUrl(filePath);
+
+  // Log publicUrl for debug
+  console.log("Public URL to be saved:", publicUrl);
+
+  screenshot_url = publicUrl;
+}
+
+    // Use profile data for store location and permissions (role)
+    const storeLocation = profile?.store_location || "";
+    const userRole = profile?.permissions || "";
+
+    // Insert ticket into Supabase
+    await supabase.from("support_tickets").insert([{
+      user_id: user.id,
+      user_name: user.user_metadata?.name || user.email,
+      user_role: userRole,
+      store: storeLocation,
+      page,
+      error_message: description,
+      replication_steps: repSteps.filter(Boolean),
+      screenshot_url,
+      status: "todo",
+    }]);
+
+    // Webhook (send all info, including store/role)
+    const makeWebhookURL = "https://hook.eu2.make.com/8pdrel42bt65yzcncv7picyrxgdtnih2";
+    await fetch(makeWebhookURL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        store: storeLocation,
+        page,
+        description,
+        repSteps,
+        userName: user.user_metadata?.name || user.email,
+        userRole,
+        screenshot_url
+      }),
+    });
+
     setPage("");
     setDescription("");
     setRepSteps([""]);
     setScreenshot(null);
     setLoading(false);
     if (onCreated) onCreated();
-
-    // Replace with your Make.com webhook URL
-const makeWebhookURL = "https://hook.eu2.make.com/8pdrel42bt65yzcncv7picyrxgdtnih2";
-await fetch(makeWebhookURL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    store,
-    page,
-    description,
-    repSteps,
-    userName: user.user_metadata?.name || user.email,
-    screenshot_url
-  })
-});
-
   }
 
   return (
@@ -69,8 +91,6 @@ await fetch(makeWebhookURL, {
       className="max-w-lg mx-auto bg-white rounded-xl shadow p-6 space-y-4 mt-4"
     >
       <h2 className="text-xl font-semibold mb-2">Log a new Issue</h2>
-      
-      {/* Page/Screen */}
       <div>
         <label className="block text-sm font-medium mb-1">Page / Screen</label>
         <input
@@ -81,8 +101,6 @@ await fetch(makeWebhookURL, {
           onChange={e => setPage(e.target.value)}
         />
       </div>
-      
-      {/* Error Description */}
       <div>
         <label className="block text-sm font-medium mb-1">
           Describe the Error <span className="text-gray-400">(optional)</span>
@@ -95,8 +113,6 @@ await fetch(makeWebhookURL, {
           onChange={e => setDescription(e.target.value)}
         />
       </div>
-      
-      {/* Replication Steps */}
       <div>
         <label className="block text-sm font-medium mb-1">
           Steps to Reproduce <span className="text-red-500">*</span>
@@ -126,21 +142,17 @@ await fetch(makeWebhookURL, {
           onClick={() => setRepSteps([...repSteps, ""])}
         >+ Add Step</button>
       </div>
-      
-      {/* Screenshot */}
       <div>
         <label className="block text-sm font-medium mb-1">
-          Screenshot <span className="text-red-500">*</span>
+          Screenshot <span className="text-gray-400">(optional)</span>
         </label>
         <input
-          required
           type="file"
           accept="image/*"
           className="block"
           onChange={e => setScreenshot(e.target.files[0])}
         />
       </div>
-      
       <div className="flex justify-end">
         <button
           type="submit"
