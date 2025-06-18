@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { FileUpload } from "@/components/ui/file-upload";
-import { useAuth } from "@/hooks/UseAuth";
-import { useStores } from "@/hooks/use-stores";
-import { useCategories } from "@/hooks/use-categories";
-import { useJobLogs } from "@/hooks/use-joblogs";
-import { useToast } from "@/hooks/use-toast"; // Step 1: Import useToast
+import { Button } from "../../components/ui/button.jsx";
+import { Input } from "../../components/ui/input.jsx";
+import { Textarea } from "../../components/ui/textarea.jsx";
+import { Label } from "../../components/ui/label.jsx";
+import { FileUpload } from "../../components/ui/file-upload.jsx";
+import { useAuth } from "../../hooks/UseAuth.jsx";
+import { useStores } from "../../hooks/use-stores.jsx";
+import { useCategories } from "../../hooks/use-categories.jsx";
+import { useJobLogs } from "../../hooks/use-joblogs.jsx";
+import { useToast } from "../../hooks/use-toast.jsx"; // Step 1: Import useToast
 
 export default function MaintenanceWizard({ onClose, userProfile: propUserProfile }) { // Accept userProfile prop
   const { user, profile, isLoading: isLoadingAuth } = useAuth(); // Add isLoadingAuth

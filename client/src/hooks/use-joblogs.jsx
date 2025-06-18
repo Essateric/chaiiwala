@@ -1,7 +1,7 @@
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "../hooks/use-toast.jsx";
+import { supabase } from "../lib/supabaseClient.js";
 
 function useJobLogs(storeId) {
   const supabase = useSupabaseClient();
@@ -9,27 +9,17 @@ function useJobLogs(storeId) {
   const { toast } = useToast();
 
   // ✅ Fetch job logs based on storeId
-  const { data: jobLogs = [], isLoading, error } = useQuery({
-    queryKey: ["joblogs"],
-    queryFn: async () => {
-      let query = supabase.from("joblogs").select("*").order("created_at", { ascending: false });
+const { data: jobLogs = [], isLoading, error, refetch } = useQuery({
+  queryKey: ["joblogs"],
+  queryFn: async () => {
+    let query = supabase.from("joblogs").select("*").order("created_at", { ascending: false });
 
-      // if (typeof storeId === "number" && !isNaN(storeId)) {
-      //   query = query.eq("storeId", storeId);
-      // }
-      
-
-      // if (storeId !== null && storeId !== undefined) {
-      //   query = query.eq("storeId", storeId);
-      // }
-
-      const { data, error } = await query;
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: true,
-    
-  });
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  enabled: true,
+});
 
   // ✅ Create job log
   const { mutateAsync: createJobLog, isPending: isCreating } = useMutation({
@@ -60,6 +50,7 @@ function useJobLogs(storeId) {
     error,
     createJobLog,
     isCreating,
+    refetch
   };
 }
 

@@ -4,9 +4,8 @@ import { Loader2, PlusIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import JobLogsGrid from "@/components/Maintenance/JobLogsGrid";
-import MaintenanceWizard from "@/components/Maintenance/MaintenanceWizard";
-
+import MaintenanceWizard from "../../components/Maintenance/MaintenanceWizard.jsx";
+import JobLogKanban from "./MaintenanceKanban.jsx";
 
 import {
   Card,
@@ -60,8 +59,6 @@ const formSchema = JobLogSchema.extend({
 });
 
 export default function JobLogSection() {
-  console.log("📍 Rendering JobLogSection");
-
   const { user, profile } = useAuth();
   const { stores = [] } = useStores();
   const { categories } = useCategories();
@@ -78,17 +75,28 @@ export default function JobLogSection() {
 
   const isPrivileged = ["admin", "regional", "maintenance"].includes(profile?.permissions);
 
-  const filteredLogs = useMemo(() => {
-    if (!profile) return [];
-    if (isPrivileged) {
-      if (selectedStoreId) {
-        return jobLogs.filter((log) => log.storeId === Number(selectedStoreId));
-      }
-      return jobLogs;
-    }
-    return jobLogs.filter((log) => profile.store_ids.includes(log.storeId));
+const filteredLogs = useMemo(() => {
+  if (!profile) return [];
 
-  }, [jobLogs, selectedStoreId, profile]);
+  if (isPrivileged) {
+    if (selectedStoreId) {
+      return jobLogs
+        .filter((log) => log && typeof log === "object" && log.storeId === Number(selectedStoreId));
+    }
+    return jobLogs.filter((log) => log && typeof log === "object");
+  }
+
+  if (!Array.isArray(profile.store_ids)) return [];
+
+  return jobLogs
+    .filter((log) =>
+      log &&
+      typeof log === "object" &&
+      log.storeId &&
+      profile.store_ids.includes(log.storeId)
+    );
+}, [jobLogs, selectedStoreId, profile]);
+
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -109,25 +117,23 @@ export default function JobLogSection() {
   const onSubmit = async (values) => {
     try {
       const now = new Date();
-  
-      const isoDate = now.toISOString().split("T")[0]; // yyyy-mm-dd
-      const isoTime = now.toTimeString().split(" ")[0]; // hh:mm:ss
-  
+      const isoDate = now.toISOString().split("T")[0];
+      const isoTime = now.toTimeString().split(" ")[0];
+
       await createJobLog({
         ...values,
-        logDate: isoDate,        // e.g., "2025-05-06"
-        logTime: isoTime,        // e.g., "14:35:00"
+        logDate: isoDate,
+        logTime: isoTime,
         user_id: user?.id,
         loggedBy: profile?.name || ""
       });
-  
+
       form.reset();
       setDialogOpen(false);
     } catch (error) {
       console.error("Error creating job log:", error.message || error);
     }
   };
- 
 
   if (!profile) {
     return (
@@ -136,7 +142,6 @@ export default function JobLogSection() {
       </Card>
     );
   }
-console.log("🔎 jobLogs returned from useJobLogs:", jobLogs);
 
   return (
     <Card className="mt-6">
@@ -165,12 +170,13 @@ console.log("🔎 jobLogs returned from useJobLogs:", jobLogs);
       <CardContent>
         <div className="flex justify-end mb-4">
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusIcon className="h-4 w-4 mr-2" /> Create Maintenance Task
-              </Button>
-            </DialogTrigger>
-
+            {profile?.permissions !== "maintenance" && (
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusIcon className="h-4 w-4 mr-2" /> Create Maintenance Task
+                </Button>
+              </DialogTrigger>
+            )}
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Maintenance Task</DialogTitle>
@@ -178,13 +184,11 @@ console.log("🔎 jobLogs returned from useJobLogs:", jobLogs);
                   Fill out the details below to create a new maintenance task.
                 </DialogDescription>
               </DialogHeader>
-
-              <MaintenanceWizard  onClose={() => setDialogOpen(false)}/>
-
+              <MaintenanceWizard onClose={() => setDialogOpen(false)} />
             </DialogContent>
           </Dialog>
         </div>
-        {console.log("🧪 Filtered logs:", filteredLogs.length)}
+
         {filteredLogs.length === 0 ? (
           <p className="text-gray-500 text-sm">
             {isPrivileged
@@ -192,7 +196,8 @@ console.log("🔎 jobLogs returned from useJobLogs:", jobLogs);
               : "No maintenance tasks found for this location."}
           </p>
         ) : (
-          <JobLogsGrid jobLogs={filteredLogs} />
+          <JobLogKanban jobLogs={filteredLogs} />
+          
         )}
       </CardContent>
     </Card>
