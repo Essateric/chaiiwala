@@ -3,32 +3,31 @@ import { supabase } from "../lib/supabaseClient.js";
 import ChecklistItem from "../components/checklists/checklist-item.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
-import { useAuth } from "../hooks/UseAuth.jsx"; // Make sure you have this hook
+import { useAuth } from "../hooks/UseAuth.jsx";
 
 export default function DailyChecklist() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [checklists, setChecklists] = useState([]);
 
-  // Fetch today's checklist from Supabase
   useEffect(() => {
     async function fetchChecklist() {
-      if (!user?.id) {
+      if (!profile?.id) {
         setChecklists([]);
         setLoading(false);
         return;
       }
+
       setLoading(true);
-
       const today = new Date().toISOString().split("T")[0];
+      const storeId = profile?.store_ids?.[0];
 
-      // Fetch all checklist rows for today/user/store
       const { data, error } = await supabase
-        .from("daily_checklist")
+        .from("v_daily_checklist_with_status")
         .select("*")
-        .eq("user_id", user.id)
-        .eq("checklist_date", today)
-        .order("id");
+        .eq("store_id", storeId)
+        .eq("date", today)
+        .order("task_id");
 
       if (error) {
         console.error("Error loading checklist:", error);
@@ -43,31 +42,31 @@ export default function DailyChecklist() {
             category: "Operations",
             assignedTo: "Store Manager",
             tasks: data.map((task) => ({
-              id: task.id,
-              title: task.title,
+              id: task.id, // checklist status row ID
+              task_id: task.task_id,
+              title: task.task_name,
               status: task.status || "pending",
               completed_at: task.completed_at,
-              completed_by: task.completed_by,
+              completed_by: task.user_id,
             }))
           }
         ]);
       } else {
         setChecklists([]);
       }
+
       setLoading(false);
     }
 
     fetchChecklist();
-  }, [user]);
+  }, [profile]);
 
-  // Cycle status: pending -> in progress -> completed -> pending
   const nextStatus = (current) => {
     if (current === "pending") return "in progress";
     if (current === "in progress") return "completed";
     return "pending";
   };
 
-  // Handles a status cycle and DB update
   const handleTaskToggle = async (checklistId, taskId) => {
     const checklist = checklists.find((c) => c.id === checklistId);
     const task = checklist?.tasks.find((t) => t.id === taskId);
@@ -75,9 +74,8 @@ export default function DailyChecklist() {
 
     const newStatus = nextStatus(task.status);
     const completed_at = newStatus === "completed" ? new Date().toISOString() : null;
-    const completed_by = newStatus === "completed" ? user?.id : null;
+    const completed_by = newStatus === "completed" ? profile?.id : null;
 
-    // Update UI instantly
     setChecklists((prev) =>
       prev.map((cl) =>
         cl.id === checklistId
@@ -93,13 +91,12 @@ export default function DailyChecklist() {
       )
     );
 
-    // Update DB always (no sample/demo tasks anymore)
     await supabase
-      .from("daily_checklist")
+      .from("daily_checklist_status")
       .update({
         status: newStatus,
         completed_at,
-        completed_by
+        user_id: completed_by,
       })
       .eq("id", taskId);
   };
