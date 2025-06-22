@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "../../hooks/UseAuth.jsx";
-import { supabase } from "../../lib/supabaseClient.js"; // Make sure this is correct
+import { supabase } from "../../lib/supabaseClient.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card.jsx";
 import EventOrderTable from "./EventOrderTable.jsx";
 import EventOrderFormDialog from "./EventOrderFormDialog.jsx";
+import StatusModal from "./StatusModal.jsx";
 import { useEventOrders } from "../../hooks/use-event-orders.jsx";
 import { useStores } from "../../hooks/use-stores.jsx";
 import { Button } from "../../components/ui/button.jsx";
@@ -19,7 +20,10 @@ export default function EventOrdersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [filterStoreId, setFilterStoreId] = useState();
   const [filterStatus, setFilterStatus] = useState();
-   const { eventOrders, isLoading, error, updateEventOrder } = useEventOrders(filterStoreId);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+
+  const { eventOrders, isLoading, error, updateEventOrder } = useEventOrders(filterStoreId);
 
   const canCreateOrder = ALLOWED_ROLES.includes(profile?.permissions);
 
@@ -41,13 +45,11 @@ export default function EventOrdersPage() {
     );
   }
 
-  // --- ADD THIS FUNCTION ---
   async function handleCreateEventOrder(formData) {
     if (!canCreateOrder) {
       alert("You do not have permission to add event orders.");
       return;
     }
-
     // Prepare data for supabase (convert types)
     const data = {
       store_id: Number(formData.storeId),
@@ -66,77 +68,106 @@ export default function EventOrdersPage() {
       booked_by: formData.bookedBy,
       status: formData.status,
       notes: formData.notes || null,
-      // created_at is automatic
     };
-
     const { error } = await supabase.from("event_orders").insert([data]);
     if (error) {
       alert("Error creating event order: " + error.message);
       return;
     }
     setIsFormOpen(false);
-    // Optionally: refresh event orders, show toast, etc.
+    updateEventOrder?.();
+  }
+
+  // Called by the modal (now handles payment status)
+  async function handleStatusChangeWithComment(orderId, newStatus, comment, paymentStatus) {
+    const updateData = {
+      status: newStatus,
+      payment_status: paymentStatus,
+    };
+    // Status transitions
+    if (newStatus === "completed") {
+      updateData.completed_at = new Date().toISOString();
+      updateData.completed_by = profile?.name || profile?.first_name || profile?.email || "Unknown";
+    }
+    if (newStatus === "in_progress" || newStatus === "pending") {
+      updateData.completed_at = null;
+      updateData.completed_by = null;
+    }
+    if (comment !== undefined) {
+      updateData.event_comment = comment;
+    }
+    const { error } = await supabase
+      .from("event_orders")
+      .update(updateData)
+      .eq("id", orderId);
+    if (error) {
+      alert("Error updating status: " + error.message);
+      return;
+    }
+    updateEventOrder?.();
   }
 
   return (
-  <DashboardLayout title="Event Orders">
-    <div className="max-w-6xl mx-auto p-4">
-      <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <CalendarDays className="w-6 h-6 text-chai-gold" />
-              Event Orders
-            </CardTitle>
-            <CardDescription>View, create, and manage all event orders here.</CardDescription>
-          </div>
-          {canCreateOrder && (
-            <Button
-              onClick={() => setIsFormOpen(true)}
-              className="mt-4 md:mt-0 bg-chai-gold hover:bg-yellow-700"
-            >
-              + New Event Order
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="text-red-500 p-4 text-center">
-              Failed to load event orders. Try refreshing the page.
+    <DashboardLayout title="Event Orders">
+      <div className="max-w-6xl mx-auto p-4">
+        <Card>
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <CalendarDays className="w-6 h-6 text-chai-gold" />
+                Event Orders
+              </CardTitle>
+              <CardDescription>View, create, and manage all event orders here.</CardDescription>
             </div>
-          )}
-          {isLoading && (
-            <div className="flex justify-center items-center p-8">
-              <span className="loader mr-2"></span>
-              Loading event orders...
-            </div>
-          )}
-          {!isLoading && !error && (
-            <EventOrderTable
-              profile={profile}
-              stores={stores}
-              eventOrders={eventOrders}
-              filterStoreId={filterStoreId}
-              filterStatus={filterStatus}
-              setFilterStoreId={setFilterStoreId}
-              setFilterStatus={setFilterStatus}
-              updateEventOrder={updateEventOrder}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Only show modal if allowed */}
-      {canCreateOrder && (
-        <EventOrderFormDialog
-          isFormOpen={isFormOpen}
-          setIsFormOpen={setIsFormOpen}
-          profile={profile}
-          stores={stores}
-          onSubmit={handleCreateEventOrder}
+            {canCreateOrder && (
+              <Button
+                onClick={() => setIsFormOpen(true)}
+                className="mt-4 md:mt-0 bg-chai-gold hover:bg-yellow-700"
+              >
+                + New Event Order
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="text-red-500 p-4 text-center">
+                Failed to load event orders. Try refreshing the page.
+              </div>
+            )}
+            {isLoading && (
+              <div className="flex justify-center items-center p-8">
+                <span className="loader mr-2"></span>
+                Loading event orders...
+              </div>
+            )}
+            {!isLoading && !error && (
+              <EventOrderTable
+                profile={profile}
+                eventOrders={eventOrders}
+                onOpenStatusModal={order => {
+                  setSelectedOrder(order);
+                  setStatusModalOpen(true);
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
+        {canCreateOrder && (
+          <EventOrderFormDialog
+            isFormOpen={isFormOpen}
+            setIsFormOpen={setIsFormOpen}
+            profile={profile}
+            stores={stores}
+            onSubmit={handleCreateEventOrder}
+          />
+        )}
+        <StatusModal
+          open={statusModalOpen}
+          onClose={() => setStatusModalOpen(false)}
+          order={selectedOrder}
+          onSubmit={handleStatusChangeWithComment}
         />
-      )}
-    </div>
-  </DashboardLayout>
+      </div>
+    </DashboardLayout>
   );
 }
