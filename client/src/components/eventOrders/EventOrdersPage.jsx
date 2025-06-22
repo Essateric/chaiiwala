@@ -11,6 +11,7 @@ import { useStores } from "../../hooks/use-stores.jsx";
 import { Button } from "../../components/ui/button.jsx";
 import { CalendarDays } from "lucide-react";
 import DashboardLayout from "../layout/DashboardLayout.jsx";
+import { toast } from "sonner";
 
 const ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 
@@ -18,12 +19,10 @@ export default function EventOrdersPage() {
   const { profile, isLoading: isLoadingAuth } = useAuth();
   const { stores = [] } = useStores();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [filterStoreId, setFilterStoreId] = useState();
-  const [filterStatus, setFilterStatus] = useState();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 
-  const { eventOrders, isLoading, error, updateEventOrder } = useEventOrders(filterStoreId);
+  const { eventOrders, isLoading, error, updateEventOrder, refetch } = useEventOrders();
 
   const canCreateOrder = ALLOWED_ROLES.includes(profile?.permissions);
 
@@ -45,12 +44,12 @@ export default function EventOrdersPage() {
     );
   }
 
+  // -- CREATE event order, then refetch and show toast --
   async function handleCreateEventOrder(formData) {
     if (!canCreateOrder) {
-      alert("You do not have permission to add event orders.");
+      toast.error("You do not have permission to add event orders.");
       return;
     }
-    // Prepare data for supabase (convert types)
     const data = {
       store_id: Number(formData.storeId),
       event_date: formData.eventDate,
@@ -71,41 +70,46 @@ export default function EventOrdersPage() {
     };
     const { error } = await supabase.from("event_orders").insert([data]);
     if (error) {
-      alert("Error creating event order: " + error.message);
+      toast.error("Error creating event order: " + error.message);
       return;
     }
     setIsFormOpen(false);
-    updateEventOrder?.();
+    toast.success("Event order has been added successfully!");
+    refetch(); // This triggers a reload of the event orders.
   }
 
-  // Called by the modal (now handles payment status)
+  // -- Update event order (status, payment, comment) --
   async function handleStatusChangeWithComment(orderId, newStatus, comment, paymentStatus) {
-    const updateData = {
-      status: newStatus,
-      payment_status: paymentStatus,
-    };
-    // Status transitions
-    if (newStatus === "completed") {
-      updateData.completed_at = new Date().toISOString();
-      updateData.completed_by = profile?.name || profile?.first_name || profile?.email || "Unknown";
+    try {
+      // Prepare the update fields
+      const updateData = {
+        status: newStatus,
+        payment_status: paymentStatus,
+        event_comment: comment,
+      };
+
+      // If status is completed, set completed_by and completed_at
+      if (newStatus === "completed") {
+        updateData.completed_at = new Date().toISOString();
+        updateData.completed_by = profile?.name || profile?.first_name || profile?.email || "Unknown";
+      } else {
+        updateData.completed_at = null;
+        updateData.completed_by = null;
+      }
+
+      await updateEventOrder({
+        id: orderId,
+        data: updateData
+      });
+
+      setStatusModalOpen(false); // Close modal
+      // Auto-refresh is handled by TanStack Query
+      toast.success("Order status updated.");
+    } catch (error) {
+      toast.error("Failed to update status: " + error.message);
     }
-    if (newStatus === "in_progress" || newStatus === "pending") {
-      updateData.completed_at = null;
-      updateData.completed_by = null;
-    }
-    if (comment !== undefined) {
-      updateData.event_comment = comment;
-    }
-    const { error } = await supabase
-      .from("event_orders")
-      .update(updateData)
-      .eq("id", orderId);
-    if (error) {
-      alert("Error updating status: " + error.message);
-      return;
-    }
-    updateEventOrder?.();
   }
+
 
   return (
     <DashboardLayout title="Event Orders">

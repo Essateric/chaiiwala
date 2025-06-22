@@ -11,7 +11,8 @@ export function useEventOrders(storeId) {
   const {
     data: eventOrders = [],
     isLoading,
-    error
+    error,
+    refetch, // <-- ADD THIS!
   } = useQuery({
     queryKey: storeId ? ["event_orders", "store", storeId] : ["event_orders"],
     queryFn: async () => {
@@ -29,9 +30,13 @@ export function useEventOrders(storeId) {
     refetchOnWindowFocus: true,
   });
 
-  // Create event order mutation
+  // Create event order mutation (SAFE)
   const { mutateAsync: createEventOrder, isPending: isCreating } = useMutation({
     mutationFn: async (eventOrder) => {
+      // Defensive: require required fields, and return early if undefined
+      if (!eventOrder || typeof eventOrder !== "object") {
+        throw new Error("No event order data provided.");
+      }
       const { data, error } = await supabase
         .from("event_orders")
         .insert([eventOrder])
@@ -59,9 +64,17 @@ export function useEventOrders(storeId) {
     },
   });
 
-  // Update event order mutation
+  // Update event order mutation (SAFE)
   const { mutateAsync: updateEventOrder, isPending: isUpdating } = useMutation({
-    mutationFn: async ({ id, data }) => {
+    // Defensive: ensure object shape and id present
+    mutationFn: async (params) => {
+      if (!params || typeof params !== "object") {
+        throw new Error("Update parameters not provided.");
+      }
+      const { id, data } = params;
+      if (!id || !data) {
+        throw new Error("Both 'id' and 'data' are required to update an event order.");
+      }
       const { data: updated, error } = await supabase
         .from("event_orders")
         .update(data)
@@ -91,6 +104,7 @@ export function useEventOrders(storeId) {
 
   // Fetch a single event order by ID
   const getEventOrder = async (id) => {
+    if (!id) throw new Error("No event order ID provided.");
     const { data, error } = await supabase
       .from("event_orders")
       .select("*")
@@ -109,5 +123,6 @@ export function useEventOrders(storeId) {
     getEventOrder,
     isCreating,
     isUpdating,
+    refetch, // <-- now works
   };
 }

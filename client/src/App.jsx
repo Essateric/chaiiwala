@@ -16,6 +16,7 @@ import EventOrdersPage from "./components/eventOrders/EventOrdersPage.jsx";
 import DailyChecklist from "./pages/DailyChecklist.jsx";
 import SupportPage from "./pages/SupportPage.jsx";
 import  NotificationListener  from "./components/Support/NotificationListener.jsx";
+import { Toaster } from 'sonner';
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -32,6 +33,7 @@ function AppRoutes() {
 
   return (
     <Router>
+          <Toaster position="top-right" richColors />
       <Routes>
         {/* Login page (NO sidebar) */}
         <Route path="/auth" element={<AuthPage />} />

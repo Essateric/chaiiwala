@@ -1,13 +1,31 @@
 import { format } from "date-fns";
 import StatusBadge from "./StatusBadge.jsx";
-import PaymentStatusBadge from "./PaymentStatusBadge.jsx"; // NEW - see below
 
 export default function EventOrderTable({
   eventOrders,
   profile,
-  onOpenStatusModal, // (order) => void
+  onOpenStatusModal,
 }) {
   const canUpdateStatus = ["admin", "regional", "area", "store"].includes(profile?.permissions);
+
+  // Payment status coloring
+  function renderPaymentStatus(status) {
+    if (status === "paid") {
+      return (
+        <span className="inline-block px-2 py-1 rounded text-white" style={{ background: "#19bc59" }}>
+          Paid
+        </span>
+      );
+    }
+    if (status === "unpaid") {
+      return (
+        <span className="inline-block px-2 py-1 rounded text-white" style={{ background: "#fb8800" }}>
+          Unpaid
+        </span>
+      );
+    }
+    return "-";
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -61,9 +79,7 @@ export default function EventOrderTable({
                   <StatusBadge status={order.status} />
                 )}
               </td>
-              <td className="px-4 py-2">
-                <PaymentStatusBadge status={order.payment_status} />
-              </td>
+              <td className="px-4 py-2">{renderPaymentStatus(order.payment_status)}</td>
               <td className="px-4 py-2" style={{ maxWidth: 120, wordBreak: "break-word" }}>
                 {order.event_comment ? order.event_comment : "-"}
               </td>

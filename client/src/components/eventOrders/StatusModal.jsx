@@ -1,15 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function StatusModal({ open, onClose, order, onSubmit }) {
-  const [newStatus, setNewStatus] = useState(order?.status || "");
-  const [paymentStatus, setPaymentStatus] = useState(order?.payment_status || "unpaid");
+  const [newStatus, setNewStatus] = useState(order?.status || "pending");
+  const [newPaymentStatus, setNewPaymentStatus] = useState(order?.payment_status || "unpaid");
   const [comment, setComment] = useState(order?.event_comment || "");
 
-  React.useEffect(() => {
-    setNewStatus(order?.status || "");
-    setPaymentStatus(order?.payment_status || "unpaid");
+  // Reset state when order changes or modal opens
+  useEffect(() => {
+    setNewStatus(order?.status || "pending");
+    setNewPaymentStatus(order?.payment_status || "unpaid");
     setComment(order?.event_comment || "");
-  }, [order]);
+  }, [order, open]);
 
   if (!open || !order) return null;
 
@@ -17,6 +18,8 @@ export default function StatusModal({ open, onClose, order, onSubmit }) {
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded shadow max-w-md w-full">
         <h2 className="font-semibold mb-2">Update Status</h2>
+
+        {/* Status */}
         <div className="mb-4">
           <label className="block mb-1 font-medium">Status:</label>
           <select
@@ -26,19 +29,24 @@ export default function StatusModal({ open, onClose, order, onSubmit }) {
           >
             <option value="pending">Pending</option>
             <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
+
+        {/* Payment Status */}
         <div className="mb-4">
           <label className="block mb-1 font-medium">Payment Status:</label>
           <select
             className="border rounded px-2 py-1 w-full"
-            value={paymentStatus}
-            onChange={e => setPaymentStatus(e.target.value)}
+            value={newPaymentStatus}
+            onChange={e => setNewPaymentStatus(e.target.value)}
           >
             <option value="unpaid">Unpaid</option>
             <option value="paid">Paid</option>
           </select>
         </div>
+
+        {/* Comment */}
         <div className="mb-4">
           <label className="block mb-1 font-medium">Comment (optional):</label>
           <textarea
@@ -57,7 +65,7 @@ export default function StatusModal({ open, onClose, order, onSubmit }) {
           <button
             className="px-4 py-1 rounded bg-chai-gold text-white"
             onClick={() => {
-              onSubmit(order.id, newStatus, comment, paymentStatus);
+              onSubmit(order.id, newStatus, comment, newPaymentStatus);
               onClose();
             }}
             type="button"
