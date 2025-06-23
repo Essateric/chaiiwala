@@ -1,200 +1,208 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import StatsCard from "@/components/dashboard/stats-card";
-import TaskItem from "@/components/dashboard/task-item";
-import AnnouncementItem from "@/components/dashboard/announcement-item";
-// import JobLogsWidget from "@/components/dashboard/job-logs-widget"; // Assuming JobLogsGrid is used directly for maintenance
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
+import StatsCard from "../components/dashboard/stats-card.jsx";
+import TaskItem from "../components/dashboard/task-item.jsx";
+import AnnouncementItem from "../components/dashboard/announcement-item.jsx";
 import {
   Building,
+  BadgeAlert,
   Users,
   ClipboardList,
   Package,
   Calendar,
-  Brush, // Instead of CleaningServices
+  Brush,
+  BarChart3,
+  Bell,
   ShoppingCart,
-  Wrench, // Instead of Tools
-  UserX,
-  CalendarCheck,
+  Wrench,
   CalendarPlus,
   Clipboard,
-  Loader2 // Added import for Loader2
+  Loader2
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/UseAuth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { BadgeAlert, Bell, BarChart3 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "../hooks/UseAuth.jsx";
+import { useToast } from "../hooks/use-toast.jsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card.jsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
+import { Separator } from "../components/ui/separator.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { supabase } from "../lib/supabaseClient.js";
 import { useState, useEffect } from "react";
-import JobLogsGrid from "@/components/Maintenance/JobLogsGrid"; // Assuming this is the correct path
-import AddUserForm from "@/components/AddUserForm";
-
+import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
+import AddUserForm from "../components/AddUserForm.jsx";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  // Get user, global loading state, and global profile from useAuth
   const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
-  const [dashboardProfile, setDashboardProfile] = useState(null); // Profile specific to this dashboard's needs
-  const [selectedStore, setSelectedStore] = useState("all");
+  const queryClient = useQueryClient();
 
-  // Fetch stores data
-  const { data: stores = [] } = useQuery({
-    queryKey: ["/api/stores"], // Consider using a more descriptive query key if this is a direct Supabase call elsewhere
-                               // or ensure this matches the key used if apiRequest handles it.
-    // If this is a direct Supabase call and not via apiRequest, the queryFn would be different.
-    // For now, assuming apiRequest or a similar mechanism populates this.
+  const [dashboardProfile, setDashboardProfile] = useState(null);
+
+  // Fetch stores from Supabase
+  const { data: stores = [], isLoading: isLoadingStores } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("stores").select("id, name");
+      if (error) throw error;
+      return data || [];
+    }
   });
 
-  // Fetch tasks data
-  const { data: tasks = [] } = useQuery({
-    queryKey: ["/api/tasks/today"],
+  // Fetch tasks from Supabase (today's tasks)
+  const { data: tasks = [], isLoading: isLoadingTasks } = useQuery({
+    queryKey: ["tasks_today"],
+    queryFn: async () => {
+      // Example: filter by today's date
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("due_date", today);
+      if (error) throw error;
+      return data || [];
+    }
   });
 
-  // Fetch announcements data
-  const { data: announcements = [] } = useQuery({
-    queryKey: ["/api/announcements/recent"],
+  // Fetch announcements from Supabase (most recent)
+  const { data: announcements = [], isLoading: isLoadingAnnouncements } = useQuery({
+    queryKey: ["recent_announcements"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data || [];
+    }
   });
 
+  // Fetch staff count from Supabase
+  const { data: staffCount = 0 } = useQuery({
+    queryKey: ["staff_count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true });
+      if (error) throw error;
+      return count || 0;
+    }
+  });
+
+  // Fetch low stock count from Supabase (example: quantity < threshold)
+  const { data: lowStockCount = 0 } = useQuery({
+    queryKey: ["low_stock_count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("stock_items")
+        .select("id", { count: "exact", head: true })
+        .lt("quantity", 10); // Example: threshold of 10
+      if (error) throw error;
+      return count || 0;
+    }
+  });
+
+  // Profile fetch for dashboard (already included, no change)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) {
+        setDashboardProfile(null);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, name, permissions, store_ids")
+        .eq("auth_id", user.id)
+        .single();
+      if (error) setDashboardProfile(null);
+      else setDashboardProfile(data);
+    };
+    fetchProfile();
+  }, [user]);
+
+  // Complete/reopen task handler, using Supabase
   const handleTaskComplete = async (id, completed) => {
     try {
-      await apiRequest("PUT", `/api/tasks/${id}`, { completed });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/today"] });
+      const { error } = await supabase
+        .from("tasks")
+        .update({ completed })
+        .eq("id", id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["tasks_today"] });
       toast({
         title: completed ? "Task Completed" : "Task Reopened",
-        description: `Task has been marked as ${completed ? "completed" : "reopened"}.`,
+        description: `Task has been marked as ${completed ? "completed" : "reopened"}.`
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update task status.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
 
-  // Effect to fetch the profile specifically for this dashboard page
-  useEffect(() => {
-    console.log("👤 DashboardPage: Auth user from useAuth:", user);
-    const fetchProfile = async () => {
-      if (!user?.id) {
-        console.log("⚠️ DashboardPage: No user ID found, skipping profile fetch.");
-        setDashboardProfile(null); // Clear dashboard profile if no user
-        return;
-      }
-      console.log("📡 DashboardPage: Fetching profile for auth_id:", user.id);
-      setDashboardProfile(null); // Reset profile while fetching new one to ensure loading state is shown
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id, first_name, name, permissions, store_ids") // Select necessary fields for dashboard display/logic
-          .eq("auth_id", user.id)
-          .single();
-
-        if (error) {
-          console.error("❌ DashboardPage: Profile fetch error:", error.message);
-          setDashboardProfile(null); // Set to null on error to potentially show an error message or fallback
-        } else {
-          console.log("✅ DashboardPage: Profile fetch result:", data);
-           setDashboardProfile(data);
-        }
-      } catch (err) {
-        console.error("❌ DashboardPage: Unexpected error during profile fetch:", err.message);
-        setDashboardProfile(null); // Set to null on unexpected error
-      }
-    };
-
-    fetchProfile();
-  }, [user]); // Re-run this effect if the user object from useAuth changes
-
-  // --- Loading and Access Control ---
-
-  console.log(
-  "DASHBOARD PAGE: about to render DashboardLayout with",
-  "\n  profile:", dashboardProfile,
-  "\n  announcements:", announcements
-);
-
-
-  // 1. Wait for useAuth to finish its initial loading
   if (isAuthLoading) {
-    console.log("DashboardPage: Waiting for useAuth to complete initial load...");
     return (
-        <div className="min-h-screen flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
-            <p className="ml-2 text-gray-700">Initializing dashboard...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
+        <p className="ml-2 text-gray-700">Initializing dashboard...</p>
+      </div>
     );
   }
 
-  // 2. If useAuth is done loading and there's no user, redirect (should be handled by AuthPage or ProtectedRoute)
   if (!user && !isAuthLoading) {
-    console.log("DashboardPage: No user session, and auth loading is complete. Should redirect to login.");
-    // This case should ideally be handled by a redirect in AuthPage or a ProtectedRoute component
-    // wrapping your dashboard route. Returning null or a simple message here is a fallback.
     return <p className="p-4 text-center text-red-600">No active session. Please log in.</p>;
   }
 
-if (!dashboardProfile) {
+  if (!dashboardProfile) {
+    return (
+      <DashboardLayout
+        title="Dashboard"
+        profile={dashboardProfile}
+        announcements={announcements || []}
+      >
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
+          <p className="ml-2 text-gray-700">Loading dashboard data...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (dashboardProfile?.permissions === "maintenance") {
+    return (
+      <DashboardLayout
+        title="Maintenance Dashboard"
+        profile={dashboardProfile}
+        announcements={announcements || []}
+      >
+        <div className="p-4">
+          <h2 className="text-2xl font-montserrat font-bold mb-2">
+            Maintenance View
+          </h2>
+          <p className="mb-4 text-gray-700">
+            Welcome, {dashboardProfile?.first_name || dashboardProfile?.name || "Maintenance User"}.
+          </p>
+          <JobLogsGrid />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       title="Dashboard"
       profile={dashboardProfile}
       announcements={announcements || []}
     >
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-chai-gold" />
-        <p className="ml-2 text-gray-700">Loading dashboard data...</p>
-      </div>
-    </DashboardLayout>
-  );
-}
-
-  // --- Render Content Based on Profile ---
-if (dashboardProfile?.permissions === "maintenance") {
-  return (
-    <DashboardLayout
-      title="Maintenance Dashboard"
-      profile={dashboardProfile}
-      announcements={announcements || []}
-    >
-      <div className="p-4">
-        <h2 className="text-2xl font-montserrat font-bold mb-2">
-          Maintenance View
-        </h2>
-        <p className="mb-4 text-gray-700">
-          Welcome, {dashboardProfile?.first_name || dashboardProfile?.name || "Maintenance User"}.
-        </p>
-        <JobLogsGrid />
-      </div>
-    </DashboardLayout>
-  );
-}
-
-
-
-  // Regular Dashboard for other users
-  return (
-  <DashboardLayout 
-    title="Dashboard"
-    profile={dashboardProfile}
-    announcements={announcements || []}> 
       {/* Welcome Section */}
       <div className="mb-6">
-      <h2 className="text-2xl font-montserrat font-bold mb-2">
-        Welcome back, {dashboardProfile?.first_name || dashboardProfile?.name || "there"}.
-      </h2>
+        <h2 className="text-2xl font-montserrat font-bold mb-2">
+          Welcome back, {dashboardProfile?.first_name || dashboardProfile?.name || "there"}.
+        </h2>
         <p className="text-gray-600">Here's what's happening across your stores today.</p>
       </div>
 
-      {/* Maintenance Job Logs Widget - Always visible on dashboard (if you still want a summary here) */}
-      {/* <div className="mb-6"> */}
-        {/* <JobLogsWidget /> */} {/* You can decide if non-maintenance users see a summary widget */}
-      {/* </div> */}
-
-      {/* Main Dashboard Categories - Based on handwritten diagram */}
       <Tabs defaultValue="overview" className="mb-6">
         <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -207,9 +215,8 @@ if (dashboardProfile?.permissions === "maintenance") {
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab - Summary of all categories */}
+        {/* Overview Tab */}
         <TabsContent value="overview">
-          {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatsCard
               title="Total Stores"
@@ -221,7 +228,7 @@ if (dashboardProfile?.permissions === "maintenance") {
             />
             <StatsCard
               title="Staff Members"
-              value="42" // This seems hardcoded, consider fetching actual staff count
+              value={staffCount}
               icon={Users}
               iconColor="text-green-600"
               iconBgColor="bg-green-100"
@@ -237,7 +244,7 @@ if (dashboardProfile?.permissions === "maintenance") {
             />
             <StatsCard
               title="Low Stock Items"
-              value="5" // This seems hardcoded, consider fetching actual low stock count
+              value={lowStockCount}
               icon={Package}
               iconColor="text-red-600"
               iconBgColor="bg-red-100"
@@ -247,7 +254,6 @@ if (dashboardProfile?.permissions === "maintenance") {
 
           {/* Quick Access Section */}
           <div className="grid grid-cols-1 gap-6">
-            {/* Quick Access */}
             <div className="space-y-6">
               {/* Today's Tasks */}
               <Card>
@@ -270,7 +276,7 @@ if (dashboardProfile?.permissions === "maintenance") {
                           id={task.id}
                           title={task.title}
                           location={task.location}
-                          dueDate={task.dueDate}
+                          dueDate={task.due_date}
                           completed={task.completed}
                           onComplete={handleTaskComplete}
                         />
@@ -299,9 +305,9 @@ if (dashboardProfile?.permissions === "maintenance") {
                         <AnnouncementItem
                           key={announcement.id}
                           title={announcement.title}
-                          description={announcement.description}
-                          date={announcement.date}
-                          isHighlighted={announcement.isHighlighted}
+                          description={announcement.content}
+                          date={announcement.created_at}
+                          isHighlighted={announcement.important}
                         />
                       ))
                     )}
