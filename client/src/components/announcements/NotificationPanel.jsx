@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useAuth } from "@/hooks/UseAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { supabase } from "../../lib/supabaseClient.js";
+import { useAuth } from "../../hooks/UseAuth.jsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card.jsx";
+import { Button } from "../../components/ui/button.jsx";
 
 // Minimal notification card
 function NotificationCard({ id, title, content, date, isRead, author, onMarkRead }) {

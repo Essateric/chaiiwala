@@ -107,12 +107,14 @@ export default function TopBar({ title, onMenuClick, username, role, announcemen
                 <div className="max-h-60 overflow-y-auto">
                   <NotificationPanel />
                 </div>
-          <Link
-  to="/announcements"
-  className="block text-center px-4 py-2 text-sm text-chai-gold font-medium border-t border-gray-200 cursor-pointer"
->
-  View all notifications
-</Link>
+  <Link to="/announcements"   style={{
+    color: "#e6b400",
+    display: "block",
+    textAlign: "center",
+    padding: "8px 0", // optional, for spacing
+  }}>
+    View all notifications
+  </Link>
               </div>
             )}
           </div>

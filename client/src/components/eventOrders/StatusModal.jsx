@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import {useState, useEffect } from "react";
 
 export default function StatusModal({ open, onClose, order, onSubmit }) {
   const [newStatus, setNewStatus] = useState(order?.status || "pending");
