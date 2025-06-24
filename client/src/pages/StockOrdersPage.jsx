@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/hooks/UseAuth";
-import { useStores } from "@/hooks/use-stores";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
+import { useAuth } from "../hooks/UseAuth.jsx";
+import { useStores } from "../hooks/use-stores.jsx";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.jsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
+import { Alert, AlertDescription } from "../components/ui/alert.jsx";
+import { Button } from "../components/ui/button.jsx";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "../components/ui/dialog.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Textarea } from "../components/ui/textarea.jsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.jsx";
+import { Badge } from "../components/ui/badge.jsx";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover.jsx";
 import { 
   ShoppingCartIcon, 
   TruckIcon, 

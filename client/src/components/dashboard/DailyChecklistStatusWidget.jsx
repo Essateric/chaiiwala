@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { useQuery } from "@tanstack/react-query";
 
-export default function StockWidget() {
+export default function DailyChecklistStatusWidget() {
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
@@ -13,38 +13,33 @@ export default function StockWidget() {
   });
 
   const [selectedStoreId, setSelectedStoreId] = useState("all");
+  const today = new Date().toISOString().slice(0, 10);
 
-  // Fetch all low stock items
-  const { data: lowStockItems = [], isLoading } = useQuery({
-    queryKey: ["all_low_stock_items"],
+  const { data: checklistRows = [], isLoading } = useQuery({
+    queryKey: ["daily_checklist_status", today],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("stock_items")
-        .select("id, name, sku, quantity, store_id")
-        .lt("quantity", 10);
+        .from("daily_checklist_status")
+        .select("id, task_id, store_id, due_date, completed")
+        .eq("due_date", today);
       if (error) throw error;
       return data || [];
     }
   });
 
-  // Filter by store if selected
-  const filteredItems = useMemo(() => {
-    if (selectedStoreId === "all") return lowStockItems;
-    return lowStockItems.filter(item => String(item.store_id) === String(selectedStoreId));
-  }, [lowStockItems, selectedStoreId]);
-
-  // Helper
-  const getStoreName = id =>
-    stores.find(s => String(s.id) === String(id))?.name || "Unknown";
+  const filteredRows = useMemo(() => {
+    if (selectedStoreId === "all") return checklistRows;
+    return checklistRows.filter(row => String(row.store_id) === String(selectedStoreId));
+  }, [checklistRows, selectedStoreId]);
 
   return (
     <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
       <div className="mb-2 flex items-center">
         <label className="mr-2 font-semibold">Store:</label>
         <select
-          className="border rounded p-1 bg-white"
           value={selectedStoreId}
           onChange={e => setSelectedStoreId(e.target.value)}
+          className="border rounded p-1 bg-white"
         >
           <option value="all">All Stores</option>
           {stores.map(store => (
@@ -57,24 +52,21 @@ export default function StockWidget() {
           <span>Loading...</span>
         ) : (
           <span>
-            <b>{filteredItems.length}</b> low stock item{filteredItems.length !== 1 ? "s" : ""}
-            {selectedStoreId !== "all" && (
-              <> for <b>{getStoreName(selectedStoreId)}</b></>
-            )}
+            <b>{filteredRows.length}</b> tasks for {selectedStoreId === "all" ? "all stores" : stores.find(s => String(s.id) === String(selectedStoreId))?.name}
           </span>
         )}
       </div>
-      <div className="mt-2 font-semibold">Immediate attention</div>
-      <div className="text-sm text-red-600 mt-1">
+      <div className="mt-2 font-semibold">Today's Tasks</div>
+      <div className="text-sm text-gray-600 mt-1">
         {isLoading
           ? "Loading..."
-          : filteredItems.length === 0
-            ? "No low stock items."
+          : filteredRows.length === 0
+            ? "No tasks for today."
             : (
               <ul className="list-disc ml-5">
-                {filteredItems.map(item => (
-                  <li key={item.id}>
-                    {item.name} (SKU: {item.sku}, Qty: {item.quantity}, {getStoreName(item.store_id)})
+                {filteredRows.map(row => (
+                  <li key={row.id}>
+                    Task #{row.task_id}{row.completed ? " (Completed)" : ""}
                   </li>
                 ))}
               </ul>
