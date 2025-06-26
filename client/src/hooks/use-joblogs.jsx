@@ -8,18 +8,32 @@ function useJobLogs(storeId) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // ✅ Fetch job logs based on storeId
-const { data: jobLogs = [], isLoading, error, refetch } = useQuery({
-  queryKey: ["joblogs"],
-  queryFn: async () => {
-    let query = supabase.from("joblogs").select("*").order("created_at", { ascending: false });
+  // ✅ Fetch job logs based on storeId, JOIN stores!
+  const { data: jobLogs = [], isLoading, error, refetch } = useQuery({
+    queryKey: ["joblogs", storeId], // include storeId so refetch works for filtered stores
+    queryFn: async () => {
+      let query = supabase
+        .from("joblogs")
+        .select(`
+          *,
+          stores:storeId (
+            id,
+            name,
+            store_code
+          )
+        `)
+        .order("created_at", { ascending: false });
 
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return data;
-  },
-  enabled: true,
-});
+      if (storeId) {
+        query = query.eq("storeId", storeId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: true,
+  });
 
   // ✅ Create job log
   const { mutateAsync: createJobLog, isPending: isCreating } = useMutation({
@@ -50,7 +64,7 @@ const { data: jobLogs = [], isLoading, error, refetch } = useQuery({
     error,
     createJobLog,
     isCreating,
-    refetch
+    refetch,
   };
 }
 

@@ -38,6 +38,8 @@ export default function JobLogCard({ log }) {
     fetchStaff();
   }, []);
 
+  const isUrgent = log.flag === "urgent" || log.priority === "urgent";
+
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!user?.id || !newComment.trim()) return;
@@ -46,41 +48,38 @@ export default function JobLogCard({ log }) {
     setNewComment("");
   };
 
-const getAllowedNextStatuses = (currentStatus, role) => {
-  if (role === "admin") {
-    if (currentStatus === "pending") return ["approved", "in_progress", "completed"];
-    if (currentStatus === "approved") return ["in_progress", "completed"];
-    if (currentStatus === "in_progress") return ["completed"];
-  }
-  if (role === "regional") {
-    if (currentStatus === "pending") return ["approved"];
-    if (currentStatus === "approved") return ["in_progress", "completed"];
-    if (currentStatus === "in_progress") return ["completed"];
-  }
-  if (role === "maintenance") {
-    if (currentStatus === "approved") return ["in_progress"];
-    if (currentStatus === "in_progress") return ["completed"];
-  }
-  return [];
-};
-
+  const getAllowedNextStatuses = (currentStatus, role) => {
+    if (role === "admin") {
+      if (currentStatus === "pending") return ["approved", "in_progress", "completed"];
+      if (currentStatus === "approved") return ["in_progress", "completed"];
+      if (currentStatus === "in_progress") return ["completed"];
+    }
+    if (role === "regional") {
+      if (currentStatus === "pending") return ["approved"];
+      if (currentStatus === "approved") return ["in_progress", "completed"];
+      if (currentStatus === "in_progress") return ["completed"];
+    }
+    if (role === "maintenance") {
+      if (currentStatus === "approved") return ["in_progress"];
+      if (currentStatus === "in_progress") return ["completed"];
+    }
+    return [];
+  };
 
   const handleStatusChange = async (newStatus) => {
     if (!log?.id) {
       console.error("Missing log ID");
       return;
     }
-
     const { error } = await supabase
       .from("joblogs")
       .update({ status: newStatus })
       .eq("id", log.id);
-
     if (error) {
       alert("Failed to update status: " + error.message);
     } else {
       setOpen(false);
-      await refetchJobLogs(); // ✅ ensures logs update
+      await refetchJobLogs();
     }
   };
 
@@ -92,15 +91,19 @@ const getAllowedNextStatuses = (currentStatus, role) => {
     }
   } catch {}
 
-  const hasImage =
-    Array.isArray(log?.ImageUpload) && log.ImageUpload.length > 0;
-
+  const hasImage = Array.isArray(log?.ImageUpload) && log.ImageUpload.length > 0;
   const allowedStatuses = getAllowedNextStatuses(log.status, profile?.permissions);
+
+  // THIS IS WHERE YOU DISPLAY THE STORE DETAILS FROM THE JOINED OBJECT
+  const store = log.stores && typeof log.stores === "object" ? log.stores : null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <div className="cursor-pointer border rounded shadow hover:border-chai-gold">
+        <div
+          className={`relative cursor-pointer border rounded shadow hover:border-chai-gold
+            ${isUrgent ? " bg-red-200" : ""}`}
+        >
           {hasImage && (
             <img
               src={log.ImageUpload[0]}
@@ -108,7 +111,21 @@ const getAllowedNextStatuses = (currentStatus, role) => {
               alt="Job Preview"
             />
           )}
+          {isUrgent && (
+            <Badge className="bg-red-600 text-white absolute top-2 right-2 z-10">
+              Urgent
+            </Badge>
+          )}
+
           <div className="p-4 space-y-1 text-sm">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>Logged for:</span>
+              <span className="font-bold">
+                {store
+                  ? `${store.store_code || ""}${store.name ? ` (${store.name})` : ""}`
+                  : log.storeId || "Unknown"}
+              </span>
+            </div>
             <p className="font-semibold truncate">{log.title}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <CalendarDays className="h-3 w-3" />
@@ -164,8 +181,12 @@ const getAllowedNextStatuses = (currentStatus, role) => {
         )}
 
         <div className="text-xs text-muted-foreground space-y-1 mb-4">
-          <p><strong>Category:</strong> {log.category}</p>
-          <p><strong>Priority:</strong> {log.flag?.replace("_", " ")}</p>
+          <p>
+            <strong>Category:</strong> {log.category}
+          </p>
+          <p>
+            <strong>Priority:</strong> {log.flag?.replace("_", " ")}
+          </p>
         </div>
 
         {allowedStatuses.length > 0 && (
