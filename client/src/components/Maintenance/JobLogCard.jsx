@@ -46,21 +46,24 @@ export default function JobLogCard({ log }) {
     setNewComment("");
   };
 
-  const getAllowedNextStatuses = (currentStatus, role) => {
-    if (role === "admin") {
-      if (currentStatus === "pending") return ["approved", "in_progress", "completed"];
-      if (currentStatus === "approved") return ["in_progress", "completed"];
-      if (currentStatus === "in_progress") return ["completed"];
-    }
-    if (role === "regional") {
-      if (currentStatus === "pending") return ["approved"];
-    }
-    if (role === "maintenance") {
-      if (currentStatus === "approved") return ["in_progress"];
-      if (currentStatus === "in_progress") return ["completed"];
-    }
-    return [];
-  };
+const getAllowedNextStatuses = (currentStatus, role) => {
+  if (role === "admin") {
+    if (currentStatus === "pending") return ["approved", "in_progress", "completed"];
+    if (currentStatus === "approved") return ["in_progress", "completed"];
+    if (currentStatus === "in_progress") return ["completed"];
+  }
+  if (role === "regional") {
+    if (currentStatus === "pending") return ["approved"];
+    if (currentStatus === "approved") return ["in_progress", "completed"];
+    if (currentStatus === "in_progress") return ["completed"];
+  }
+  if (role === "maintenance") {
+    if (currentStatus === "approved") return ["in_progress"];
+    if (currentStatus === "in_progress") return ["completed"];
+  }
+  return [];
+};
+
 
   const handleStatusChange = async (newStatus) => {
     if (!log?.id) {
