@@ -30,6 +30,8 @@ import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
 import AddUserForm from "../components/AddUserForm.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
+import { Link } from "react-router-dom";
+
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -343,13 +345,14 @@ export default function DashboardPage() {
           {/* Today's Tasks Card */}
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-6">
+                            {["admin", "store"].includes(dashboardProfile?.permissions) && (
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg">Today's Tasks</CardTitle>
-                    <a href="/tasks" className="text-chai-gold hover:underline text-sm font-medium">
-                      View All
-                    </a>
+   <Link to="/daily-checklist" className="text-chai-gold hover:underline text-sm font-medium">
+  View All
+</Link>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -375,8 +378,9 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </CardContent>
-              </Card>
+              </Card>)}
               {/* Recent Announcements */}
+              {["admin", "regional"].includes(dashboardProfile?.permissions) && (
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-center">
@@ -403,7 +407,7 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </CardContent>
-              </Card>
+              </Card>)}
               {/* Chart moved here if you want managers to see it too, else keep above */}
             </div>
           </div>
