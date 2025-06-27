@@ -138,21 +138,21 @@ export default function Sidebar({ isOpen, onClose }) {
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
         {navItems.map((item, index) => {
           // Safely check profile and permissions before rendering items
-          // If profile is null, or permissions are not in the allowed roles, return null
-          if (item.name === 'Stock Orders' && profile) { // Add profile check here
-            const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // Example IDs
-            const canAccessStockOrders = 
-              profile?.permissions === 'admin' || 
-              profile.permissions === 'regional' ||
-              profile.permissions === 'area' ||
-              // Check if profile.store_ids (array) has any common elements with allowedStoreIds
-              (profile.permissions === 'store' && 
-               profile.store_ids && 
-               profile.store_ids.some(id => allowedStoreIds.includes(id)));
-            if (!canAccessStockOrders) return null;
-          } else if (!profile?.permissions || !item.roles.includes(profile.permissions)) {
-            return null;
-          }
+          // // If profile is null, or permissions are not in the allowed roles, return null
+          // if (item.name === 'Stock Orders' && profile) { // Add profile check here
+          //   const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // Example IDs
+          //   const canAccessStockOrders = 
+          //     profile?.permissions === 'admin' || 
+          //     profile.permissions === 'regional' ||
+          //     profile.permissions === 'area' ||
+          //     // Check if profile.store_ids (array) has any common elements with allowedStoreIds
+          //     (profile.permissions === 'store' && 
+          //      profile.store_ids && 
+          //      profile.store_ids.some(id => allowedStoreIds.includes(id)));
+          //   if (!canAccessStockOrders) return null;
+          // } else if (!profile?.permissions || !item.roles.includes(profile.permissions)) {
+          //   return null;
+          // }
 
           return (
             <a
