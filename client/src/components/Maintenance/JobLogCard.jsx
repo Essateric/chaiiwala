@@ -14,7 +14,7 @@ import { useAuth } from "../../hooks/UseAuth.jsx";
 import { supabase } from "../../lib/supabaseClient.js";
 import { MentionsInput, Mention } from "react-mentions";
 import { useJobLogs } from "../../hooks/use-joblogs.jsx";
-import { useJobLogComments } from "../../hooks/use-joblog-comments.js";
+import { useJobLogComments } from "../../hooks/useJobLogComments.jsx";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function JobLogCard({ log }) {
@@ -216,7 +216,7 @@ export default function JobLogCard({ log }) {
                 <div key={c.id} className="bg-yellow-600 rounded p-2 text-sm text-white">
                   <p>{c.comment}</p>
                   <div className="text-xs mt-1 opacity-80">
-                    <strong>{c.profiles?.name || "Unknown"}:</strong>{" "}
+                    <strong>{c.profiles?.name || c.commenter_name || "Unknown"}:</strong>{" "}
                     {format(new Date(c.created_at), "d MMM yyyy, h:mmaaa")}
                   </div>
                 </div>
