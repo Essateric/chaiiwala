@@ -106,12 +106,12 @@ export default function StockOrdersPage() {
     if (statusFilters.length > 0) {
       // The hook's fetchOrders doesn't directly support OR on statuses,
       // so we might need to call it multiple times or adjust the hook.
-      // For now, let's fetch 'Awaiting Confirmation' for pending, and 'Completed' for received to test.
+      // For now, let's fetch all Freshways orders when a tab is active,
+      // and let getFilteredOrders handle the display logic for specific statuses per tab.
+      // This is simpler than multiple specific fetches until the hook supports 'IN' array for statuses.
       if (activeTab === "pending") {
-        fetchOrders({ status: 'Awaiting Confirmation', supplier_name: 'Freshways' });
+        fetchOrders({ supplier_name: 'Freshways' }); // Fetch all Freshways, getFilteredOrders will pick relevant ones
       } else if (activeTab === "received") {
-        // Example: fetchOrders({ status: 'Completed', supplier_name: 'Freshways' });
-        // Or fetch all and filter client-side for multiple statuses if hook isn't modified yet
         fetchOrders({ supplier_name: 'Freshways' }); // Fetch all Freshways then filter locally
       }
     } else {
