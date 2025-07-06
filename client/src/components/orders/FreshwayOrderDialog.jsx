@@ -5,6 +5,7 @@ import { Label } from "../ui/label.jsx";
 import { Input } from "../ui/input.jsx";
 import { Textarea } from "../ui/textarea.jsx";
 import React from "react";
+import { supabase } from "../../lib/supabaseClient.js"; // Import Supabase client
 
 // Pass these props: open, setOpen, allowedStores, selectedStoreId, setSelectedStoreId, selectedItems, setSelectedItems, itemPrices, user, profile
 export default function FreshwaysOrderDialog({
@@ -68,38 +69,85 @@ export default function FreshwaysOrderDialog({
             const userInitials = user?.username
               ? user.username.substring(0, 2).toUpperCase()
               : 'UA';
-            const orderId = `FW-${userInitials}${dateStr}-01`;
+            const orderDisplayId = `FW-${userInitials}${dateStr}-01`; // Renamed for clarity
             const storeObj = allowedStores.find(s => s.id === Number(selectedStoreId));
-            // POST order
-            fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId,
-                accountNumber,
-                deliveryDate,
-                items: orderItems,
-                orderType: 'Freshways',
-                store: storeObj?.name || '',
-                storeAddress: storeObj?.address || '',
-                storePhone: storeObj?.phone || '',
-                notes,
-                totalPrice: totalPrice,
-                totalPriceFormatted: `£${totalPrice.toFixed(2)}`
-              }),
-            })
-              .then((response) => {
-                if (response.ok) {
-                  alert('Freshways order submitted successfully!');
-                  setOpen(false);
-                } else {
-                  alert('Failed to submit order. Please try again.');
-                }
+
+            // 1. Prepare data for Supabase
+            const orderDataToSave = {
+              order_display_id: orderDisplayId,
+              supplier_name: 'Freshways',
+              store_id: Number(selectedStoreId),
+              user_id: user?.id,
+              account_number: accountNumber,
+              items: orderItems, // Already an array of objects
+              total_price: totalPrice,
+              expected_delivery_date: deliveryDate,
+              notes: notes,
+              status: 'Awaiting Confirmation',
+              // created_at and updated_at will be set by default by Supabase
+            };
+
+            try {
+              // 2. Insert into Supabase
+              const { data: savedOrder, error: supabaseError } = await supabase
+                .from('freshways_orders') // Use the correct table name
+                .insert([orderDataToSave])
+                .select();
+
+              if (supabaseError) {
+                console.error('Error saving order to Supabase:', supabaseError);
+                alert(`Failed to save order to system: ${supabaseError.message}`);
+                return; // Stop if Supabase insert fails
+              }
+
+              if (!savedOrder || savedOrder.length === 0) {
+                console.error('Order saved to Supabase but no data returned.');
+                alert('Order saved to system but failed to get confirmation. Please check system.');
+                return;
+              }
+
+              console.log('Order saved to Supabase:', savedOrder[0]);
+
+              // 3. POST order to Make.com webhook (existing logic)
+              // The webhook might eventually read from Supabase using orderDisplayId or savedOrder[0].id
+              fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: orderDisplayId, // Keep original field name for webhook if needed
+                  supabaseOrderId: savedOrder[0].id, // Optionally send Supabase internal ID
+                  accountNumber,
+                  deliveryDate,
+                  items: orderItems,
+                  orderType: 'Freshways',
+                  store: storeObj?.name || '',
+                  storeAddress: storeObj?.address || '',
+                  storePhone: storeObj?.phone || '',
+                  notes,
+                  totalPrice: totalPrice,
+                  totalPriceFormatted: `£${totalPrice.toFixed(2)}`
+                }),
               })
-              .catch((error) => {
-                console.error('Error submitting order:', error);
-                alert('Error submitting order. Please try again.');
-              });
+                .then((response) => {
+                  if (response.ok) {
+                    alert('Order saved and submitted to Freshways successfully!');
+                    setSelectedItems({}); // Clear selected items
+                    setOpen(false); // Close dialog
+                  } else {
+                    // Inform user that it was saved locally but webhook failed
+                    alert('Order saved to system, but failed to submit to Freshways via webhook. Please contact support.');
+                  }
+                })
+                .catch((error) => {
+                  console.error('Error submitting order to webhook:', error);
+                  // Inform user that it was saved locally but webhook failed
+                  alert('Order saved to system, but an error occurred while submitting to Freshways via webhook. Please contact support.');
+                });
+
+            } catch (error) {
+              console.error('Unexpected error during order submission:', error);
+              alert('An unexpected error occurred. Please try again.');
+            }
           }}
         >
           <div className="grid gap-4 py-4">
