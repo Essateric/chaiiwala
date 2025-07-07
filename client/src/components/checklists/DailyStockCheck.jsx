@@ -91,55 +91,55 @@ const handleSave = async (item) => {
 
   setLoading(true);
 
-  if (item.store_stock_level_id) {
-    // Update existing row
-    const { error: updateError } = await supabase
-      .from("store_stock_levels")
-      .update({
-        quantity: Number(newQty),
-        last_updated: new Date().toISOString(),
-        updated_by: profile?.id ?? null,
-      })
-      .eq("id", item.store_stock_level_id);
-    if (updateError) {
-      alert("Update error: " + updateError.message);
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase
-  .from("store_stock_levels")
-  .update({
+  const commonPayloadParts = {
     quantity: Number(newQty),
     last_updated: new Date().toISOString(),
     updated_by: profile?.id ?? null,
-  })
-  .eq("id", item.store_stock_level_id);
+  };
 
-if (error) {
-  console.error("Failed to update stock level:", error);
-  alert("Error updating stock: " + error.message);
-}
+  console.log("[DailyStockCheck] Attempting to save stock level.");
+  console.log("[DailyStockCheck] Item details:", JSON.parse(JSON.stringify(item))); // Deep copy for logging to see its state at save time
+  console.log("[DailyStockCheck] New Quantity (raw from editing state):", editing[item.id], "(parsed as):", Number(newQty));
+  console.log("[DailyStockCheck] Store ID for operation:", storeId);
+  console.log("[DailyStockCheck] Profile ID (for updated_by):", profile?.id);
+
+
+  if (item.store_stock_level_id) {
+    // Update existing row
+    const updateData = { ...commonPayloadParts };
+    console.log("[DailyStockCheck] Attempting UPDATE on store_stock_levels.");
+    console.log("[DailyStockCheck] Update Condition: id =", item.store_stock_level_id);
+    console.log("[DailyStockCheck] Update Payload:", updateData);
+
+    const { error: updateError } = await supabase
+      .from("store_stock_levels")
+      .update(updateData)
+      .eq("id", item.store_stock_level_id);
+
+    if (updateError) {
+      alert("Update error: " + updateError.message);
+      console.error("[DailyStockCheck] Supabase update error:", updateError);
+      setLoading(false);
+      return;
+    }
   } else {
     // Insert new row
-    console.log("Trying to insert new stock row:", {
+    const insertData = {
+      ...commonPayloadParts,
       stock_item_id: item.id,
       store_id: storeId,
-      quantity: Number(newQty),
-      last_updated: new Date().toISOString(),
-      updated_by: profile?.id ?? null,
-    });
+    };
+    console.log("[DailyStockCheck] Attempting INSERT into store_stock_levels.");
+    console.log("[DailyStockCheck] Insert Payload:", insertData);
+
     const { error: insertError } = await supabase
       .from("store_stock_levels")
-      .insert([{
-        stock_item_id: item.id,
-        store_id: storeId,
-        quantity: Number(newQty),
-        last_updated: new Date().toISOString(),
-        updated_by: profile?.id ?? null,
-      }]);
+      .insert([insertData]);
+      // Note: Original code had console.log for "Trying to insert new stock row" which is now covered by the detailed log above.
+
     if (insertError) {
       alert("Insert error: " + insertError.message);
+      console.error("[DailyStockCheck] Supabase insert error:", insertError);
       setLoading(false);
       return;
     }
@@ -148,7 +148,6 @@ if (error) {
   setLoading(false);
 
     // Refetch stock for updated quantities
-    // (You could optimize by only updating the single item, but this is safer for now)
     if (storeId) {
       setLoading(true);
       // Re-fetch like in useEffect
