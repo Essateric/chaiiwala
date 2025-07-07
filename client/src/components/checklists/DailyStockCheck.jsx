@@ -44,23 +44,29 @@ export default function DailyStockCheck() {
     if (itemIds.length === 0) return []; // No daily check items found
 
     // 2. Get store_stock_levels for this store, including last_updated
-    let levels = [];
+    let processedLevelData = [];
     const { data: levelData, error: levelsError } = await supabase
       .from("store_stock_levels")
-      .select("stock_item_id, quantity, id:store_stock_level_id, last_updated") // Corrected alias
+      .select("stock_item_id, quantity, id, last_updated") // Select id directly
       .in("stock_item_id", itemIds)
       .eq("store_id", currentStoreId);
 
     if (levelsError) {
       console.error("Error fetching store_stock_levels:", levelsError);
-      // Decide if this should throw or return partial data. For now, return items without levels.
-      // throw levelsError; // Or handle more gracefully
+      // Propagate the error so react-query can handle it
+      throw levelsError;
     }
-    if (levelData) levels = levelData;
+
+    if (levelData) {
+      processedLevelData = levelData.map(level => ({
+        ...level,
+        store_stock_level_id: level.id // Create the 'alias' in JS
+      }));
+    }
 
     // 3. Merge
     const levelsByItem = {};
-    levels.forEach(level => { levelsByItem[level.stock_item_id] = level; });
+    processedLevelData.forEach(level => { levelsByItem[level.stock_item_id] = level; });
 
     const merged = items.map(item => ({
       ...item,
