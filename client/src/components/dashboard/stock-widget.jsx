@@ -68,10 +68,14 @@ export default function StockWidget() {
       }
       const { data, error } = await supabase
         .from("store_stock_levels")
-        .select("stock_item_id, store_id, quantity, id:store_stock_level_id") // Corrected alias syntax
+        .select("stock_item_id, store_id, quantity, id") // Select id directly
         .in("stock_item_id", dailyCheckItemIds);
       if (error) throw error;
-      return data || [];
+      // Manually map id to store_stock_level_id
+      return (data || []).map(level => ({
+        ...level,
+        store_stock_level_id: level.id
+      }));
     },
     enabled: dailyCheckItemIds.length > 0 // Only run if there are item IDs
   });

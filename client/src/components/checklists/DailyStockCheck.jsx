@@ -47,7 +47,7 @@ export default function DailyStockCheck() {
     let levels = [];
     const { data: levelData, error: levelsError } = await supabase
       .from("store_stock_levels")
-      .select("stock_item_id, quantity, id as store_stock_level_id, last_updated") // Added last_updated
+      .select("stock_item_id, quantity, id:store_stock_level_id, last_updated") // Corrected alias
       .in("stock_item_id", itemIds)
       .eq("store_id", currentStoreId);
 
