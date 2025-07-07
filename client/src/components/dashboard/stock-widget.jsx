@@ -116,7 +116,7 @@ export default function StockWidget() {
       </div>
       <div className="mt-2 font-semibold">Daily Stock Check Items</div>
       <div className="text-sm text-gray-700 mt-1"> {/* Changed text color from red for less alarm */}
-        {isLoading
+        {isLoadingDailyCheckItems
           ? "Loading..."
           : filteredItems.length === 0
             ? "No items marked for daily check."
