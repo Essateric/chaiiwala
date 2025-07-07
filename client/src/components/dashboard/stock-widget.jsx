@@ -44,44 +44,121 @@ export default function StockWidget() {
   }, [stores, userProfile]);
 
 
-  // Fetch all daily check stock items
-  const { data: dailyCheckStockItems = [], isLoading: isLoadingDailyCheckItems } = useQuery({
-    queryKey: ["daily_check_stock_items"],
+  // Query 1: Fetch base daily check items (metadata)
+  const { data: baseDailyCheckItems = [], isLoading: isLoadingBaseItems } = useQuery({
+    queryKey: ["base_daily_check_items"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stock_items")
-        .select("id, name, sku, quantity, store_id, low_stock_threshold, category, price, quantity_per_unit") // Added more fields as per user's table schema
+        .select("id, name, sku, category, low_stock_threshold, price, quantity_per_unit") // Removed quantity, store_id
         .eq("daily_check", true);
       if (error) throw error;
       return data || [];
     }
   });
 
-  // Filter by store if selected
-  const filteredItems = useMemo(() => {
-    if (selectedStoreId === "all") return dailyCheckStockItems;
-    return dailyCheckStockItems.filter(item => String(item.store_id) === String(selectedStoreId));
-  }, [dailyCheckStockItems, selectedStoreId]);
+  const dailyCheckItemIds = useMemo(() => baseDailyCheckItems.map(item => item.id), [baseDailyCheckItems]);
 
+  // Query 2: Fetch all store stock levels for the daily check items
+  const { data: allStoreStockLevels = [], isLoading: isLoadingStockLevels } = useQuery({
+    queryKey: ["store_stock_levels_for_daily_check", dailyCheckItemIds],
+    queryFn: async () => {
+      if (!dailyCheckItemIds || dailyCheckItemIds.length === 0) {
+        return []; // No items to fetch levels for
+      }
+      const { data, error } = await supabase
+        .from("store_stock_levels")
+        .select("stock_item_id, store_id, quantity, id as store_stock_level_id") // id is primary key of store_stock_levels
+        .in("stock_item_id", dailyCheckItemIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: dailyCheckItemIds.length > 0 // Only run if there are item IDs
+  });
+
+  // isLoading state for the component should consider both queries
+  const isLoading = isLoadingBaseItems || isLoadingStockLevels;
+
+  // Filter by store if selected - THIS WILL BE REPLACED by processedDailyCheckItems in next step
+  // For now, let's adapt it minimally or comment out if it breaks due to schema changes.
+  // The `filteredItems` logic will be completely overhauled in the next step.
   // Helper
   const getStoreName = id =>
     stores.find(s => String(s.id) === String(id))?.name || "Unknown";
 
-  const showStoreSelector = useMemo(() => {
-    if (!userProfile) return false; // Don't show if profile not loaded
-    if (userProfile.permissions === "store") {
-      return userProfile.store_ids?.length > 1; // Show if manager of >1 store
+  const processedDailyCheckItems = useMemo(() => {
+    if (isLoadingBaseItems || isLoadingStockLevels) return []; // Still loading upstream data
+
+    if (!selectedStoreId && userProfile?.permissions === "store" && userProfile.store_ids?.length === 0) {
+        // Store manager with no stores assigned, selectedStoreId might be null
+        return [];
     }
-    return true; // Show for admin, regional, etc.
+
+    if (selectedStoreId && selectedStoreId !== "all") {
+      // Specific store selected (or store manager view)
+      return baseDailyCheckItems.map(item => {
+        const level = allStoreStockLevels.find(
+          l => String(l.stock_item_id) === String(item.id) && String(l.store_id) === String(selectedStoreId)
+        );
+        const quantity = level ? level.quantity : null; // null if no record, vs 0 quantity
+        const isLow = quantity !== null && item.low_stock_threshold !== null && quantity < item.low_stock_threshold;
+        return {
+          ...item,
+          displayQuantity: quantity === null ? "N/A" : quantity,
+          isLowStock: isLow,
+          storeName: getStoreName(selectedStoreId), // Store context is the selected store
+        };
+      }).filter(item => item.displayQuantity !== "N/A"); // Optionally, only show items that exist in the store's stock levels
+    } else if (selectedStoreId === "all" && userProfile?.permissions !== "store") {
+      // "All Stores" selected by Admin/Regional
+      // For each base item, determine if it's low in ANY of the available stores.
+      return baseDailyCheckItems.map(item => {
+        let lowStockInStores = [];
+        for (const store of stores) { // 'stores' contains all store objects
+          const level = allStoreStockLevels.find(
+            l => String(l.stock_item_id) === String(item.id) && String(l.store_id) === String(store.id)
+          );
+          if (level && item.low_stock_threshold !== null && level.quantity < item.low_stock_threshold) {
+            lowStockInStores.push(store.name);
+          }
+        }
+        return {
+          ...item,
+          displayQuantity: "Varies", // General placeholder for "All Stores"
+          isLowStock: lowStockInStores.length > 0,
+          lowStockSummary: lowStockInStores.length > 0 ? `Low in: ${lowStockInStores.join(', ')}` : "",
+          storeName: "All Stores",
+        };
+      });
+    }
+    return []; // Default empty if no case matches (e.g. initial state for admin before 'all' is set)
+  }, [baseDailyCheckItems, allStoreStockLevels, selectedStoreId, userProfile, stores, isLoadingBaseItems, isLoadingStockLevels, getStoreName]);
+
+
+  const showStoreSelector = useMemo(() => {
+    if (!userProfile) return false;
+    if (userProfile.permissions === "store") {
+      return userProfile.store_ids?.length > 1;
+    }
+    return true;
   }, [userProfile]);
 
-  if (isAuthLoading) {
+  if (isAuthLoading) { // This is from useAuth(), for user profile
     return (
       <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
         Loading user data...
       </div>
     );
   }
+
+  // Use combined isLoading for component's main loading state
+  // if (isLoading) { // isLoading = isLoadingBaseItems || isLoadingStockLevels;
+  //   return (
+  //     <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
+  //       Loading stock data...
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
@@ -90,10 +167,9 @@ export default function StockWidget() {
           <label className="mr-2 font-semibold">Store:</label>
           <select
             className="border rounded p-1 bg-white"
-            value={selectedStoreId}
+            value={selectedStoreId} // This should be correctly initialized by useEffect
             onChange={e => setSelectedStoreId(e.target.value)}
           >
-            {/* Admins/Regionals see "All Stores" option if they are not store managers */}
             {userProfile?.permissions !== "store" && <option value="all">All Stores</option>}
             {storeOptions.map(store => (
               <option key={store.id} value={store.id}>{store.name}</option>
@@ -102,35 +178,43 @@ export default function StockWidget() {
         </div>
       )}
       <div className="font-medium mb-2">
-        {isLoadingDailyCheckItems ? (
-          <span>Loading...</span>
+        {isLoading ? ( // Combined loading state
+          <span>Loading items...</span>
         ) : (
           <span>
-            <b>{filteredItems.length}</b> item{filteredItems.length !== 1 ? "s" : ""} for daily check
-            {/* Display store name if it's not "all" or if it's a single-store manager */}
-            {(selectedStoreId !== "all" || (userProfile?.permissions === "store" && userProfile.store_ids?.length === 1)) && storeOptions.length > 0 && (
-              <> for <b>{getStoreName(selectedStoreId) || (storeOptions.length === 1 ? storeOptions[0].name : '')}</b></>
+            <b>{processedDailyCheckItems.length}</b> item{processedDailyCheckItems.length !== 1 ? "s" : ""} for daily check
+            {(selectedStoreId && selectedStoreId !== "all" || (userProfile?.permissions === "store" && userProfile.store_ids?.length === 1)) && (
+              <> for <b>{getStoreName(selectedStoreId)}</b></>
             )}
           </span>
         )}
       </div>
       <div className="mt-2 font-semibold">Daily Stock Check Items</div>
-      <div className="text-sm text-gray-700 mt-1"> {/* Changed text color from red for less alarm */}
-        {isLoadingDailyCheckItems
-          ? "Loading..."
-          : filteredItems.length === 0
-            ? "No items marked for daily check."
-            : (
-              <ul className="list-disc ml-5">
-                {filteredItems.map(item => (
-                  <li key={item.id}>
-                    {item.name} (SKU: {item.sku}, Qty: {item.quantity ?? 'N/A'}, Store: {getStoreName(item.store_id)})
-                    {item.quantity < item.low_stock_threshold && <span className="text-red-600 font-bold ml-2">LOW STOCK</span>}
-                  </li>
-                ))}
-              </ul>
-            )
-        }
+      <div className="text-sm text-gray-700 mt-1">
+        {isLoading ? ( // Combined loading state
+          "Loading details..."
+        ) : processedDailyCheckItems.length === 0 ? (
+          selectedStoreId === "all" && userProfile?.permissions !== "store"
+            ? "No items marked for daily check, or no stock levels reported."
+            : "No items for daily check in this store, or no stock levels reported."
+        ) : (
+          <ul className="list-disc ml-5">
+            {processedDailyCheckItems.map(item => (
+              <li key={item.id}>
+                {item.name} (SKU: {item.sku})
+                {selectedStoreId && selectedStoreId !== "all" && (
+                  <>
+                    , Qty: {item.displayQuantity}
+                    {item.isLowStock && <span className="text-red-600 font-bold ml-2">LOW STOCK</span>}
+                  </>
+                )}
+                {selectedStoreId === "all" && item.isLowStock && (
+                  <span className="text-orange-600 font-semibold ml-2">({item.lowStockSummary || "Low Stock in some stores"})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
