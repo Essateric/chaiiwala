@@ -174,11 +174,14 @@ const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, cur
       }
     },
     onSuccess: (data, variables) => { // data is what mutationFn returns, variables is what mutate was called with
-      console.log("[DailyStockCheck] MUTATION onSuccess: Attempting to invalidate queries with key:", ['dailyStockCheckItems', storeId]);
-      queryClient.invalidateQueries({ queryKey: ['dailyStockCheckItems', storeId] });
-      console.log("[DailyStockCheck] MUTATION onSuccess: Query invalidation initiated for key:", ['dailyStockCheckItems', storeId]);
+      console.log("[DailyStockCheck] MUTATION onSuccess: Save successful for item ID:", variables.item.id, "at", new Date().toLocaleTimeString());
+      console.log("[DailyStockCheck] MUTATION onSuccess: Scheduling query invalidation with 1s delay.");
+      setTimeout(() => {
+        console.log("[DailyStockCheck] MUTATION onSuccess (Delayed): Attempting to invalidate queries with key:", ['dailyStockCheckItems', storeId], "at", new Date().toLocaleTimeString());
+        queryClient.invalidateQueries({ queryKey: ['dailyStockCheckItems', storeId] });
+        console.log("[DailyStockCheck] MUTATION onSuccess (Delayed): Query invalidation initiated for key:", ['dailyStockCheckItems', storeId]);
+      }, 1000);
       setEditing((prev) => ({ ...prev, [variables.item.id]: undefined }));
-      // No need for manual setLoading(false) or refetch here
     },
     onError: (error, variables) => {
       console.error("[DailyStockCheck] Save failed for item ID:", variables.item.id, error);
