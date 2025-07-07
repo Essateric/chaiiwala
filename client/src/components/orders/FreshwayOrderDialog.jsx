@@ -5,14 +5,13 @@ import { Label } from "../ui/label.jsx";
 import { Input } from "../ui/input.jsx";
 import { Textarea } from "../ui/textarea.jsx";
 import React from "react";
+import { supabase } from "../../lib/supabaseClient.js";
 
-// Pass these props: open, setOpen, allowedStores, selectedStoreId, setSelectedStoreId, selectedItems, setSelectedItems, itemPrices, user, profile
 export default function FreshwaysOrderDialog({
   open, setOpen,
   allowedStores, selectedStoreId, setSelectedStoreId,
   selectedItems, setSelectedItems, itemPrices, user, profile
 }) {
-  // Calculate total using price * qty
   const calculateTotalPrice = () => {
     return Object.entries(selectedItems).reduce((total, [key, qty]) => {
       if (qty > 0 && itemPrices[key]) {
@@ -21,7 +20,7 @@ export default function FreshwaysOrderDialog({
       return total;
     }, 0);
   };
-  const totalPrice = calculateTotalPrice();
+  const totalPriceForDisplay = calculateTotalPrice(); // For display in the dialog
 
   const isStoreManager = profile?.permissions === 'store' && allowedStores.length === 1;
 
@@ -45,7 +44,7 @@ export default function FreshwaysOrderDialog({
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
             const orderItems = [];
-            let totalPrice = 0;
+            let currentOrderSubmissionTotalPrice = 0;
             Object.entries(selectedItems).forEach(([key, qty]) => {
               if (qty > 0 && itemPrices[key]) {
                 orderItems.push({
@@ -54,7 +53,7 @@ export default function FreshwaysOrderDialog({
                   quantity: qty,
                   subtotal: `£${(itemPrices[key].price * qty).toFixed(2)}`
                 });
-                totalPrice += itemPrices[key].price * qty;
+                currentOrderSubmissionTotalPrice += itemPrices[key].price * qty;
               }
             });
             const accountNumber = formData.get('account-number');
@@ -64,42 +63,90 @@ export default function FreshwaysOrderDialog({
             const year = currentDate.getFullYear().toString().slice(-2);
             const month = String(currentDate.getMonth() + 1).padStart(2, '0');
             const day = String(currentDate.getDate()).padStart(2, '0');
+            const hours = String(currentDate.getHours()).padStart(2, '0');
+            const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+            const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+
             const dateStr = `${year}${month}${day}`;
+            const timeStr = `${hours}${minutes}${seconds}`;
+
             const userInitials = user?.username
               ? user.username.substring(0, 2).toUpperCase()
               : 'UA';
-            const orderId = `FW-${userInitials}${dateStr}-01`;
+            const orderDisplayId = `FW-${userInitials}${dateStr}-${timeStr}`;
             const storeObj = allowedStores.find(s => s.id === Number(selectedStoreId));
-            // POST order
-            fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId,
-                accountNumber,
-                deliveryDate,
-                items: orderItems,
-                orderType: 'Freshways',
-                store: storeObj?.name || '',
-                storeAddress: storeObj?.address || '',
-                storePhone: storeObj?.phone || '',
-                notes,
-                totalPrice: totalPrice,
-                totalPriceFormatted: `£${totalPrice.toFixed(2)}`
-              }),
-            })
-              .then((response) => {
-                if (response.ok) {
-                  alert('Freshways order submitted successfully!');
-                  setOpen(false);
-                } else {
-                  alert('Failed to submit order. Please try again.');
-                }
+
+            const orderDataToSave = {
+              order_display_id: orderDisplayId,
+              supplier_name: 'Freshways',
+              store_id: Number(selectedStoreId),
+              user_id: user?.id,
+              account_number: accountNumber,
+              items: orderItems,
+              total_price: currentOrderSubmissionTotalPrice,
+              expected_delivery_date: deliveryDate,
+              notes: notes,
+              status: 'Awaiting Confirmation',
+            };
+
+            try {
+              const { data: savedOrder, error: supabaseError } = await supabase
+                .from('freshways_orders')
+                .insert([orderDataToSave])
+                .select();
+
+              if (supabaseError) {
+                console.error('Error saving order to Supabase:', supabaseError);
+                alert(`Failed to save order to system: ${supabaseError.message}`);
+                return;
+              }
+
+              if (!savedOrder || savedOrder.length === 0) {
+                console.error('Order saved to Supabase but no data returned.');
+                alert('Order saved to system but failed to get confirmation. Please check system.');
+                return;
+              }
+
+              console.log('Order saved to Supabase:', savedOrder[0]);
+
+              // THIS IS THE NEW WEBHOOK URL
+              fetch('https://hook.eu2.make.com/4m8o9c8re4srvx9vquvid2s8mtw7hzf2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: orderDisplayId,
+                  supabaseOrderId: savedOrder[0].id,
+                  placedByName: profile?.name || user?.email || 'Unknown User', // THIS IS THE ADDED FIELD
+                  accountNumber,
+                  deliveryDate,
+                  items: orderItems,
+                  orderType: 'Freshways',
+                  store: storeObj?.name || '',
+                  storeAddress: storeObj?.address || '',
+                  storePhone: storeObj?.phone || '',
+                  notes,
+                  totalPrice: currentOrderSubmissionTotalPrice,
+                  totalPriceFormatted: `£${currentOrderSubmissionTotalPrice.toFixed(2)}`
+                }),
               })
-              .catch((error) => {
-                console.error('Error submitting order:', error);
-                alert('Error submitting order. Please try again.');
-              });
+                .then((response) => {
+                  if (response.ok) {
+                    alert('Order saved and submitted to Freshways successfully!');
+                    setSelectedItems({});
+                    setOpen(false);
+                  } else {
+                    alert('Order saved to system, but failed to submit to Freshways via webhook. Please contact support.');
+                  }
+                })
+                .catch((error) => {
+                  console.error('Error submitting order to webhook:', error);
+                  alert('Order saved to system, but an error occurred while submitting to Freshways via webhook. Please contact support.');
+                });
+
+            } catch (error) {
+              console.error('Unexpected error during order submission:', error);
+              alert('An unexpected error occurred. Please try again.');
+            }
           }}
         >
           <div className="grid gap-4 py-4">
@@ -155,7 +202,6 @@ export default function FreshwaysOrderDialog({
               />
             </div>
             
-            {/* Quantity selection for each item */}
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">
                 Items
@@ -202,12 +248,11 @@ export default function FreshwaysOrderDialog({
                 </table>
               </div>
             </div>
-            {/* Total price display */}
             <div className="mt-4 border-t pt-4">
               <div className="flex justify-between items-center font-medium">
                 <span>Total Order Value:</span>
                 <span className="text-lg text-right">
-                  £{calculateTotalPrice().toFixed(2)}
+                  £{totalPriceForDisplay.toFixed(2)}
                 </span>
               </div>
             </div>
