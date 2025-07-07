@@ -68,7 +68,7 @@ export default function StockWidget() {
       }
       const { data, error } = await supabase
         .from("store_stock_levels")
-        .select("stock_item_id, store_id, quantity, id as store_stock_level_id") // id is primary key of store_stock_levels
+        .select("stock_item_id, store_id, quantity, id:store_stock_level_id") // Corrected alias syntax
         .in("stock_item_id", dailyCheckItemIds);
       if (error) throw error;
       return data || [];
