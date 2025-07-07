@@ -26,6 +26,7 @@ export default function DailyStockCheck() {
   const [search, setSearch] = useState('');
 
   const fetchDailyStockCheckItems = async (currentStoreId) => {
+    console.log('[DailyStockCheck] fetchDailyStockCheckItems CALLED for storeId:', currentStoreId, 'at:', new Date().toLocaleTimeString());
     if (!currentStoreId) return []; // Don't fetch if storeId is not available
 
     // 1. Get all daily_check items
@@ -74,6 +75,7 @@ export default function DailyStockCheck() {
       store_stock_level_id: levelsByItem[item.id]?.store_stock_level_id ?? null,
       last_updated: levelsByItem[item.id]?.last_updated ?? null, // Add last_updated to merged item
     }));
+    console.log('[DailyStockCheck] Data RETURNED by fetchDailyStockCheckItems length:', merged?.length, 'First item if exists:', merged?.[0] ? JSON.parse(JSON.stringify(merged[0])) : 'N/A');
     return merged;
   };
 
@@ -81,12 +83,18 @@ export default function DailyStockCheck() {
     data: stockListData = [], // Default to empty array
     isLoading, // Replaces manual loading state
     isError,
-    error
+    error,
+    isFetching, // Destructure isFetching
+    dataUpdatedAt // Destructure dataUpdatedAt
   } = useQuery({
     queryKey: ['dailyStockCheckItems', storeId],
     queryFn: () => fetchDailyStockCheckItems(storeId),
     enabled: !!storeId, // Only run query if storeId is available
   });
+
+  console.log('[DailyStockCheck] Component Render - useQuery STATE: isLoading:', isLoading, 'isFetching:', isFetching, 'isError:', isError, 'dataUpdatedAt:', dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : 'N/A', 'stockListData length:', stockListData?.length);
+  console.log('[DailyStockCheck] stockListData length:', stockListData?.length, 'First item if exists:', stockListData?.[0] ? JSON.parse(JSON.stringify(stockListData[0])) : 'N/A');
+
 
   // Pagination & Search now operates on stockListData from useQuery
   const filteredStockItems = useMemo(() => {
@@ -166,8 +174,9 @@ const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, cur
       }
     },
     onSuccess: (data, variables) => { // data is what mutationFn returns, variables is what mutate was called with
-      console.log("[DailyStockCheck] Save successful for item ID:", variables.item.id);
+      console.log("[DailyStockCheck] MUTATION onSuccess: Attempting to invalidate queries with key:", ['dailyStockCheckItems', storeId]);
       queryClient.invalidateQueries({ queryKey: ['dailyStockCheckItems', storeId] });
+      console.log("[DailyStockCheck] MUTATION onSuccess: Query invalidation initiated for key:", ['dailyStockCheckItems', storeId]);
       setEditing((prev) => ({ ...prev, [variables.item.id]: undefined }));
       // No need for manual setLoading(false) or refetch here
     },
