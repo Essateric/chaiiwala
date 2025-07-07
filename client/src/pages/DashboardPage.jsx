@@ -30,6 +30,7 @@ import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
 import AddUserForm from "../components/AddUserForm.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
+import StockWidget from "../components/dashboard/stock-widget.jsx"; // Import the StockWidget
 import { Link } from "react-router-dom";
 
 
@@ -379,6 +380,12 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>)}
+
+              {/* Daily Stock Check Items Widget */}
+              {["admin", "store"].includes(dashboardProfile?.permissions) && (
+                <StockWidget />
+              )}
+
               {/* Recent Announcements */}
               {["admin", "regional"].includes(dashboardProfile?.permissions) && (
               <Card>
