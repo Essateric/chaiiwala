@@ -5,15 +5,13 @@ import { Label } from "../ui/label.jsx";
 import { Input } from "../ui/input.jsx";
 import { Textarea } from "../ui/textarea.jsx";
 import React from "react";
-import { supabase } from "../../lib/supabaseClient.js"; // Import Supabase client
+import { supabase } from "../../lib/supabaseClient.js";
 
-// Pass these props: open, setOpen, allowedStores, selectedStoreId, setSelectedStoreId, selectedItems, setSelectedItems, itemPrices, user, profile
 export default function FreshwaysOrderDialog({
   open, setOpen,
   allowedStores, selectedStoreId, setSelectedStoreId,
   selectedItems, setSelectedItems, itemPrices, user, profile
 }) {
-  // Calculate total using price * qty
   const calculateTotalPrice = () => {
     return Object.entries(selectedItems).reduce((total, [key, qty]) => {
       if (qty > 0 && itemPrices[key]) {
@@ -22,7 +20,7 @@ export default function FreshwaysOrderDialog({
       return total;
     }, 0);
   };
-  const totalPrice = calculateTotalPrice();
+  const totalPriceForDisplay = calculateTotalPrice(); // For display in the dialog
 
   const isStoreManager = profile?.permissions === 'store' && allowedStores.length === 1;
 
@@ -46,7 +44,7 @@ export default function FreshwaysOrderDialog({
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
             const orderItems = [];
-            let totalPrice = 0;
+            let currentOrderSubmissionTotalPrice = 0;
             Object.entries(selectedItems).forEach(([key, qty]) => {
               if (qty > 0 && itemPrices[key]) {
                 orderItems.push({
@@ -55,7 +53,7 @@ export default function FreshwaysOrderDialog({
                   quantity: qty,
                   subtotal: `£${(itemPrices[key].price * qty).toFixed(2)}`
                 });
-                totalPrice += itemPrices[key].price * qty;
+                currentOrderSubmissionTotalPrice += itemPrices[key].price * qty;
               }
             });
             const accountNumber = formData.get('account-number');
@@ -75,35 +73,32 @@ export default function FreshwaysOrderDialog({
             const userInitials = user?.username
               ? user.username.substring(0, 2).toUpperCase()
               : 'UA';
-            const orderDisplayId = `FW-${userInitials}${dateStr}-${timeStr}`; // New, more unique ID
+            const orderDisplayId = `FW-${userInitials}${dateStr}-${timeStr}`;
             const storeObj = allowedStores.find(s => s.id === Number(selectedStoreId));
 
-            // 1. Prepare data for Supabase
             const orderDataToSave = {
               order_display_id: orderDisplayId,
               supplier_name: 'Freshways',
               store_id: Number(selectedStoreId),
               user_id: user?.id,
               account_number: accountNumber,
-              items: orderItems, // Already an array of objects
-              total_price: totalPrice,
+              items: orderItems,
+              total_price: currentOrderSubmissionTotalPrice,
               expected_delivery_date: deliveryDate,
               notes: notes,
               status: 'Awaiting Confirmation',
-              // created_at and updated_at will be set by default by Supabase
             };
 
             try {
-              // 2. Insert into Supabase
               const { data: savedOrder, error: supabaseError } = await supabase
-                .from('freshways_orders') // Use the correct table name
+                .from('freshways_orders')
                 .insert([orderDataToSave])
                 .select();
 
               if (supabaseError) {
                 console.error('Error saving order to Supabase:', supabaseError);
                 alert(`Failed to save order to system: ${supabaseError.message}`);
-                return; // Stop if Supabase insert fails
+                return;
               }
 
               if (!savedOrder || savedOrder.length === 0) {
@@ -114,14 +109,14 @@ export default function FreshwaysOrderDialog({
 
               console.log('Order saved to Supabase:', savedOrder[0]);
 
-              // 3. POST order to Make.com webhook (existing logic)
-              // The webhook might eventually read from Supabase using orderDisplayId or savedOrder[0].id
-              fetch('https://hook.eu2.make.com/onukum5y8tnoo3lebhxe2u6op8dfj3oy', {
+              // THIS IS THE NEW WEBHOOK URL
+              fetch('https://hook.eu2.make.com/4m8o9c8re4srvx9vquvid2s8mtw7hzf2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  orderId: orderDisplayId, // Keep original field name for webhook if needed
-                  supabaseOrderId: savedOrder[0].id, // Optionally send Supabase internal ID
+                  orderId: orderDisplayId,
+                  supabaseOrderId: savedOrder[0].id,
+                  placedByName: profile?.name || user?.email || 'Unknown User', // THIS IS THE ADDED FIELD
                   accountNumber,
                   deliveryDate,
                   items: orderItems,
@@ -130,23 +125,21 @@ export default function FreshwaysOrderDialog({
                   storeAddress: storeObj?.address || '',
                   storePhone: storeObj?.phone || '',
                   notes,
-                  totalPrice: totalPrice,
-                  totalPriceFormatted: `£${totalPrice.toFixed(2)}`
+                  totalPrice: currentOrderSubmissionTotalPrice,
+                  totalPriceFormatted: `£${currentOrderSubmissionTotalPrice.toFixed(2)}`
                 }),
               })
                 .then((response) => {
                   if (response.ok) {
                     alert('Order saved and submitted to Freshways successfully!');
-                    setSelectedItems({}); // Clear selected items
-                    setOpen(false); // Close dialog
+                    setSelectedItems({});
+                    setOpen(false);
                   } else {
-                    // Inform user that it was saved locally but webhook failed
                     alert('Order saved to system, but failed to submit to Freshways via webhook. Please contact support.');
                   }
                 })
                 .catch((error) => {
                   console.error('Error submitting order to webhook:', error);
-                  // Inform user that it was saved locally but webhook failed
                   alert('Order saved to system, but an error occurred while submitting to Freshways via webhook. Please contact support.');
                 });
 
@@ -209,7 +202,6 @@ export default function FreshwaysOrderDialog({
               />
             </div>
             
-            {/* Quantity selection for each item */}
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">
                 Items
@@ -256,12 +248,11 @@ export default function FreshwaysOrderDialog({
                 </table>
               </div>
             </div>
-            {/* Total price display */}
             <div className="mt-4 border-t pt-4">
               <div className="flex justify-between items-center font-medium">
                 <span>Total Order Value:</span>
                 <span className="text-lg text-right">
-                  £{calculateTotalPrice().toFixed(2)}
+                  £{totalPriceForDisplay.toFixed(2)}
                 </span>
               </div>
             </div>
