@@ -65,15 +65,29 @@ export default function DailyStockCheck() {
       }));
     }
 
-    // 3. Merge
-    const levelsByItem = {};
-    processedLevelData.forEach(level => { levelsByItem[level.stock_item_id] = level; });
+    // 3. Merge - ensuring only the most recent stock level for each item is used
+    const latestLevelsByItem = {};
+    if (processedLevelData) {
+      processedLevelData.forEach(level => {
+        // Ensure last_updated is valid before comparison
+        if (level.last_updated) {
+          const existingLevel = latestLevelsByItem[level.stock_item_id];
+          if (!existingLevel || new Date(level.last_updated) > new Date(existingLevel.last_updated)) {
+            latestLevelsByItem[level.stock_item_id] = level;
+          }
+        } else if (!latestLevelsByItem[level.stock_item_id]) {
+          // If this item has no entry with a last_updated date yet, take this one
+          // This case might be less common if last_updated is always set
+          latestLevelsByItem[level.stock_item_id] = level;
+        }
+      });
+    }
 
     const merged = items.map(item => ({
       ...item,
-      current_qty: levelsByItem[item.id]?.quantity ?? 0,
-      store_stock_level_id: levelsByItem[item.id]?.store_stock_level_id ?? null,
-      last_updated: levelsByItem[item.id]?.last_updated ?? null, // Add last_updated to merged item
+      current_qty: latestLevelsByItem[item.id]?.quantity ?? 0,
+      store_stock_level_id: latestLevelsByItem[item.id]?.store_stock_level_id ?? null,
+      last_updated: latestLevelsByItem[item.id]?.last_updated ?? null,
     }));
     console.log('[DailyStockCheck] Data RETURNED by fetchDailyStockCheckItems length:', merged?.length, 'First item if exists:', merged?.[0] ? JSON.parse(JSON.stringify(merged[0])) : 'N/A');
     return merged;
@@ -173,14 +187,11 @@ const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, cur
         }
       }
     },
-    onSuccess: (data, variables) => { // data is what mutationFn returns, variables is what mutate was called with
+    onSuccess: (data, variables) => {
       console.log("[DailyStockCheck] MUTATION onSuccess: Save successful for item ID:", variables.item.id, "at", new Date().toLocaleTimeString());
-      console.log("[DailyStockCheck] MUTATION onSuccess: Scheduling query invalidation with 1s delay.");
-      setTimeout(() => {
-        console.log("[DailyStockCheck] MUTATION onSuccess (Delayed): Attempting to invalidate queries with key:", ['dailyStockCheckItems', storeId], "at", new Date().toLocaleTimeString());
-        queryClient.invalidateQueries({ queryKey: ['dailyStockCheckItems', storeId] });
-        console.log("[DailyStockCheck] MUTATION onSuccess (Delayed): Query invalidation initiated for key:", ['dailyStockCheckItems', storeId]);
-      }, 1000);
+      console.log("[DailyStockCheck] MUTATION onSuccess: Attempting to invalidate queries with key:", ['dailyStockCheckItems', storeId]);
+      queryClient.invalidateQueries({ queryKey: ['dailyStockCheckItems', storeId] });
+      console.log("[DailyStockCheck] MUTATION onSuccess: Query invalidation initiated for key:", ['dailyStockCheckItems', storeId]);
       setEditing((prev) => ({ ...prev, [variables.item.id]: undefined }));
     },
     onError: (error, variables) => {
