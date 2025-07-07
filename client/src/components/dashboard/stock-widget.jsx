@@ -1,21 +1,51 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../hooks/UseAuth.jsx"; // Import useAuth
 
 export default function StockWidget() {
+  const { profile: userProfile, isLoading: isAuthLoading } = useAuth(); // Get user profile
+
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
       const { data, error } = await supabase.from("stores").select("id, name");
       if (error) throw error;
       return data || [];
-    }
+    },
+    enabled: !!userProfile // Ensure stores are fetched only after profile is available
   });
 
   const [selectedStoreId, setSelectedStoreId] = useState("all");
 
+  useEffect(() => {
+    if (userProfile?.permissions === "store") {
+      if (userProfile.store_ids?.length > 0) {
+        setSelectedStoreId(String(userProfile.store_ids[0]));
+      } else {
+        setSelectedStoreId(null); // No specific store selected if manager has no stores
+      }
+    } else if (userProfile?.permissions !== "store") { // Admin, regional etc.
+      setSelectedStoreId("all");
+    }
+  }, [userProfile]);
+
+  // Determine stores to display in dropdown
+  const storeOptions = useMemo(() => {
+    if (!userProfile || !stores.length) return [];
+    if (userProfile.permissions === "store") {
+      if (userProfile.store_ids?.length > 0) {
+        return stores.filter(store => userProfile.store_ids.includes(store.id));
+      }
+      return []; // No options if store manager has no assigned stores
+    }
+    // For admin/regional or other roles, show all stores
+    return stores;
+  }, [stores, userProfile]);
+
+
   // Fetch all daily check stock items
-  const { data: dailyCheckStockItems = [], isLoading } = useQuery({
+  const { data: dailyCheckStockItems = [], isLoading: isLoadingDailyCheckItems } = useQuery({
     queryKey: ["daily_check_stock_items"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -37,29 +67,49 @@ export default function StockWidget() {
   const getStoreName = id =>
     stores.find(s => String(s.id) === String(id))?.name || "Unknown";
 
+  const showStoreSelector = useMemo(() => {
+    if (!userProfile) return false; // Don't show if profile not loaded
+    if (userProfile.permissions === "store") {
+      return userProfile.store_ids?.length > 1; // Show if manager of >1 store
+    }
+    return true; // Show for admin, regional, etc.
+  }, [userProfile]);
+
+  if (isAuthLoading) {
+    return (
+      <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
+        Loading user data...
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#faebc8] border border-[#f6d67a] rounded-lg p-4 mb-4">
-      <div className="mb-2 flex items-center">
-        <label className="mr-2 font-semibold">Store:</label>
-        <select
-          className="border rounded p-1 bg-white"
-          value={selectedStoreId}
-          onChange={e => setSelectedStoreId(e.target.value)}
-        >
-          <option value="all">All Stores</option>
-          {stores.map(store => (
-            <option key={store.id} value={store.id}>{store.name}</option>
-          ))}
-        </select>
-      </div>
+      {showStoreSelector && (
+        <div className="mb-2 flex items-center">
+          <label className="mr-2 font-semibold">Store:</label>
+          <select
+            className="border rounded p-1 bg-white"
+            value={selectedStoreId}
+            onChange={e => setSelectedStoreId(e.target.value)}
+          >
+            {/* Admins/Regionals see "All Stores" option if they are not store managers */}
+            {userProfile?.permissions !== "store" && <option value="all">All Stores</option>}
+            {storeOptions.map(store => (
+              <option key={store.id} value={store.id}>{store.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="font-medium mb-2">
-        {isLoading ? (
+        {isLoadingDailyCheckItems ? (
           <span>Loading...</span>
         ) : (
           <span>
             <b>{filteredItems.length}</b> item{filteredItems.length !== 1 ? "s" : ""} for daily check
-            {selectedStoreId !== "all" && (
-              <> for <b>{getStoreName(selectedStoreId)}</b></>
+            {/* Display store name if it's not "all" or if it's a single-store manager */}
+            {(selectedStoreId !== "all" || (userProfile?.permissions === "store" && userProfile.store_ids?.length === 1)) && storeOptions.length > 0 && (
+              <> for <b>{getStoreName(selectedStoreId) || (storeOptions.length === 1 ? storeOptions[0].name : '')}</b></>
             )}
           </span>
         )}
