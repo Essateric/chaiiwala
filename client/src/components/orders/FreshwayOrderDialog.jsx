@@ -26,6 +26,20 @@ export default function FreshwaysOrderDialog({
 
   const isStoreManager = profile?.permissions === 'store' && allowedStores.length === 1;
 
+  useEffect(() => {
+  async function fetchItemPrices() {
+    const { data, error } = await supabase
+      .from('your_items_table')
+      .select('*')
+      .eq('store_id', selectedStoreId);
+
+    if (!error) setItemPrices(data);
+  }
+
+  fetchItemPrices();
+}, [selectedStoreId]);
+
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

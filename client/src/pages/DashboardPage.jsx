@@ -38,6 +38,8 @@ export default function DashboardPage() {
   const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
   const queryClient = useQueryClient();
 
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+
   // Fetch all stores for dropdown
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
     queryKey: ["stores"],
@@ -125,19 +127,25 @@ export default function DashboardPage() {
 
   // Fetch all checklist rows for today (all stores)
   const today = new Date().toISOString().split("T")[0];
-  const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
-    queryKey: ["daily_checklist_status", today],
-    queryFn: async () => {
-      // fetch all checklist rows for today (all stores)
-      const { data, error } = await supabase
-        .from("daily_checklist_status")
-        .select("id, task_id, store_id, status, date")
-        .eq("date", today); // adjust if needed for your column
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!today
-  });
+const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
+  queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId],
+  queryFn: async () => {
+    let query = supabase
+      .from("v_daily_checklist_with_status")
+      .select("*")
+      .eq("date", today);
+
+    if (selectedTaskStoreId !== "all") {
+      query = query.eq("store_id", selectedTaskStoreId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+  enabled: !!today
+});
+
 
   // Calculate percent/complete/total for stats card
   let filteredChecklistRows = checklistRows;
@@ -183,26 +191,32 @@ export default function DashboardPage() {
   }, [checklistRows, allDailyTasks, stores, selectedTaskStoreId]);
 
   // Task complete handler
-  const handleTaskComplete = async (id, newStatus) => {
-    try {
-      const { error } = await supabase
-        .from("daily_checklist_status")
-        .update({ status: newStatus })
-        .eq("id", id);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["daily_checklist_status", today] });
-      toast({
-        title: newStatus === "completed" ? "Task Completed" : "Task Updated",
-        description: `Task has been marked as ${newStatus}.`
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update task status.",
-        variant: "destructive"
-      });
-    }
-  };
+// Task complete handler
+const handleTaskComplete = async (id, newStatus) => {
+  setUpdatingTaskId(id); // Set the updating task
+  const { error } = await supabase
+    .from("daily_checklist_status")
+    .update({
+      status: newStatus,
+      completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+      user_id: user.id // <-- ADD THIS LINE! This is required!
+    })
+    .eq("id", id);
+
+  if (error && error.code !== "409") {
+    toast({
+      title: "❌ Update Failed",
+      description: error.message || "Could not update task.",
+      variant: "destructive"
+    });
+  }
+
+  // Always refresh (even on 409) to show latest state
+  queryClient.invalidateQueries({ queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId] });
+  setUpdatingTaskId(null);
+};
+
+
 
   // Loading and error handling
   if (isAuthLoading || isLoadingStores) {
@@ -363,17 +377,21 @@ export default function DashboardPage() {
                       <p className="text-gray-500 text-sm">No tasks for today</p>
                     ) : (
                       todaysTasksForList.slice(0, 3).map(task => (
-                        <TaskItem
-                          key={task.id}
-                          id={task.id}
-                          title={task.title}
-                          location={task.location}
-                          dueDate={task.date}
-                          completed={task.status === "completed"}
-                          onComplete={(id, value) =>
-                            handleTaskComplete(id, value ? "completed" : "pending")
-                          }
-                        />
+<TaskItem
+  key={task.id}
+  id={task.id}
+  title={task.title}
+  location={task.location}
+  dueDate={task.date}
+  completed={task.status === "completed"}
+  onComplete={(id, value) =>
+    handleTaskComplete(id, value ? "completed" : "pending")
+  }
+  isUpdating={updatingTaskId === task.id}
+
+/>
+
+
                       ))
                     )}
                   </div>

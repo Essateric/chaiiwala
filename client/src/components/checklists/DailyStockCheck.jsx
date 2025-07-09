@@ -13,196 +13,136 @@ export default function DailyStockCheck() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
-  const itemsPerPage = 10;
   const [search, setSearch] = useState('');
+  const itemsPerPage = 10;
 
-
-  // Fetch all daily_check stock items + their store-specific levels
-  useEffect(() => {
+  // ✅ Shared fetch function
+  const fetchStock = async () => {
     if (!storeId) return;
+
     setLoading(true);
-    async function fetchStock() {
-      // 1. Get all daily_check items
-      const { data: items, error: itemError } = await supabase
-        .from("stock_items")
-        .select("*")
-        .eq("daily_check", true)
-        .order("name", { ascending: true });
-      if (itemError) {
-        setStockItems([]);
-        setLoading(false);
-        return;
-      }
 
-      const itemIds = items.map(i => i.id);
+    // 1. Get all daily_check items
+    const { data: items, error: itemError } = await supabase
+      .from("stock_items")
+      .select("*")
+      .eq("daily_check", true)
+      .order("name", { ascending: true });
 
-      // 2. Get store_stock_levels for this store
-      let levels = [];
-      if (itemIds.length > 0) {
-        const { data: levelData, error: levelsError } = await supabase
-          .from("store_stock_levels")
-          .select("*")
-          .in("stock_item_id", itemIds)
-          .eq("store_id", storeId);
-
-        if (!levelsError && levelData) levels = levelData;
-      }
-
-      // 3. Merge
-      const levelsByItem = {};
-      levels.forEach(level => { levelsByItem[level.stock_item_id] = level; });
-
-      const merged = items.map(item => ({
-        ...item,
-        current_qty: levelsByItem[item.id]?.quantity ?? 0,
-        store_stock_level_id: levelsByItem[item.id]?.id ?? null,
-      }));
-
-      setStockItems(merged);
+    if (itemError) {
+      setStockItems([]);
       setLoading(false);
+      return;
     }
+
+    const itemIds = items.map(i => i.id);
+
+    // 2. Get store_stock_levels for this store
+    let levels = [];
+    if (itemIds.length > 0) {
+      const { data: levelData, error: levelsError } = await supabase
+        .from("store_stock_levels")
+        .select("*")
+        .in("stock_item_id", itemIds)
+        .eq("store_id", storeId);
+
+      if (!levelsError && levelData) levels = levelData;
+    }
+
+    // 3. Merge
+    const levelsByItem = {};
+    levels.forEach(level => {
+      levelsByItem[level.stock_item_id] = level;
+    });
+
+    const merged = items.map(item => ({
+      ...item,
+      current_qty: levelsByItem[item.id]?.quantity ?? 0,
+      store_stock_level_id: levelsByItem[item.id]?.id ?? null,
+    }));
+
+    setStockItems(merged);
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchStock();
   }, [storeId]);
 
-  // Pagination
-const filteredStockItems = search
-  ? stockItems.filter(item =>
-      (item.name?.toLowerCase().includes(search.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(search.toLowerCase()))
-    )
-  : stockItems;
+  // ✅ Save (update or insert) to store_stock_levels
+  const handleSaveStock = async (stockRow) => {
+    console.log("Trying to insert new stock row:", stockRow);
 
-const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage);
-const pageItems = filteredStockItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const { data, error } = await supabase
+      .from("store_stock_levels")
+      .upsert(stockRow)
+      .select();
 
+    if (error) {
+      console.error("Error saving stock:", error);
+      alert("Failed to save stock.");
+      return;
+    }
 
-  // Editing logic for quantity
+    alert("Stock saved!");
+    await fetchStock();
+  };
+
+  // ✅ Handle Save click from UI
+  const handleSave = (item) => {
+    const quantity = Number(editing[item.id]);
+    if (isNaN(quantity)) return;
+
+    const stockRow = {
+      stock_item_id: item.id,
+      store_id: storeId,
+      quantity,
+      last_updated: new Date().toISOString(),
+      updated_by: profile?.id,
+      ...(item.store_stock_level_id && { id: item.store_stock_level_id })
+    };
+
+    handleSaveStock(stockRow);
+  };
+
+  // Edit quantity
   const handleEditChange = (id, value) => {
-    setEditing((prev) => ({
+    setEditing(prev => ({
       ...prev,
       [id]: value
     }));
   };
 
-  // Save (update or insert) to store_stock_levels, not stock_items
-const handleSave = async (item) => {
-  const newQty = editing[item.id];
-  if (typeof newQty === "undefined" || newQty === "" || isNaN(Number(newQty))) return;
+  // Filter + paginate
+  const filteredStockItems = search
+    ? stockItems.filter(item =>
+        item.name?.toLowerCase().includes(search.toLowerCase()) ||
+        item.sku?.toLowerCase().includes(search.toLowerCase())
+      )
+    : stockItems;
 
-  setLoading(true);
-
-  if (item.store_stock_level_id) {
-    // Update existing row
-    const { error: updateError } = await supabase
-      .from("store_stock_levels")
-      .update({
-        quantity: Number(newQty),
-        last_updated: new Date().toISOString(),
-        updated_by: profile?.id ?? null,
-      })
-      .eq("id", item.store_stock_level_id);
-    if (updateError) {
-      alert("Update error: " + updateError.message);
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase
-  .from("store_stock_levels")
-  .update({
-    quantity: Number(newQty),
-    last_updated: new Date().toISOString(),
-    updated_by: profile?.id ?? null,
-  })
-  .eq("id", item.store_stock_level_id);
-
-if (error) {
-  console.error("Failed to update stock level:", error);
-  alert("Error updating stock: " + error.message);
-}
-  } else {
-    // Insert new row
-    console.log("Trying to insert new stock row:", {
-      stock_item_id: item.id,
-      store_id: storeId,
-      quantity: Number(newQty),
-      last_updated: new Date().toISOString(),
-      updated_by: profile?.id ?? null,
-    });
-    const { error: insertError } = await supabase
-      .from("store_stock_levels")
-      .insert([{
-        stock_item_id: item.id,
-        store_id: storeId,
-        quantity: Number(newQty),
-        last_updated: new Date().toISOString(),
-        updated_by: profile?.id ?? null,
-      }]);
-    if (insertError) {
-      alert("Insert error: " + insertError.message);
-      setLoading(false);
-      return;
-    }
-  }
-  setEditing((prev) => ({ ...prev, [item.id]: undefined }));
-  setLoading(false);
-
-    // Refetch stock for updated quantities
-    // (You could optimize by only updating the single item, but this is safer for now)
-    if (storeId) {
-      setLoading(true);
-      // Re-fetch like in useEffect
-      const { data: items, error: itemError } = await supabase
-        .from("stock_items")
-        .select("*")
-        .eq("daily_check", true)
-        .order("name", { ascending: true });
-        
-
-      const itemIds = items?.map(i => i.id) ?? [];
-      let levels = [];
-      if (itemIds.length > 0) {
-        const { data: levelData, error: levelsError } = await supabase
-          .from("store_stock_levels")
-          .select("*")
-          .in("stock_item_id", itemIds)
-          .eq("store_id", storeId);
-        if (!levelsError && levelData) levels = levelData;
-      }
-      const levelsByItem = {};
-      levels.forEach(level => { levelsByItem[level.stock_item_id] = level; });
-
-      const merged = (items ?? []).map(item => ({
-        ...item,
-        current_qty: levelsByItem[item.id]?.quantity ?? 0,
-        store_stock_level_id: levelsByItem[item.id]?.id ?? null,
-      }));
-
-      setStockItems(merged);
-      setLoading(false);
-    }
-    
-  };
-
-  
+  const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage);
+  const pageItems = filteredStockItems.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
-    
     <Card className="mb-6">
       <CardHeader>
         <CardTitle>Daily Stock Check</CardTitle>
         <p className="text-sm text-gray-500">Update today’s stock levels for all daily-check items.</p>
       </CardHeader>
       <CardContent>
-         <div className="mb-4 flex items-center">
-    <Input
-      placeholder="Search by name or SKU..."
-      value={search}
-      onChange={e => setSearch(e.target.value)}
-      className="w-64"
-    />
-  </div>
-        
+        <div className="mb-4 flex items-center">
+          <Input
+            placeholder="Search by name or SKU..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-64"
+          />
+        </div>
+
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading stock items...</div>
         ) : (
@@ -210,10 +150,7 @@ if (error) {
             {pageItems.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No daily stock items found.</div>
             ) : (
-              
               <div className="overflow-x-auto">
-                <div className="mb-4 flex items-center">
-</div>
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead>
                     <tr className="bg-gray-50">
@@ -260,13 +197,9 @@ if (error) {
                     ))}
                   </tbody>
                 </table>
-                {/* Pagination controls */}
-                
+
                 <div className="flex justify-between items-center mt-4">
-                  
-                  <span>
-                    Page {currentPage} of {totalPages || 1}
-                  </span>
+                  <span>Page {currentPage} of {totalPages || 1}</span>
                   <div className="space-x-2">
                     <Button
                       variant="outline"
