@@ -244,9 +244,10 @@ export default function DeepCleaningKanban() {
           </Button>
         </div>
         {/* Kanban board */}
-        <div className="flex w-full gap-4 overflow-x-auto scrollbar-hide">
+       <div className="grid grid-cols-7 gap-4 w-full">
           {days.map(day => {
             const dayString = format(day, "yyyy-MM-dd");
+            
             const allTasks = getTasksForDay(day);
             const page = getColumnPage(dayString);
             const pageCount = Math.ceil(allTasks.length / TASKS_PER_PAGE) || 1;
@@ -257,7 +258,8 @@ export default function DeepCleaningKanban() {
             return (
               <div
                 key={dayString}
-                className="bg-white rounded shadow flex-1 min-w-[240px] max-w-[270px] flex flex-col"
+                className="bg-white rounded shadow flex-1 min-w-0 flex flex-col"
+
                 style={{ height: 450 }}
               >
                 <div className="font-semibold text-sm text-gray-700 p-2 border-b">{format(day, "EEE, MMM d")}</div>

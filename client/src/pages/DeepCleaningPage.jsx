@@ -1,172 +1,246 @@
-import React, { useState, useEffect } from "react";
-import { format, addDays } from "date-fns";
+import React, { useState, useEffect } from 'react';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { Loader2, Plus, Filter } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/UseAuth";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { Loader2, Plus, Filter } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/UseAuth';
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/lib/supabaseClient";
+import DeepCleaningKanban from "@/components/DeepCleaningKanban";
 
-// Number of tasks per column page
-const TASKS_PER_PAGE = 10;
+// Calendar localizer setup
+const locales = { 'en-US': enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
-export default function DeepCleaningKanban() {
+// Color logic for calendar cards
+function getTaskColor(task) {
+  if (task.completed_at) return 'green';
+  const created = new Date(task.created_at || task.start);
+  const now = new Date();
+  const ageInDays = (now - created) / (1000 * 60 * 60 * 24);
+  if (ageInDays >= 7) return 'orange';
+  return 'blue';
+}
+
+export default function DeepCleaningPage() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
 
+  // State
   const [stores, setStores] = useState([]);
   const [cleaningTasks, setCleaningTasks] = useState([]);
-  const [tasks, setTasks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedStore, setSelectedStore] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Pagination: page per column (date)
-  const [columnPages, setColumnPages] = useState({}); // {dateString: pageNum}
-
-  // Modal for viewing/editing an existing task
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState('all');
   const [selectedTask, setSelectedTask] = useState(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [events, setEvents] = useState([]);
 
-  // Fetch stores and tasks on mount
+  // Fetch stores from Supabase
   useEffect(() => {
     async function fetchStores() {
-      const { data, error } = await supabase.from("stores").select("id, name");
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id, name');
       if (!error) setStores(data || []);
     }
-    async function fetchCleaningTasks() {
-      const { data, error } = await supabase.from("deep_cleaning_tasks").select("id, dc_task");
-      if (!error) setCleaningTasks(data || []);
-    }
     fetchStores();
-    fetchCleaningTasks();
   }, []);
 
-  // Fetch deep cleaning tasks for the Kanban board
+  // Fetch deep cleaning tasks from Supabase (dc_task)
   useEffect(() => {
     async function fetchTasks() {
-      let { data, error } = await supabase.from("deep_cleaning").select("*");
-      if (!data) data = [];
-      // Filter by permissions
-      if (profile?.permissions === "store" && profile.store_ids?.[0]) {
-        data = data.filter(task => task.store_id === profile.store_ids[0]);
-      } else if (
-        (profile?.permissions === "admin" || profile?.permissions === "regional") &&
-        selectedStore !== "all"
-      ) {
-        data = data.filter(task => task.store_id === Number(selectedStore));
-      }
-      setTasks(data);
+      const { data, error } = await supabase
+        .from('deep_cleaning_tasks')
+        .select('id, dc_task');
+      if (!error) setCleaningTasks(data || []);
     }
-    if (profile) fetchTasks();
-  }, [profile, selectedStore, isLoading]);
+    fetchTasks();
+  }, []);
 
   // Only show relevant stores in dropdown for admin/regional
   const visibleStores =
-    profile?.permissions === "admin"
+    profile?.permissions === 'admin'
       ? stores
       : stores.filter(store => profile?.store_ids?.includes(store.id));
 
-  // All dates in range (today + next 6 days)
-  const today = new Date();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
-
-  // Task input form setup
+  // Form setup
   const form = useForm({
     defaultValues: {
-      task: "",
-      startTime: "09:00",
-      endTime: "10:00",
-      anytime: false,
+      task: '',
+      startTime: '09:00',
+      endTime: '10:00',
       storeId:
-        profile?.permissions === "store"
+        profile?.permissions === 'store'
           ? String(profile?.store_ids?.[0])
-          : selectedStore !== "all"
-          ? selectedStore
-          : "",
-      date: format(today, "yyyy-MM-dd")
+          : selectedStore !== 'all'
+            ? selectedStore
+            : '',
+      anytime: false // <-- NEW
     }
   });
 
-  // Handle add task
-  const onSubmit = async data => {
+  // Fetch events from Supabase
+  useEffect(() => {
+    async function fetchEvents() {
+      const { data, error } = await supabase
+        .from('deep_cleaning')
+        .select('*');
+      let filteredEvents = data || [];
+      // Store managers: only see their own store
+      if (profile?.permissions === 'store' && profile.store_ids?.[0]) {
+        filteredEvents = filteredEvents.filter(
+          event => event.store_id === profile.store_ids[0]
+        );
+      }
+      // Regional/admin: filter by selected store
+      else if (
+        (profile?.permissions === 'admin' || profile?.permissions === 'regional') &&
+        selectedStore !== 'all'
+      ) {
+        filteredEvents = filteredEvents.filter(
+          event => event.store_id === Number(selectedStore)
+        );
+      }
+      setEvents(
+        filteredEvents.map(ev => ({
+          ...ev,
+          start: new Date(ev.start),
+          end: new Date(ev.end_time)
+        }))
+      );
+    }
+    fetchEvents();
+  }, [profile, selectedStore, isLoading, stores]);
+
+  // Calendar slot select handler
+  const handleSelectSlot = ({ start }) => {
+    setSelectedDate(start);
+    setIsModalOpen(true);
+    const storeId =
+      profile?.permissions === 'store'
+        ? String(profile.store_ids?.[0])
+        : selectedStore !== 'all'
+          ? selectedStore
+          : '';
+    form.reset({
+      task: '',
+      startTime: '09:00',
+      endTime: '10:00',
+      storeId,
+      anytime: false // <-- reset anytime flag
+    });
+  };
+
+  // Calendar event select handler
+  const handleEventSelect = (event) => {
+    setSelectedTask(event);
+    setViewDialogOpen(true);
+  };
+
+  // Create new cleaning task
+  const onSubmit = async (data) => {
+    if (!selectedDate) return;
     setIsLoading(true);
-    const startDate = new Date(data.date);
-    const endDate = new Date(data.date);
-    if (!data.anytime) {
-      const [startHours, startMinutes] = data.startTime.split(":").map(Number);
-      const [endHours, endMinutes] = data.endTime.split(":").map(Number);
+
+    // Compose start/end from selected date and form times
+    let startDate = new Date(selectedDate);
+    let endDate = new Date(selectedDate);
+
+    if (data.anytime) {
+      startDate.setHours(0, 0, 0, 0);     // 00:00
+      endDate.setHours(23, 59, 59, 999);  // 23:59:59
+    } else {
+      const [startHours, startMinutes] = data.startTime.split(':').map(Number);
+      const [endHours, endMinutes] = data.endTime.split(':').map(Number);
       startDate.setHours(startHours, startMinutes, 0, 0);
       endDate.setHours(endHours, endMinutes, 0, 0);
-    } else {
-      // If anytime, just set to midnight for both
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(0, 0, 0, 0);
     }
 
     // Lookup correct store ID/name
-    let storeId = null, storeName = "";
-    if (profile?.permissions === "store" && profile.store_ids?.[0]) {
+    let storeId = null, storeName = '';
+    if (profile?.permissions === 'store' && profile.store_ids?.[0]) {
       storeId = profile.store_ids[0];
-      storeName = stores.find(s => s.id === storeId)?.name || "";
+      storeName = stores.find(s => s.id === storeId)?.name || '';
     } else if (data.storeId) {
       storeId = Number(data.storeId);
-      storeName = stores.find(s => s.id === storeId)?.name || "";
+      storeName = stores.find(s => s.id === storeId)?.name || '';
     }
 
+    // The selected task (from dc_task) string
     const taskName = data.task;
-    const { error } = await supabase
-      .from("deep_cleaning")
+
+    // Save to Supabase
+    const { data: insertData, error } = await supabase
+      .from('deep_cleaning')
       .insert([
         {
-          task: taskName,
+          task: taskName, // Store the dc_task string!
           start: startDate.toISOString(),
           end_time: endDate.toISOString(),
           store_id: storeId,
           store_name: storeName,
-          anytime: !!data.anytime,
           created_by: profile?.id,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          anytime: data.anytime // <-- SAVE THE FLAG!
         }
-      ]);
-    setIsLoading(false);
+      ])
+      .select()
+      .single();
+
     if (!error) {
       toast({
-        title: "Deep cleaning task scheduled",
-        description: `${taskName} scheduled for ${storeName} on ${format(startDate, "MMMM dd, yyyy")}`
+        title: 'Deep cleaning task scheduled',
+        description: `${taskName} scheduled for ${storeName} on ${format(
+          startDate,
+          'MMMM dd, yyyy'
+        )}`
       });
+      setIsLoading(false);
       setIsModalOpen(false);
-      form.reset();
-      setTasks([]); // force refresh
-      setTimeout(() => setIsLoading(false), 200); // quick hack for effect
+      setEvents(prev => [
+        ...prev,
+        {
+          ...insertData,
+          start: new Date(insertData.start),
+          end: new Date(insertData.end_time)
+        }
+      ]);
     } else {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive"
       });
+      setIsLoading(false);
     }
-  };
-
-  // ---- Pagination helpers ----
-  const getTasksForDay = day => {
-    const dayString = format(day, "yyyy-MM-dd");
-    return tasks.filter(
-      t => format(new Date(t.start), "yyyy-MM-dd") === dayString
-    );
-  };
-
-  const getColumnPage = dayString => columnPages[dayString] || 1;
-  const setColumnPage = (dayString, pageNum) => {
-    setColumnPages(p => ({ ...p, [dayString]: pageNum }));
   };
 
   // Mark task as complete
@@ -183,7 +257,7 @@ export default function DeepCleaningKanban() {
         title: 'Task marked as complete!',
         description: `${selectedTask.task} is now completed.`,
       });
-      setTasks((prev) =>
+      setEvents((prev) =>
         prev.map((task) =>
           task.id === selectedTask.id
             ? { ...task, completed_at: now.toISOString() }
@@ -201,106 +275,48 @@ export default function DeepCleaningKanban() {
     }
   };
 
-  // ---- Render ----
-  return (
-    <DashboardLayout title="Deep Cleaning Kanban">
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold text-white mb-1">Deep Cleaning Kanban</h1>
-        <p className="text-gray-400 mb-6">
-          Each column is a day. Drag tasks to reschedule (coming soon).
-        </p>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4 mb-6">
-          <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add New Task
-          </Button>
-          {(profile?.permissions === "admin" || profile?.permissions === "regional") && (
-            <div className="flex items-center">
-              <Select value={selectedStore} onValueChange={setSelectedStore}>
-                <SelectTrigger className="w-[200px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter by Store" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stores</SelectItem>
-                  {visibleStores.map(store => (
-                    <SelectItem key={store.id} value={String(store.id)}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-        {/* Kanban board */}
-        <div className="flex w-full gap-4 overflow-x-auto scrollbar-hide">
-          {days.map(day => {
-            const dayString = format(day, "yyyy-MM-dd");
-            const allTasks = getTasksForDay(day);
-            const page = getColumnPage(dayString);
-            const pageCount = Math.ceil(allTasks.length / TASKS_PER_PAGE) || 1;
-            const paginated = allTasks.slice(
-              (page - 1) * TASKS_PER_PAGE,
-              page * TASKS_PER_PAGE
-            );
-            return (
-              <div
-                key={dayString}
-                className="bg-white rounded shadow flex-1 min-w-[240px] max-w-[270px] flex flex-col"
-                style={{ height: 450 }}
-              >
-                <div className="font-semibold text-sm text-gray-700 p-2 border-b">{format(day, "EEE, MMM d")}</div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {paginated.length === 0 ? (
-                    <div className="text-xs text-gray-400 text-center">No tasks</div>
-                  ) : (
-                    paginated.map(task => (
-                      <div
-                        key={task.id}
-                        className="bg-yellow-50 border rounded p-2 cursor-pointer"
-                        onClick={() => { setSelectedTask(task); setViewDialogOpen(true); }}
-                      >
-                        <div className="font-bold text-sm">{task.task}</div>
-                        <div className="text-xs">{task.store_name}</div>
-                        <div className="text-xs text-gray-500">
-                          {task.anytime
-                            ? <span>Anytime</span>
-                            : <>
-                              {format(new Date(task.start), "h:mmaaa")} - {format(new Date(task.end_time), "h:mmaaa")}
-                            </>
-                          }
-                        </div>
-                        {task.completed_at && (
-                          <div className="text-xs text-green-700 mt-1">✔ Completed</div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-                {pageCount > 1 && (
-                  <div className="flex justify-between items-center p-1 border-t text-xs bg-yellow-100 rounded-b">
-                    <Button size="sm" variant="ghost" disabled={page === 1}
-                      onClick={() => setColumnPage(dayString, page - 1)}>Prev</Button>
-                    <span>
-                      Page {page} / {pageCount}
-                    </span>
-                    <Button size="sm" variant="ghost" disabled={page === pageCount}
-                      onClick={() => setColumnPage(dayString, page + 1)}>Next</Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+  // Calendar card color logic
+  const eventPropGetter = (event) => {
+    const color = getTaskColor(event);
+    return {
+      style: {
+        backgroundColor: color,
+        borderColor: color,
+        color: 'white'
+      }
+    };
+  };
 
-      {/* Modal for scheduling new task (re-using your form) */}
+  // Calendar event title logic
+  const getEventTitle = (event) => {
+    let timeLabel = '';
+    if (event.anytime) {
+      timeLabel = '(Anytime)';
+    } else if (event.start && event.end) {
+      timeLabel =
+        ' (' +
+        format(event.start, 'HH:mm') +
+        '-' +
+        format(event.end, 'HH:mm') +
+        ')';
+    }
+    if ((profile?.permissions === 'admin' || profile?.permissions === 'regional') && event.store_name) {
+      return `${event.task}${timeLabel} - ${event.store_name}`;
+    }
+    return `${event.task}${timeLabel}`;
+  };
+
+  return (
+    <>
+      <DeepCleaningKanban />
+
+      {/* Modal for scheduling new task */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Add Deep Cleaning Task</DialogTitle>
             <DialogDescription>
-              Schedule a new task for any day and store.
+              {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -332,7 +348,7 @@ export default function DeepCleaningKanban() {
                   </FormItem>
                 )}
               />
-              {(profile?.permissions === "admin" || profile?.permissions === "regional") && (
+              {(profile?.permissions === 'admin' || profile?.permissions === 'regional') && (
                 <FormField
                   control={form.control}
                   name="storeId"
@@ -360,22 +376,7 @@ export default function DeepCleaningKanban() {
                   )}
                 />
               )}
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <input
-                        type="date"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+
               {/* NEW CHECKBOX FOR ANYTIME */}
               <FormField
                 control={form.control}
@@ -396,6 +397,7 @@ export default function DeepCleaningKanban() {
                   </FormItem>
                 )}
               />
+
               {/* TIME INPUTS */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -444,7 +446,7 @@ export default function DeepCleaningKanban() {
                       Scheduling...
                     </>
                   ) : (
-                    "Schedule Task"
+                    'Schedule Task'
                   )}
                 </Button>
               </DialogFooter>
@@ -471,11 +473,12 @@ export default function DeepCleaningKanban() {
               {selectedTask.completed_at && (
                 <div><b>Completed:</b> {format(selectedTask.completed_at, "PPpp")}</div>
               )}
-              {selectedTask.anytime ? (
+              {selectedTask.anytime && (
                 <div><b>Time:</b> Anytime</div>
-              ) : (
+              )}
+              {!selectedTask.anytime && (
                 <div>
-                  <b>Time:</b> {format(selectedTask.start, 'HH:mm')} - {format(selectedTask.end_time, 'HH:mm')}
+                  <b>Time:</b> {format(selectedTask.start, 'HH:mm')} - {format(selectedTask.end, 'HH:mm')}
                 </div>
               )}
             </div>
@@ -492,6 +495,6 @@ export default function DeepCleaningKanban() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }
