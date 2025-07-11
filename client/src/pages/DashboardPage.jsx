@@ -147,22 +147,27 @@ const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
 });
 
 
-  // Calculate percent/complete/total for stats card
-  let filteredChecklistRows = checklistRows;
-  if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
-    filteredChecklistRows = checklistRows.filter(row => String(row.store_id) === String(selectedTaskStoreId));
-  }
-  const totalTasks = filteredChecklistRows.length;
-  const completedTasks = filteredChecklistRows.filter(row => row.status === "completed").length;
-  const percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+// For stats card: SUM all rows across all stores if "all"
+let filteredChecklistRows = checklistRows;
+if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
+  filteredChecklistRows = checklistRows.filter(row => String(row.store_id) === String(selectedTaskStoreId));
+}
 
-  // For "All Stores" show %, else show completed/total
-  let openTasksStatDisplay;
-  if (selectedTaskStoreId === "all") {
-    openTasksStatDisplay = totalTasks > 0 ? `${Math.round((completedTasks / totalTasks) * 100)}%` : "0%";
-  } else {
-    openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
-  }
+let totalTasks, completedTasks, percentComplete, openTasksStatDisplay;
+
+if (selectedTaskStoreId === "all") {
+  // For ALL STORES: count every row
+  totalTasks = checklistRows.length;
+  completedTasks = checklistRows.filter(row => row.status === "completed").length;
+  percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+  openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
+} else {
+  // For single store
+  totalTasks = filteredChecklistRows.length;
+  completedTasks = filteredChecklistRows.filter(row => row.status === "completed").length;
+  percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+  openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
+}
 
   // Fetch task titles for today's tasks (allDailyTasks)
   const { data: allDailyTasks = [] } = useQuery({
@@ -177,6 +182,11 @@ const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
     enabled: !!today
   });
 
+console.log("ChecklistRows:", checklistRows);
+console.log("Pending count (raw):", checklistRows.filter(row => row.status === "pending").length);
+
+
+
   // Map tasks for "Today's Tasks" list, based on selectedTaskStoreId
   const todaysTasksForList = useMemo(() => {
     let filteredRows = checklistRows;
@@ -190,7 +200,6 @@ const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
     }));
   }, [checklistRows, allDailyTasks, stores, selectedTaskStoreId]);
 
-  // Task complete handler
 // Task complete handler
 const handleTaskComplete = async (id, newStatus) => {
   setUpdatingTaskId(id); // Set the updating task

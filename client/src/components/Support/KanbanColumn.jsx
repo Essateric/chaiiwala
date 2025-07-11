@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useAuth } from "../../hooks/UseAuth.jsx";
+import CommentSection from "./CommentSection.jsx"; // Adjust path if needed
+
 
 // Modal for showing full ticket details, with delete button if allowed
 function TicketModal({ ticket, onClose, canDelete, onDelete }) {
@@ -42,7 +44,7 @@ function TicketModal({ ticket, onClose, canDelete, onDelete }) {
     </a>
           </div>
         )}
-        <div className="mt-4 text-xs text-gray-400">ID: {ticket.id}</div>
+ <CommentSection ticketId={ticket.id} />
         {canDelete && ticket.status !== "completed" && (
           <div className="mt-4">
             <button
