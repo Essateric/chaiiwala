@@ -15,8 +15,6 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { MentionsInput, Mention } from "react-mentions";
 import { useJobLogs } from "../../hooks/use-joblogs.jsx";
 import { useJobLogComments } from "../../hooks/useJobLogComments.jsx";
-import { useCategories } from "../../hooks/use-categories.jsx";
-import { FileUpload } from "../../components/ui/file-upload.jsx";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function JobLogCard({ log }) {
@@ -28,26 +26,16 @@ export default function JobLogCard({ log }) {
   const [staffList, setStaffList] = useState([]);
   const { comments, addComment, loading } = useJobLogComments(log.id);
   const { refetch: refetchJobLogs } = useJobLogs();
-  const { categories = [] } = useCategories();
   const queryClient = useQueryClient();
 
-  // Edit/delete state
+  // --------- Edit/delete state ---------
   const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({
-    title: log.title,
-    description: log.description,
-    category: log.category || "",
-    flag: log.flag || "normal",
-  });
-  const [editImages, setEditImages] = useState(log.ImageUpload || []);
+  const [editData, setEditData] = useState({ title: log.title, description: log.description });
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchStaff = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name")
-        .is("deleted_at", null);
+      const { data, error } = await supabase.from("profiles").select("id, name");
       if (!error && Array.isArray(data)) {
         setStaffList(data.map((u) => ({ id: u.id, display: u.name })));
       }
@@ -57,29 +45,20 @@ export default function JobLogCard({ log }) {
 
   // Update edit fields if log changes
   useEffect(() => {
-    setEditData({
-      title: log.title,
-      description: log.description,
-      category: log.category || "",
-      flag: log.flag || "normal",
-    });
-    setEditImages(log.ImageUpload || []);
-  }, [log.title, log.description, log.category, log.flag, log.ImageUpload]);
+    setEditData({ title: log.title, description: log.description });
+  }, [log.title, log.description]);
 
   const isUrgent = log.flag === "urgent" || log.priority === "urgent";
 
   const getAllowedNextStatuses = (currentStatus, role) => {
     if (role === "admin") {
-      if (currentStatus === "pending")
-        return ["approved", "in_progress", "completed"];
-      if (currentStatus === "approved")
-        return ["in_progress", "completed"];
+      if (currentStatus === "pending") return ["approved", "in_progress", "completed"];
+      if (currentStatus === "approved") return ["in_progress", "completed"];
       if (currentStatus === "in_progress") return ["completed"];
     }
     if (role === "regional") {
       if (currentStatus === "pending") return ["approved"];
-      if (currentStatus === "approved")
-        return ["in_progress", "completed"];
+      if (currentStatus === "approved") return ["in_progress", "completed"];
       if (currentStatus === "in_progress") return ["completed"];
     }
     if (role === "maintenance") {
@@ -106,7 +85,6 @@ export default function JobLogCard({ log }) {
     }
   };
 
-  // Format log date
   let displayDate = "Unknown date";
   try {
     const parsed = new Date(`${log.logDate} ${log.logTime}`);
@@ -115,27 +93,15 @@ export default function JobLogCard({ log }) {
     }
   } catch {}
 
-  const hasImage =
-    Array.isArray(log?.ImageUpload) && log.ImageUpload.length > 0;
-  const allowedStatuses = getAllowedNextStatuses(
-    log.status,
-    profile?.permissions
-  );
+  const hasImage = Array.isArray(log?.ImageUpload) && log.ImageUpload.length > 0;
+  const allowedStatuses = getAllowedNextStatuses(log.status, profile?.permissions);
 
-  // Store details from joined object
+  // THIS IS WHERE YOU DISPLAY THE STORE DETAILS FROM THE JOINED OBJECT
   const store = log.stores && typeof log.stores === "object" ? log.stores : null;
 
-  // Edit/Save logic
+  // ----- Edit/Save logic -----
   const handleEditChange = (key, value) => {
     setEditData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleAddImage = (url) => {
-    if (!editImages.includes(url)) setEditImages((prev) => [...prev, url]);
-  };
-
-  const handleRemoveImage = (url) => {
-    setEditImages((prev) => prev.filter((img) => img !== url));
   };
 
   const handleEditSave = async () => {
@@ -145,38 +111,22 @@ export default function JobLogCard({ log }) {
       .update({
         title: editData.title,
         description: editData.description,
-        category: editData.category,
-        flag: editData.flag,
-        ImageUpload: editImages,
       })
       .eq("id", log.id);
     if (error) {
       alert("Failed to update: " + error.message);
     } else {
       setEditing(false);
-      await refetchJobLogs();
+      await refetchJobLogs(); // Refresh!
     }
   };
 
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this maintenance ticket?"
-      )
-    )
-      return;
+    if (!window.confirm("Are you sure you want to delete this maintenance ticket?")) return;
     setDeleting(true);
-    const { error } = await supabase
-      .from("joblogs")
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: user.id,
-      })
-      .eq("id", log.id);
-
+    const { error } = await supabase.from("joblogs").delete().eq("id", log.id);
     if (error) {
       alert("Failed to delete: " + error.message);
-      console.error(error);
     } else {
       setOpen(false);
       await refetchJobLogs();
@@ -230,31 +180,26 @@ export default function JobLogCard({ log }) {
       </DialogTrigger>
 
       <DialogContent className="max-w-3xl w-full sm:max-w-[90%] md:max-w-2xl overflow-y-auto max-h-[90vh]">
-        {/* Edit/Delete buttons for pending status */}
+        {/* ---- Pending: Edit/Delete buttons ---- */}
         {log.status === "pending" && !editing && (
           <div className="flex gap-2 mb-4">
             <Button size="sm" onClick={() => setEditing(true)}>
               Edit
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
+            <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? "Deleting..." : "Delete"}
             </Button>
           </div>
         )}
 
-        {/* Edit Form */}
+        {/* ---- Edit Form ---- */}
         {editing ? (
           <div className="space-y-2 mb-4">
             <label className="block font-bold">Title</label>
             <input
               className="border rounded w-full p-2"
               value={editData.title}
-              onChange={(e) => handleEditChange("title", e.target.value)}
+              onChange={e => handleEditChange("title", e.target.value)}
               maxLength={100}
               disabled={deleting}
             />
@@ -263,69 +208,15 @@ export default function JobLogCard({ log }) {
               className="border rounded w-full p-2"
               rows={3}
               value={editData.description}
-              onChange={(e) => handleEditChange("description", e.target.value)}
+              onChange={e => handleEditChange("description", e.target.value)}
               maxLength={1000}
               disabled={deleting}
             />
-            <label className="block font-bold">Category</label>
-            <select
-              className="border rounded w-full p-2"
-              value={editData.category}
-              onChange={(e) => handleEditChange("category", e.target.value)}
-              disabled={deleting}
-            >
-              <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.name}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-            <label className="block font-bold">Priority</label>
-            <select
-              className="border rounded w-full p-2"
-              value={editData.flag}
-              onChange={(e) => handleEditChange("flag", e.target.value)}
-              disabled={deleting}
-            >
-              <option value="normal">Normal</option>
-              <option value="long_standing">Long Standing</option>
-              <option value="urgent">Urgent</option>
-            </select>
-            <label className="block font-bold">Images</label>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              {editImages.map((img, i) => (
-                <div key={i} className="relative">
-                  <img
-                    src={img}
-                    alt={`Edit Preview ${i}`}
-                    className="w-full h-24 object-cover rounded border"
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-0 right-0 bg-red-600 text-white px-2 py-1 rounded-bl text-xs"
-                    onClick={() => handleRemoveImage(img)}
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mb-2">
-              <label className="block text-xs mb-1">Add Image</label>
-              <FileUpload onUploadComplete={handleAddImage} />
-            </div>
             <div className="flex gap-2 mt-2">
               <Button size="sm" onClick={handleEditSave} disabled={deleting}>
                 Save
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditing(false)}
-                disabled={deleting}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={deleting}>
                 Cancel
               </Button>
             </div>
@@ -363,9 +254,7 @@ export default function JobLogCard({ log }) {
               </div>
             )}
 
-            <p className="text-sm whitespace-pre-wrap mb-4">
-              {log.description}
-            </p>
+            <p className="text-sm whitespace-pre-wrap mb-4">{log.description}</p>
 
             {log.initial_comment && (
               <div className="mb-4">
@@ -381,8 +270,7 @@ export default function JobLogCard({ log }) {
                 <strong>Category:</strong> {log.category}
               </p>
               <p>
-                <strong>Priority:</strong>{" "}
-                {log.flag?.replace("_", " ")}
+                <strong>Priority:</strong> {log.flag?.replace("_", " ")}
               </p>
             </div>
 
@@ -405,27 +293,15 @@ export default function JobLogCard({ log }) {
               <h3 className="font-semibold text-sm mb-1">Comments</h3>
               <div className="space-y-2">
                 {loading ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading comments...
-                  </p>
+                  <p className="text-sm text-muted-foreground">Loading comments...</p>
                 ) : comments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No comments yet.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No comments yet.</p>
                 ) : (
                   comments.map((c) => (
-                    <div
-                      key={c.id}
-                      className="bg-yellow-600 rounded p-2 text-sm text-white"
-                    >
+                    <div key={c.id} className="bg-yellow-600 rounded p-2 text-sm text-white">
                       <p>{c.comment}</p>
                       <div className="text-xs mt-1 opacity-80">
-                        <strong>
-                          {c.profiles?.name ||
-                            c.commenter_name ||
-                            "Unknown"}
-                          :
-                        </strong>{" "}
+                        <strong>{c.profiles?.name || c.commenter_name || "Unknown"}:</strong>{" "}
                         {format(new Date(c.created_at), "d MMM yyyy, h:mmaaa")}
                       </div>
                     </div>
@@ -434,17 +310,13 @@ export default function JobLogCard({ log }) {
               </div>
             </div>
 
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!user?.id || !newComment.trim()) return;
-                const commenterName =
-                  profile?.name || user?.email || "Unknown User";
-                await addComment(user.id, newComment, commenterName);
-                setNewComment("");
-              }}
-              className="space-y-2"
-            >
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!user?.id || !newComment.trim()) return;
+              const commenterName = profile?.name || user?.email || "Unknown User";
+              await addComment(user.id, newComment, commenterName);
+              setNewComment("");
+            }} className="space-y-2">
               <MentionsInput
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}

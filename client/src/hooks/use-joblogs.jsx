@@ -22,6 +22,7 @@ function useJobLogs(storeId) {
             store_code
           )
         `)
+         .is("deleted_at", null) 
         .order("created_at", { ascending: false });
 
       if (storeId) {
