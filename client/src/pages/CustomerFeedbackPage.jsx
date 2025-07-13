@@ -349,7 +349,6 @@ function CustomerFeedbackPage() {
   type="file"
   accept="image/*"
   capture="environment"
-  multiple
   onChange={handleImageUpload}
   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 />
