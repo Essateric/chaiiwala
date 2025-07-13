@@ -17,6 +17,8 @@ import DailyChecklist from "./pages/DailyChecklist.jsx";
 import SupportPage from "./pages/SupportPage.jsx";
 import  NotificationListener  from "./components/Support/NotificationListener.jsx";
 import { Toaster } from 'sonner';
+import CustomerFeedbackPage from "./pages/CustomerFeedbackPage.jsx";
+
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -111,6 +113,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/customerfeedback" element={<CustomerFeedbackPage />} />
+
 
         {/* Developer import logs page (NO sidebar) */}
         <Route path="/dev/import-joblogs" element={<ImportJobLogsPage />} />
