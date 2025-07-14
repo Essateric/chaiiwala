@@ -3,6 +3,40 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Star, Send, MapPin, Clock, User } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
+// Create Supabase client OUTSIDE the component to avoid GoTrueClient warning
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+// Helper to upload all images and return their public URLs
+async function uploadImagesToSupabase(files) {
+  const uploadedUrls = [];
+  for (const file of files) {
+    const fileExt = file.name.split('.').pop();
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `feedback/${uniqueName}`;
+    // Upload
+    const { error } = await supabase
+      .storage
+.from('customer-feedback-images')
+      .upload(filePath, file);
+    if (error) {
+      alert('Failed to upload image: ' + error.message);
+      continue;
+    }
+    // Get public URL
+    const { data } = supabase
+      .storage
+      .from('food-feedback')
+      .getPublicUrl(filePath);
+    if (data && data.publicUrl) {
+      uploadedUrls.push(data.publicUrl);
+    }
+  }
+  return uploadedUrls;
+}
+
 function CustomerFeedbackPage() {
   const [formData, setFormData] = useState({
     customerExperience: 0,
@@ -29,12 +63,6 @@ function CustomerFeedbackPage() {
   const [foodImages, setFoodImages] = useState([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [storeNames, setStoreNames] = useState([]);
-
-
-  const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,44 +94,75 @@ function CustomerFeedbackPage() {
     return Math.round(average * 10) / 10;
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  // Submit handler: upload images -> save feedback in Supabase -> send to webhook
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  // Prepare images (you may need to upload to storage first and get URLs)
-  // For now, send file names (or you could upload and get URLs)
-  const imageList = foodImages.map(file => file.name);
+    // 1. Upload images and get public URLs
+    let imageUrls = [];
+    if (foodImages.length > 0) {
+      imageUrls = await uploadImagesToSupabase(foodImages);
+    }
 
-  // Prepare payload
-  const payload = {
-    ...formData,
-    foodImages: imageList // or image URLs if you upload to S3/Storage
+    // 2. Prepare data in snake_case for Supabase and webhook
+    const payload = {
+      customer_experience: formData.customerExperience,
+      offered_other_items: formData.offeredOtherItems,
+      order_read_back: formData.orderReadBack,
+      staff_chewing_gum: formData.staffChewingGum,
+      display_presentable: formData.displayPresentable,
+      friendly_greeting: formData.friendlyGreeting,
+      customer_area_clean: formData.customerAreaClean,
+      staff_in_uniform: formData.staffInUniform,
+      shop_vibe: formData.shopVibe,
+      temperature_suitable: formData.temperatureSuitable,
+      food_drink_quality: formData.foodDrinkQuality,
+      food_drink_description: formData.foodDrinkDescription,
+      hot_drink_temperature: formData.hotDrinkTemperature,
+      cutlery_provided: formData.cutleryProvided,
+      staff_work_activities: formData.staffWorkActivities,
+      additional_comments: formData.additionalComments,
+      customer_name: formData.customerName,
+      visit_date: formData.visitDate,
+      location: formData.location,
+      food_images: imageUrls // JSONB array of public URLs
+    };
+
+    // 3. Insert into Supabase feedback table
+    const { error: supaError } = await supabase
+      .from('customer_feedback')
+      .insert([payload]);
+
+    if (supaError) {
+      alert('Error saving feedback: ' + supaError.message);
+      return;
+    }
+
+    // 4. Send to webhook (Make)
+    await fetch('https://hook.eu2.make.com/4ja7kw5r6knto2h5cmoirhrv93a6a8pj', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    setIsSubmitted(true);
   };
 
-  // Send to webhook
-  await fetch('https://hook.eu2.make.com/y5rmbdjzyh8nqx08rvij7fb2nt17tpon', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  setIsSubmitted(true);
-};
-
-useEffect(() => {
-  async function fetchStores() {
-    const { data, error } = await supabase
-      .from('stores')
-      .select('name')
-      .order('name');
-    if (!error && data) {
-      setStoreNames(data.map(store => store.name));
+  // Load store names for dropdown
+  useEffect(() => {
+    async function fetchStores() {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('name')
+        .order('name');
+      if (!error && data) {
+        setStoreNames(data.map(store => store.name));
+      }
     }
-  }
-  fetchStores();
-}, []);
+    fetchStores();
+  }, []);
 
-
-
+  // ... (StarRating and YesNoQuestion components unchanged) ...
   const StarRating = (props) => (
     <div className="space-y-2">
       <label className="text-sm font-medium text-gray-700">{props.label}</label>
@@ -243,18 +302,17 @@ useEffect(() => {
                   Location
                 </label>
                 <select
-  value={formData.location}
-  onChange={(e) => handleInputChange('location', e.target.value)}
-  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
->
-  <option value="">Select a location</option>
-  {storeNames.map((name) => (
-    <option key={name} value={name}>
-      {name}
-    </option>
-  ))}
-</select>
-
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">Select a location</option>
+                  {storeNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -389,15 +447,14 @@ useEffect(() => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload photos of your food/drink
                 </label>
-<input
-  type="file"
-  accept="image/*"
-  capture="environment"
-  multiple
-  onChange={handleImageUpload}
-  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-/>
-
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
 
                 {foodImages.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
