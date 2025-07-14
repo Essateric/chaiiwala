@@ -1,6 +1,7 @@
 // src/pages/CustomerFeedbackPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Camera, Star, Send, MapPin, Clock, User } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 function CustomerFeedbackPage() {
   const [formData, setFormData] = useState({
@@ -27,6 +28,13 @@ function CustomerFeedbackPage() {
 
   const [foodImages, setFoodImages] = useState([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [storeNames, setStoreNames] = useState([]);
+
+
+  const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -58,13 +66,43 @@ function CustomerFeedbackPage() {
     return Math.round(average * 10) / 10;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Submit logic
-    console.log('Form submitted:', formData);
-    console.log('Images:', foodImages);
-    setIsSubmitted(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  // Prepare images (you may need to upload to storage first and get URLs)
+  // For now, send file names (or you could upload and get URLs)
+  const imageList = foodImages.map(file => file.name);
+
+  // Prepare payload
+  const payload = {
+    ...formData,
+    foodImages: imageList // or image URLs if you upload to S3/Storage
   };
+
+  // Send to webhook
+  await fetch('https://hook.eu2.make.com/y5rmbdjzyh8nqx08rvij7fb2nt17tpon', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  setIsSubmitted(true);
+};
+
+useEffect(() => {
+  async function fetchStores() {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('name')
+      .order('name');
+    if (!error && data) {
+      setStoreNames(data.map(store => store.name));
+    }
+  }
+  fetchStores();
+}, []);
+
+
 
   const StarRating = (props) => (
     <div className="space-y-2">
@@ -204,13 +242,19 @@ function CustomerFeedbackPage() {
                   <MapPin className="w-4 h-4 mr-1" />
                   Location
                 </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="Which Chaiiwala location?"
-                />
+                <select
+  value={formData.location}
+  onChange={(e) => handleInputChange('location', e.target.value)}
+  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+>
+  <option value="">Select a location</option>
+  {storeNames.map((name) => (
+    <option key={name} value={name}>
+      {name}
+    </option>
+  ))}
+</select>
+
               </div>
             </div>
           </div>
