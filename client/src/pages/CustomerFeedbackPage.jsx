@@ -139,7 +139,7 @@ function CustomerFeedbackPage() {
     }
 
     // 4. Send to webhook (Make)
-    await fetch('/api/webhook', {
+    await fetch('https://astralblu.com/api/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
