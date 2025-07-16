@@ -16,19 +16,19 @@ async function uploadImagesToSupabase(files) {
     const fileExt = file.name.split('.').pop();
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `feedback/${uniqueName}`;
-    // Upload
+    // Upload to the correct bucket!
     const { error } = await supabase
       .storage
-.from('customer-feedback-images')
+      .from('customer-feedback-images')
       .upload(filePath, file);
     if (error) {
       alert('Failed to upload image: ' + error.message);
       continue;
     }
-    // Get public URL
+    // Get public URL from the correct bucket!
     const { data } = supabase
       .storage
-      .from('food-feedback')
+      .from('customer-feedback-images')
       .getPublicUrl(filePath);
     if (data && data.publicUrl) {
       uploadedUrls.push(data.publicUrl);
@@ -139,7 +139,7 @@ function CustomerFeedbackPage() {
     }
 
     // 4. Send to webhook (Make)
-    await fetch('https://hook.eu2.make.com/4ja7kw5r6knto2h5cmoirhrv93a6a8pj', {
+    await fetch('https://astralblu.com/api/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -162,7 +162,7 @@ function CustomerFeedbackPage() {
     fetchStores();
   }, []);
 
-  // ... (StarRating and YesNoQuestion components unchanged) ...
+  // StarRating component
   const StarRating = (props) => (
     <div className="space-y-2">
       <label className="text-sm font-medium text-gray-700">{props.label}</label>
@@ -183,6 +183,7 @@ function CustomerFeedbackPage() {
     </div>
   );
 
+  // YesNoQuestion component
   const YesNoQuestion = (props) => (
     <div className="space-y-2">
       <label className="text-sm font-medium text-gray-700">{props.label}</label>
