@@ -1,5 +1,5 @@
 // src/pages/CustomerFeedbackPage.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera, Star, Send, MapPin, Clock, User } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -106,6 +106,7 @@ function CustomerFeedbackPage() {
 
     // 2. Prepare data in snake_case for Supabase and webhook
     const payload = {
+      type: "feedback",
       customer_experience: formData.customerExperience,
       offered_other_items: formData.offeredOtherItems,
       order_read_back: formData.orderReadBack,
