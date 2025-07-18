@@ -106,7 +106,6 @@ function CustomerFeedbackPage() {
 
     // 2. Prepare data in snake_case for Supabase and webhook
     const payload = {
-      type: "feedback",
       customer_experience: formData.customerExperience,
       offered_other_items: formData.offeredOtherItems,
       order_read_back: formData.orderReadBack,
