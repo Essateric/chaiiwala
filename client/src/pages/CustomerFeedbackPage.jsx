@@ -139,7 +139,7 @@ function CustomerFeedbackPage() {
     }
 
     // 4. Send to webhook (Make)
-    await fetch('https://astralblu.com/.netlify/functions/webhook', {
+    await fetch('/.netlify/functions/sendFeedbackEmail', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
