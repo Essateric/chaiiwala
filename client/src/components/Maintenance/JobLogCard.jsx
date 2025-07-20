@@ -76,7 +76,8 @@ export default function JobLogCard({ log }) {
     const { error } = await supabase
       .from("joblogs")
       .update({ status: newStatus })
-      .eq("id", log.id);
+      .eq("id", log.id)
+        .is("deleted_at", null); 
     if (error) {
       alert("Failed to update status: " + error.message);
     } else {
@@ -121,18 +122,30 @@ export default function JobLogCard({ log }) {
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this maintenance ticket?")) return;
-    setDeleting(true);
-    const { error } = await supabase.from("joblogs").delete().eq("id", log.id);
-    if (error) {
-      alert("Failed to delete: " + error.message);
-    } else {
-      setOpen(false);
-      await refetchJobLogs();
-    }
-    setDeleting(false);
-  };
+const handleDelete = async () => {
+  if (!window.confirm("Are you sure you want to delete this maintenance ticket?")) return;
+  setDeleting(true);
+  
+  // Use the current user ID for deleted_by, if you have it
+  const deletedBy = profile?.id || user?.id || null;
+
+  // Update the job, setting deleted_at and deleted_by
+  const { error } = await supabase
+    .from("joblogs")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: deletedBy,
+    })
+    .eq("id", log.id);
+
+  if (error) {
+    alert("Failed to delete: " + error.message);
+  } else {
+    setOpen(false);
+    await refetchJobLogs();
+  }
+  setDeleting(false);
+};
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
