@@ -64,6 +64,9 @@ function CustomerFeedbackPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [storeNames, setStoreNames] = useState([]);
 
+  const [isLoading, setIsLoading] = useState(false);
+
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -95,16 +98,16 @@ function CustomerFeedbackPage() {
   };
 
   // Submit handler: upload images -> save feedback in Supabase -> send to webhook
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsLoading(true); // Start loading
 
-    // 1. Upload images and get public URLs
+  try {
     let imageUrls = [];
     if (foodImages.length > 0) {
       imageUrls = await uploadImagesToSupabase(foodImages);
     }
 
-    // 2. Prepare data in snake_case for Supabase and webhook
     const payload = {
       customer_experience: formData.customerExperience,
       offered_other_items: formData.offeredOtherItems,
@@ -125,10 +128,9 @@ function CustomerFeedbackPage() {
       customer_name: formData.customerName,
       visit_date: formData.visitDate,
       location: formData.location,
-      food_images: imageUrls // JSONB array of public URLs
+      food_images: imageUrls
     };
 
-    // 3. Insert into Supabase feedback table
     const { error: supaError } = await supabase
       .from('customer_feedback')
       .insert([payload]);
@@ -138,7 +140,6 @@ function CustomerFeedbackPage() {
       return;
     }
 
-    // 4. Send to webhook (Make)
     await fetch('/.netlify/functions/sendFeedbackEmail', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,7 +147,13 @@ function CustomerFeedbackPage() {
     });
 
     setIsSubmitted(true);
-  };
+  } catch (err) {
+    alert('Something went wrong: ' + err.message);
+  } finally {
+    setIsLoading(false); // Stop loading in both success & error
+  }
+};
+
 
   // Load store names for dropdown
   useEffect(() => {
@@ -250,6 +257,21 @@ function CustomerFeedbackPage() {
       </div>
     );
   }
+
+  if (isLoading) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-80">
+      <div className="flex flex-col items-center space-y-4">
+        <svg className="w-12 h-12 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p className="text-orange-600 font-medium">Please wait while we upload your feedback...</p>
+      </div>
+    </div>
+  );
+}
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 py-8 px-4">
