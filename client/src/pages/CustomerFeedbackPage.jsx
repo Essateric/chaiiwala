@@ -446,7 +446,7 @@ function CustomerFeedbackPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload photos of your food/drink
+                  Click the below buttonn to take pictures / Upload photos of your food/drink
                 </label>
                 <input
                   type="file"
