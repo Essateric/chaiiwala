@@ -1,53 +1,19 @@
+// sendFeedbackEmail.js (ESM + Netlify-compatible)
 import nodemailer from 'nodemailer';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import dotenv from 'dotenv';
+import { PDFDocument, rgb, StandardFonts, PDFName, PDFArray } from 'pdf-lib';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-// ✅ DEBUG import.meta.url
-console.log('🔍 import.meta.url =', import.meta.url);
+import dotenv from 'dotenv';
+dotenv.config();
 
-let __filename, __dirname;
-try {
-  if (!import.meta.url) {
-    throw new Error('❌ import.meta.url is undefined');
-  }
-  __filename = fileURLToPath(import.meta.url);
-  __dirname = path.dirname(__filename);
-  console.log('✅ __dirname resolved to:', __dirname);
-} catch (err) {
-  console.error('❌ Failed to resolve __dirname:', err.message);
-  __dirname = process.cwd(); // fallback
-  console.log('⚠️ Using fallback __dirname:', __dirname);
-}
-
-// ✅ Load .env from project root and verify it exists
-const envPath = path.resolve(__dirname, '../../.env');
-console.log('🧪 Attempting to load .env from:', envPath);
-
-if (!fs.existsSync(envPath)) {
-  console.error('❌ .env file NOT FOUND at:', envPath);
-} else {
-  console.log('✅ .env file exists at:', envPath);
-}
-
-const result = dotenv.config({ path: envPath });
-if (result.error) {
-  console.error('❌ dotenv failed to load:', result.error);
-} else {
-  console.log('✅ dotenv loaded with keys:', Object.keys(result.parsed || {}));
-}
-
-// 🔍 Show critical env vars (not passwords)
 console.log('EMAIL_USER:', process.env.EMAIL_USER || '❌ Not Set');
 console.log('🛠️ FUNCTION BOOTED ✅');
 
-
 async function generateRealPDF(htmlContent, fileName) {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595.28, 841.89]);
-  const { width, height } = page.getSize();
+  let page = pdfDoc.addPage([595.28, 841.89]);
+  let { width, height } = page.getSize();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -59,8 +25,8 @@ async function generateRealPDF(htmlContent, fileName) {
 
   for (const line of textContent.lines) {
     if (yPosition < 50) {
-      const newPage = pdfDoc.addPage([595.28, 841.89]);
-      yPosition = newPage.getSize().height - 50;
+      page = pdfDoc.addPage([595.28, 841.89]);
+      yPosition = page.getSize().height - 50;
     }
 
     const currentFont = line.bold ? boldFont : font;
@@ -72,13 +38,7 @@ async function generateRealPDF(htmlContent, fileName) {
       const testLine = currentLine + (currentLine ? ' ' : '') + word;
       const textWidth = currentFont.widthOfTextAtSize(testLine, fontSize);
       if (textWidth > maxWidth && currentLine) {
-        page.drawText(currentLine, {
-          x: margin,
-          y: yPosition,
-          size: fontSize,
-          font: currentFont,
-          color: rgb(0, 0, 0)
-        });
+        drawLine(page, currentLine, yPosition, fontSize, currentFont, line.link);
         yPosition -= lineHeight;
         currentLine = word;
       } else {
@@ -87,13 +47,7 @@ async function generateRealPDF(htmlContent, fileName) {
     }
 
     if (currentLine) {
-      page.drawText(currentLine, {
-        x: margin,
-        y: yPosition,
-        size: fontSize,
-        font: currentFont,
-        color: rgb(0, 0, 0)
-      });
+      drawLine(page, currentLine, yPosition, fontSize, currentFont, line.link);
       yPosition -= lineHeight + (line.heading ? 10 : 0);
     }
   }
@@ -106,6 +60,49 @@ async function generateRealPDF(htmlContent, fileName) {
   };
 }
 
+function drawLine(page, text, y, fontSize, font, link) {
+  const margin = 50;
+  const textWidth = font.widthOfTextAtSize(text, fontSize);
+  const color = link ? rgb(0, 0, 1) : rgb(0, 0, 0);
+
+  page.drawText(text, {
+    x: margin,
+    y,
+    size: fontSize,
+    font,
+    color
+  });
+
+  if (link) {
+    const context = page.doc.context;
+
+    const uriAction = context.obj({
+      Type: PDFName.of('Action'),
+      S: PDFName.of('URI'),
+      URI: context.obj(link)
+    });
+
+    const linkAnnotation = context.obj({
+      Type: PDFName.of('Annot'),
+      Subtype: PDFName.of('Link'),
+      Rect: context.obj([margin, y, margin + textWidth, y + fontSize]),
+      Border: context.obj([0, 0, 0]),
+      A: uriAction
+    });
+
+    let annots = page.node.lookup(PDFName.of('Annots'), PDFArray);
+
+    if (!annots) {
+      annots = context.obj([]);
+      page.node.set(PDFName.of('Annots'), annots);
+    }
+
+    annots.push(linkAnnotation);
+  }
+}
+
+
+
 function stripHtmlAndFormat(html) {
   const lines = [];
   const cleanText = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|h[1-6])>/gi, '\n');
@@ -114,8 +111,16 @@ function stripHtmlAndFormat(html) {
   for (const line of textLines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const isHeading = /<h[1-6][^>]*>/i.test(line);
-    const isBold = /<b[^>]*>|<strong[^>]*>/i.test(line);
+
+    const linkMatch = trimmed.match(/<a\s+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/i);
+    if (linkMatch) {
+      const [, url, text] = linkMatch;
+      lines.push({ text: text.trim(), bold: false, heading: false, link: url });
+      continue;
+    }
+
+    const isHeading = /<h[1-6][^>]*>/i.test(trimmed);
+    const isBold = /<b[^>]*>|<strong[^>]*>/i.test(trimmed);
     const cleanLine = trimmed.replace(/<[^>]*>/g, '');
     if (cleanLine) lines.push({ text: cleanLine, bold: isBold, heading: isHeading });
   }
@@ -144,11 +149,11 @@ async function sendRealEmail(pdfBuffer, fileName, recipientEmail = 'essateric@gm
 
   const mailOptions = {
     from: emailUser,
-  to: 'usman.aftab@chaiiwala.co.uk',  // 👈 main recipient
-  cc: [
-    'essateric@gmail.com',            // 👈 add more CCs here
-    'jubayed.chaiiwala@gmail.com'
-  ],
+    to: 'usman.aftab@chaiiwala.co.uk',
+    cc: [
+      'essateric@gmail.com',
+      'jubayed.chaiiwala@gmail.com'
+    ],
     subject: `Chaiiwala Customer Feedback - ${fileName}`,
     text: `PDF "${fileName}" attached.\n\nGenerated by Essateric Solutions`,
     html: `<h2>Chaiiwala Customer Feedback Submission</h2><p>PDF "<strong>${fileName}</strong>" is attached.</p>`,

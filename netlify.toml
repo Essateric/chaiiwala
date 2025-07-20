@@ -5,13 +5,16 @@ functions = "netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["../../.env"]  # Covers all functions unless overridden
+  included_files = [".env"]  # Covers all functions unless overridden
 
 [functions."sendFeedbackEmail"]
   node_bundler = "esbuild"
-  included_files = ["../../.env"]  # Still needed here for this specific function
+  included_files = [".env"]  # Still needed here for this specific function
   external_node_modules = ["pdf-lib", "nodemailer", "dotenv"]
   js_external_modules = true
+
+  [dev]
+  framework = "none"
 
 [[redirects]]
 from = "/api/*"
