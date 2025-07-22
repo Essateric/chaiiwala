@@ -1,6 +1,6 @@
 [build]
 command = "npm run build"        # You can still run `npx vite build` manually if needed
-publish = "dist"
+publish = "dist/public"
 functions = "netlify/functions"
 framework = "vite"               # Avoids the "Invalid framework" warning
 
