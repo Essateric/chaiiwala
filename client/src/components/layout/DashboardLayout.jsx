@@ -11,7 +11,10 @@ export default function DashboardLayout({ children, title, profile, announcement
     setSidebarOpen(!sidebarOpen);
   };
 
-    console.log("DashboardLayout sending profile:", profile, "announcements:", announcements); 
+if (profile && announcements) {
+  console.log("DashboardLayout sending profile:", profile, "announcements:", announcements);
+}
+
 
 
   return (

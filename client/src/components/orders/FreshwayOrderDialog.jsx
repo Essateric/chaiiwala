@@ -4,7 +4,7 @@ import { BuildingIcon } from "lucide-react";
 import { Label } from "../ui/label.jsx";
 import { Input } from "../ui/input.jsx";
 import { Textarea } from "../ui/textarea.jsx";
-import React from "react";
+import React, { useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient.js"; // Import Supabase client
 
 // Pass these props: open, setOpen, allowedStores, selectedStoreId, setSelectedStoreId, selectedItems, setSelectedItems, itemPrices, user, profile
@@ -29,7 +29,7 @@ export default function FreshwaysOrderDialog({
   useEffect(() => {
   async function fetchItemPrices() {
     const { data, error } = await supabase
-      .from('your_items_table')
+      .from('freshways_orders')
       .select('*')
       .eq('store_id', selectedStoreId);
 

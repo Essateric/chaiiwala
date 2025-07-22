@@ -5,7 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
+    "start": "vite",
     "build": "vite build",
+    "netlify:dev": "netlify dev",
     "check": "tsc"
   },
   "dependencies": {

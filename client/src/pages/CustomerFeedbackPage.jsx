@@ -20,7 +20,10 @@ async function uploadImagesToSupabase(files) {
     const { error } = await supabase
       .storage
       .from('customer-feedback-images')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+    cacheControl: '3600',
+    upsert: true
+  });
     if (error) {
       alert('Failed to upload image: ' + error.message);
       continue;
@@ -128,9 +131,10 @@ const handleSubmit = async (e) => {
       customer_name: formData.customerName,
       visit_date: formData.visitDate,
       location: formData.location,
-      food_images: imageUrls
+      food_images: imageUrls,
     };
 
+    // Save to Supabase DB
     const { error: supaError } = await supabase
       .from('customer_feedback')
       .insert([payload]);
@@ -140,11 +144,22 @@ const handleSubmit = async (e) => {
       return;
     }
 
-    await fetch('/.netlify/functions/sendFeedbackEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    // Send email via Netlify Function
+const baseUrl = import.meta.env.DEV
+  ? 'http://localhost:8888/.netlify/functions'
+  : '/.netlify/functions';
+
+const response = await fetch(`${baseUrl}/sendFeedbackEmail`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Email error:', errorData);
+      alert('Feedback saved, but failed to send email.');
+    }
 
     setIsSubmitted(true);
   } catch (err) {
@@ -153,6 +168,7 @@ const handleSubmit = async (e) => {
     setIsLoading(false); // Stop loading in both success & error
   }
 };
+
 
 
   // Load store names for dropdown
