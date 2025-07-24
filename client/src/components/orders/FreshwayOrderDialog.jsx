@@ -59,9 +59,9 @@ const validOrderDays = {
   Saturday: "Monday",
 };
 
-// const today = new Date();
+ const today = new Date();
 // TEMP: Force today to be Monday (for testing)
-const today = new Date("2025-07-24"); // Replace with any known valid order date
+// const today = new Date("2025-07-24"); // Replace with any known valid order date
 
 const orderDay = today.toLocaleDateString("en-GB", { weekday: "long" });
 const currentHour = today.getHours();
