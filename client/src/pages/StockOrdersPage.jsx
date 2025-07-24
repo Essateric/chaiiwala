@@ -144,14 +144,8 @@ export default function StockOrdersPage() {
     oatMilk: false,
   });
 
-  const itemPrices = {
-    milk: { name: "Milk (Pack of 6)", price: 5.49 },
-    bread: { name: "Bread (Item)", price: 1.99 },
-    buns: { name: "Buns (Pack of 6)", price: 2.49 },
-    yoghurt: { name: "Yoghurt (Tub)", price: 3.29 },
-    eggs: { name: "Eggs", price: 2.79 },
-    oatMilk: { name: "Oat Milk (Carton)", price: 1.89 },
-  };
+const [itemPrices, setItemPrices] = useState({});
+
 
   const calculateTotalPrice = () => {
     return Object.entries(selectedItems).reduce((total, [key, isSelected]) => {
@@ -189,6 +183,7 @@ export default function StockOrdersPage() {
                 selectedItems={selectedItems}
                 setSelectedItems={setSelectedItems}
                 itemPrices={itemPrices}
+                 setItemPrices={setItemPrices} 
                 user={user}
                 profile={profile}
               />
