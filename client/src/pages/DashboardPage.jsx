@@ -146,6 +146,31 @@ const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
   enabled: !!today
 });
 
+const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
+  queryKey: ["freshways_order_log", today],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("freshways_order_log")
+      .select("store_id, status, created_at, stores ( name )")
+      .eq("delivery_date", today);
+
+    if (error) throw error;
+    return data;
+  }
+});
+
+const mergedOrderLog = useMemo(() => {
+  return stores.map(store => {
+    const log = orderLogs.find(l => l.store_id === store.id);
+    return {
+      storeName: store.name,
+      status: log?.status || "missing",
+      createdAt: log?.created_at || null
+    };
+  });
+}, [stores, orderLogs]);
+
+
 
 // For stats card: SUM all rows across all stores if "all"
 let filteredChecklistRows = checklistRows;
@@ -292,14 +317,7 @@ const handleTaskComplete = async (id, newStatus) => {
                   iconBgColor="bg-blue-100"
                   change={{ value: "+1 location", isPositive: true, text: "since last month" }}
                 />
-                <StatsCard
-                  title="Staff Members"
-                  value={staffCount}
-                  icon={Users}
-                  iconColor="text-green-600"
-                  iconBgColor="bg-green-100"
-                  change={{ value: "+4 members", isPositive: true, text: "since last month" }}
-                />
+
                 {/* TASKS COMPLETE CARD */}
                 <Card className="relative bg-yellow-50">
                   {/* Clipboard icon at top-left */}
@@ -358,11 +376,73 @@ const handleTaskComplete = async (id, newStatus) => {
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
               </div>
-              {/* --- CHART --- */}
-              <TasksLast30DaysChart
-                stores={stores}
-                selectedStoreId={selectedTaskStoreId}
-              />
+ {/* --- CHART + FRESHWAYS WIDGET --- */}
+<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
+  {/* Tasks Chart */}
+  <div className="lg:col-span-3">
+    <TasksLast30DaysChart
+      stores={stores}
+      selectedStoreId={selectedTaskStoreId}
+    />
+  </div>
+
+  {/* Freshways Widget */}
+  <Card className="relative bg-blue-50 border border-blue-100 shadow-sm">
+    <div className="absolute left-4 top-4">
+      <div className="rounded-full bg-blue-100 p-2">
+        <ShoppingCart className="h-6 w-6 text-blue-600" />
+      </div>
+    </div>
+    <CardHeader className="pl-20 pt-4 pb-2">
+      <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
+      <CardDescription className="text-sm text-gray-500">Today’s Delivery</CardDescription>
+    </CardHeader>
+    <CardContent className="px-5 pb-5">
+      {isLoadingOrders ? (
+        <p className="text-gray-500 text-sm">Loading...</p>
+      ) : mergedOrderLog.length === 0 ? (
+        <p className="text-gray-500 text-sm">No stores available</p>
+      ) : (
+        <table className="w-full text-sm text-gray-700">
+          <thead>
+            <tr className="text-left border-b text-xs text-gray-400">
+              <th className="py-1">Store</th>
+              <th className="py-1">Status</th>
+              <th className="py-1">Placed At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mergedOrderLog.map((log, idx) => (
+              <tr key={idx} className="border-b">
+                <td className="py-2">{log.storeName}</td>
+                <td className="py-2">
+                  {log.status === "placed" ? (
+                    <span className="text-green-600 font-semibold">Placed</span>
+                  ) : log.status === "missed" ? (
+                    <span className="text-red-600 font-semibold">Missed</span>
+                  ) : (
+                    <span className="text-yellow-600 font-semibold">No Entry</span>
+                  )}
+                </td>
+                <td className="py-2">
+                  {log.createdAt
+                    ? new Date(log.createdAt).toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </CardContent>
+  </Card>
+</div>
             </>
           )}
           {/* Today's Tasks Card */}

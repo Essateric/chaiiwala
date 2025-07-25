@@ -7,10 +7,11 @@ import { BuildingIcon } from "lucide-react";
 import { Label } from "../ui/label.jsx";
 import { Input } from "../ui/input.jsx";
 import { Textarea } from "../ui/textarea.jsx";
-import React, { useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { useFreshwaysAcc } from "../../hooks/useFreshwaysAccs.jsx";
 import { formatDeliveryDateVerbose } from "../../lib/formatters.js";
+import React, { useEffect, useState } from "react"; // ✅ include useState
+
 
 
 export default function FreshwaysOrderDialog({
@@ -92,15 +93,57 @@ function getNextDeliveryDate(deliveryDayStr) {
 const deliveryDate = getNextDeliveryDate(deliveryDay);
 const deliveryDateISO = deliveryDate.toISOString().split("T")[0]; // e.g. "2025-07-26"
 
+// Countdown from midnight until 11AM on the DELIVERY day
+const [timeLeft, setTimeLeft] = useState("");
+
+useEffect(() => {
+  const updateCountdown = () => {
+    if (!deliveryDay) return;
+
+    const deliveryDateObj = getNextDeliveryDate(deliveryDay); // e.g. next Saturday
+    deliveryDateObj.setHours(11, 0, 0, 0); // 11:00 AM
+
+    const now = new Date();
+    const diff = deliveryDateObj - now;
+
+    if (diff <= 0) {
+      setTimeLeft("Order window closed");
+    } else {
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(
+        `⏳ ${hours}h ${minutes}m ${seconds}s left to order for delivery on ${deliveryDay}`
+      );
+    }
+  };
+
+  updateCountdown();
+  const interval = setInterval(updateCountdown, 1000); // update every second now
+  return () => clearInterval(interval);
+}, [deliveryDay]);
+
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="h-24 flex flex-col items-center justify-center gap-2" variant="outline">
           <BuildingIcon className="h-8 w-8 text-blue-600" />
           <span>Freshways Order</span>
+          {isOrderFormEnabled && (
+  <p className="text-sm text-blue-600 font-medium">{timeLeft}</p>
+)}
+
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
+        {isOrderDayValid && (
+  <p className="text-sm font-semibold text-blue-600 mb-2 text-center">
+    ⏰ {timeLeft}
+  </p>
+)}
+
         <DialogHeader>
           <DialogTitle>New Freshways Order</DialogTitle>
           <DialogDescription>Place an order for supplies from Freshways</DialogDescription>
@@ -187,14 +230,7 @@ onSubmit={async (e) => {
   }
 }}
 
-          
-        >
-          {!isOrderDayValid && (
-  <p className="text-red-500 text-sm mt-2">
-    Orders can only be placed on: {Object.keys(validOrderDays).join(", ")}
-  </p>
-)}
-
+>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="freshways-store" className="text-right">Store</Label>
@@ -329,9 +365,10 @@ onSubmit={async (e) => {
               Cancel
             </Button>
             
-<Button type="submit" disabled={!isOrderDayValid}>
+<Button type="submit" disabled={timeLeft === "Order window closed"}>
   Place Order
 </Button>
+
           </DialogFooter>
         </form>
       </DialogContent>
