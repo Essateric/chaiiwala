@@ -31,6 +31,7 @@ import AddUserForm from "../components/AddUserForm.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
 import { Link } from "react-router-dom";
+import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 
 
 export default function DashboardPage() {
@@ -39,6 +40,9 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
 
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
+  const [openFreshwaysDialog, setOpenFreshwaysDialog] = useState(false);
+const [selectedItems, setSelectedItems] = useState({});
+const [itemPrices, setItemPrices] = useState({});
 
   // Fetch all stores for dropdown
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
@@ -49,6 +53,7 @@ export default function DashboardPage() {
       return data || [];
     }
   });
+
 
   // 2 dropdowns (one for tasks, one for stock), default "all"
   const [selectedTaskStoreId, setSelectedTaskStoreId] = useState("all");
@@ -145,6 +150,20 @@ const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
   },
   enabled: !!today
 });
+
+  const storeTaskData = useMemo(() => {
+  if (!stores.length) return [];
+  // For each store, count number of completed tasks today
+  return stores.map(store => {
+    const completed = checklistRows.filter(
+      row => String(row.store_id) === String(store.id) && row.status === "completed"
+    ).length;
+    return {
+      store: store.name,
+      tasksCompleted: completed
+    };
+  });
+}, [stores, checklistRows]);
 
 const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
   queryKey: ["freshways_order_log", today],
@@ -350,6 +369,7 @@ const handleTaskComplete = async (id, newStatus) => {
                     </select>
                   </div>
                 </Card>
+                <DailytaskListChart storeTaskData={storeTaskData}/>
                 {/* LOW STOCK (with dropdown inside card) */}
                 <StatsCard
                   title={

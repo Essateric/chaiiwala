@@ -66,14 +66,12 @@ const validOrderDays = {
 
 const orderDay = today.toLocaleDateString("en-GB", { weekday: "long" });
 const currentHour = today.getHours();
-
 const isOrderDayValid = Object.keys(validOrderDays).includes(orderDay);
-const deliveryDay = validOrderDays[orderDay];
+const deliveryDay = validOrderDays[orderDay] ?? null;
+
 const isBeforeCutoff = currentHour < 12;
-// Disable order form if not a valid order day or after 12 PM
 const isOrderFormEnabled = isOrderDayValid && isBeforeCutoff;
 
-// 👇 Utility to calculate actual delivery date based on day name
 function getNextDeliveryDate(deliveryDayStr) {
   const dayIndexMap = {
     Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
@@ -90,8 +88,74 @@ function getNextDeliveryDate(deliveryDayStr) {
   nextDeliveryDate.setDate(today.getDate() + daysUntilDelivery);
   return nextDeliveryDate;
 }
-const deliveryDate = getNextDeliveryDate(deliveryDay);
-const deliveryDateISO = deliveryDate.toISOString().split("T")[0]; // e.g. "2025-07-26"
+
+
+let deliveryDate = null;
+let deliveryDateISO = null;
+
+// If today is not a valid order day, find next valid one
+let nextValidOrderDay = null;
+if (!isOrderDayValid) {
+  const todayIndex = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+  const orderedDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  for (let i = 1; i <= 7; i++) {
+    const nextDayIndex = (todayIndex + i) % 7;
+    const nextDayName = orderedDays[nextDayIndex];
+    if (validOrderDays[nextDayName]) {
+      nextValidOrderDay = nextDayName;
+      break;
+    }
+  }
+}
+
+if (deliveryDay) {
+  deliveryDate = getNextDeliveryDate(deliveryDay);
+  if (deliveryDate instanceof Date && !isNaN(deliveryDate)) {
+    deliveryDateISO = deliveryDate.toISOString().split("T")[0];
+  } else {
+    console.error("❌ Invalid deliveryDate object returned");
+  }
+}
+
+if (!deliveryDateISO) {
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="text-center py-8">
+  <DialogHeader>
+    <DialogTitle className="text-red-500">
+      🚫 Orders not accepted today ({orderDay})
+    </DialogTitle>
+    <DialogDescription>
+      Please try again on a valid order day.
+    </DialogDescription>
+  </DialogHeader>
+
+  <DialogFooter className="mt-6 justify-center">
+    <Button
+      variant="outline"
+      onClick={() => {
+        setOpen(false);
+      }}
+    >
+      Close
+    </Button>
+  </DialogFooter>
+</DialogContent>
+
+    </Dialog>
+  );
+}
+
+
+
+// 👇 Utility to calculate actual delivery date based on day name
+
+
+if (!(deliveryDate instanceof Date) || isNaN(deliveryDate)) {
+  console.error("❌ Invalid deliveryDate:", deliveryDate, "from deliveryDay:", deliveryDay);
+  return null; // or fallback logic
+}
 
 // Countdown from midnight until 11AM on the DELIVERY day
 const [timeLeft, setTimeLeft] = useState("");
@@ -125,6 +189,8 @@ useEffect(() => {
 }, [deliveryDay]);
 
 
+
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -148,7 +214,28 @@ useEffect(() => {
           <DialogTitle>New Freshways Order</DialogTitle>
           <DialogDescription>Place an order for supplies from Freshways</DialogDescription>
         </DialogHeader>
+        {!deliveryDateISO ? (
+  <div className="text-center text-red-500 font-semibold p-4">
+    Orders are not accepted today. Please try again on a valid order day.
+  </div>
+)  : (
+  <div>
+    {!isOrderDayValid && (
+      <p className="text-red-600 font-medium text-center mb-2">
+        🚫 Orders are not accepted today ({orderDay}).<br />
+        You can place your next order on <strong>{nextValidOrderDay}</strong>.
+      </p>
+    )}
+
+    <form onSubmit={async (e) => {
+      // your submit logic
+    }}>
+      {/* form content here */}
+    </form>
+  </div>
+)}
         <form
+
 onSubmit={async (e) => {
   e.preventDefault();
   const formData = new FormData(e.currentTarget);
@@ -172,8 +259,12 @@ onSubmit={async (e) => {
   const notes = formData.get('notes');
   const currentDate = new Date();
   const userInitials = user?.username?.substring(0, 2).toUpperCase() || 'UA';
-  const orderDisplayId = `FW-${userInitials}${currentDate.toISOString().replace(/\D/g, '').slice(2, 14)}`;
+  const orderDisplayId = isNaN(currentDate.getTime())
+  ? `FW-${userInitials}-INVALIDDATE`
+  : `FW-${userInitials}${currentDate.toISOString().replace(/\D/g, '').slice(2, 14)}`;
   const storeObj = allowedStores.find(s => s.id === Number(selectedStoreId));
+  console.log("🕒 currentDate:", currentDate);
+console.log("📦 deliveryDateISO:", deliveryDateISO);
 
   const orderDataToSave = {
     order_display_id: orderDisplayId,
@@ -183,7 +274,7 @@ onSubmit={async (e) => {
     account_number: accountNumber,
     items: orderItems,
     total_price: totalPrice,
-    expected_delivery_date: deliveryDateISO,
+    expected_delivery_date: deliveryDateISO || null,
     notes: notes,
     status: 'Awaiting Confirmation',
   };
@@ -365,7 +456,7 @@ onSubmit={async (e) => {
               Cancel
             </Button>
             
-<Button type="submit" disabled={timeLeft === "Order window closed"}>
+<Button type="submit" disabled={!isOrderDayValid || timeLeft === "Order window closed"}>
   Place Order
 </Button>
 

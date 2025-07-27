@@ -13,6 +13,7 @@ import {
   MoreVerticalIcon,
   X as XIcon,
   Check as CheckIcon,
+   Building as BuildingIcon,
   UserIcon,
 } from "lucide-react";
 import {
@@ -22,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
 } from "../components/ui/dialog.jsx";
 import { Label } from "../components/ui/label.jsx";
 import { Input } from "../components/ui/input.jsx";
@@ -174,19 +175,32 @@ const [itemPrices, setItemPrices] = useState({});
               {/* Local Order */}
               <LocalOrderDialog open={openLocalDialog} setOpen={setOpenLocalDialog} />
               {/* Freshways Order */}
-              <FreshwaysOrderDialog
-                open={openFreshwaysDialog}
-                setOpen={setOpenFreshwaysDialog}
-                allowedStores={allowedStores}
-                selectedStoreId={selectedStoreId}
-                setSelectedStoreId={setSelectedStoreId}
-                selectedItems={selectedItems}
-                setSelectedItems={setSelectedItems}
-                itemPrices={itemPrices}
-                 setItemPrices={setItemPrices} 
-                user={user}
-                profile={profile}
-              />
+            <div>
+  <Button
+    className="h-24 w-full flex flex-col items-center justify-center gap-2"
+    variant="outline"
+    onClick={() => setOpenFreshwaysDialog(true)}
+  >
+    <BuildingIcon className="h-8 w-8 text-blue-600" />
+    <span>Freshways Order</span>
+  </Button>
+
+  <FreshwaysOrderDialog
+    open={openFreshwaysDialog}
+    setOpen={setOpenFreshwaysDialog}
+    allowedStores={allowedStores}
+    selectedStoreId={selectedStoreId}
+    setSelectedStoreId={setSelectedStoreId}
+    selectedItems={selectedItems}
+    setSelectedItems={setSelectedItems}
+    itemPrices={itemPrices}
+    setItemPrices={setItemPrices}
+    user={user}
+    profile={profile}
+  />
+</div>
+
+
               {/* Amazon Order */}
               <AmazonOrderDialog open={openAmazonDialog} setOpen={setOpenAmazonDialog} />
             </div>
@@ -436,7 +450,7 @@ const [itemPrices, setItemPrices] = useState({});
       </div>
       {/* Order Received Dialog */}
       <Dialog open={openReceiptDialog} onOpenChange={setOpenReceiptDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md">s
           <DialogHeader>
             <DialogTitle>Mark Order as Received</DialogTitle>
             <DialogDescription>
