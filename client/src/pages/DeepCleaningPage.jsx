@@ -319,35 +319,45 @@ export default function DeepCleaningPage() {
               {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="task"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Task</FormLabel>
-                    <FormControl>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a task" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cleaningTasks.length === 0 ? (
-                            <SelectItem value="No tasks available" disabled>No tasks available</SelectItem>
-                          ) : (
-                            cleaningTasks.map(task => (
-                              <SelectItem key={task.id} value={task.dc_task}>
-                                {task.dc_task}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                  </FormItem>
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <FormField
+      control={form.control}
+      name="task"
+      rules={{ required: "Please select a task" }}
+      render={({ field, fieldState }) => (
+        <FormItem>
+          <FormLabel>Task</FormLabel>
+          <FormControl>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a task" />
+              </SelectTrigger>
+              <SelectContent>
+                {cleaningTasks.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No tasks available
+                  </SelectItem>
+                ) : (
+                  cleaningTasks.map((task) => (
+                    <SelectItem key={task.id} value={task.dc_task}>
+                      {task.dc_task}
+                    </SelectItem>
+                  ))
                 )}
-              />
+              </SelectContent>
+            </Select>
+          </FormControl>
+          {fieldState.error && (
+            <p className="text-sm text-red-500">
+              {fieldState.error.message}
+            </p>
+          )}
+        </FormItem>
+      )}
+    />
+
+
               {(profile?.permissions === 'admin' || profile?.permissions === 'regional') && (
                 <FormField
                   control={form.control}

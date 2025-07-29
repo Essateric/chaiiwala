@@ -4,45 +4,29 @@ import TaskItem from "../components/dashboard/task-item.jsx";
 import AnnouncementItem from "../components/dashboard/announcement-item.jsx";
 import {
   Building,
-  BadgeAlert,
-  Users,
   ClipboardList,
   Package,
-  Calendar,
-  Brush,
-  BarChart3,
-  Bell,
   ShoppingCart,
-  Wrench,
-  CalendarPlus,
-  Clipboard,
   Loader2
 } from "lucide-react";
 import { useAuth } from "../hooks/UseAuth.jsx";
 import { useToast } from "../hooks/use-toast.jsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card.jsx";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
-import { Separator } from "../components/ui/separator.jsx";
-import { Button } from "../components/ui/button.jsx";
+import { Tabs, TabsContent } from "../components/ui/tabs.jsx";
 import { supabase } from "../lib/supabaseClient.js";
 import { useState, useEffect, useMemo } from "react";
 import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
-import AddUserForm from "../components/AddUserForm.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 
-
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const queryClient = useQueryClient();
 
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
-  const [openFreshwaysDialog, setOpenFreshwaysDialog] = useState(false);
-const [selectedItems, setSelectedItems] = useState({});
-const [itemPrices, setItemPrices] = useState({});
 
   // Fetch all stores for dropdown
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
@@ -53,7 +37,6 @@ const [itemPrices, setItemPrices] = useState({});
       return data || [];
     }
   });
-
 
   // 2 dropdowns (one for tasks, one for stock), default "all"
   const [selectedTaskStoreId, setSelectedTaskStoreId] = useState("all");
@@ -109,7 +92,6 @@ const [itemPrices, setItemPrices] = useState({});
     queryKey: ["low_stock_count", selectedStockStoreId],
     queryFn: async () => {
       if (selectedStockStoreId === "all") {
-        // All stores: count all low stock items
         const { count, error } = await supabase
           .from("stock_items")
           .lt("quantity", 10)
@@ -117,7 +99,6 @@ const [itemPrices, setItemPrices] = useState({});
         if (error) throw error;
         return count || 0;
       } else {
-        // Single store
         const { count, error } = await supabase
           .from("stock_items")
           .eq("store_id", selectedStockStoreId)
@@ -132,86 +113,82 @@ const [itemPrices, setItemPrices] = useState({});
 
   // Fetch all checklist rows for today (all stores)
   const today = new Date().toISOString().split("T")[0];
-const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
-  queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId],
-  queryFn: async () => {
-    let query = supabase
-      .from("v_daily_checklist_with_status")
-      .select("*")
-      .eq("date", today);
+  const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
+    queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId],
+    queryFn: async () => {
+      let query = supabase
+        .from("v_daily_checklist_with_status")
+        .select("*")
+        .eq("date", today);
 
-    if (selectedTaskStoreId !== "all") {
-      query = query.eq("store_id", selectedTaskStoreId);
-    }
+      if (selectedTaskStoreId !== "all") {
+        query = query.eq("store_id", selectedTaskStoreId);
+      }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  },
-  enabled: !!today
-});
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!today
+  });
 
   const storeTaskData = useMemo(() => {
-  if (!stores.length) return [];
-  // For each store, count number of completed tasks today
-  return stores.map(store => {
-    const completed = checklistRows.filter(
-      row => String(row.store_id) === String(store.id) && row.status === "completed"
-    ).length;
-    return {
-      store: store.name,
-      tasksCompleted: completed
-    };
+    if (!stores.length) return [];
+    // For each store, count number of completed tasks today
+    return stores.map(store => {
+      const completed = checklistRows.filter(
+        row => String(row.store_id) === String(store.id) && row.status === "completed"
+      ).length;
+      return {
+        store: store.name,
+        tasksCompleted: completed
+      };
+    });
+  }, [stores, checklistRows]);
+
+  // Freshways Order Log
+  const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
+    queryKey: ["freshways_order_log", today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("freshways_order_log")
+        .select("store_id, status, created_at, stores ( name )")
+        .eq("delivery_date", today);
+
+      if (error) throw error;
+      return data;
+    }
   });
-}, [stores, checklistRows]);
 
-const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
-  queryKey: ["freshways_order_log", today],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("freshways_order_log")
-      .select("store_id, status, created_at, stores ( name )")
-      .eq("delivery_date", today);
+  const mergedOrderLog = useMemo(() => {
+    return stores.map(store => {
+      const log = orderLogs.find(l => l.store_id === store.id);
+      return {
+        storeName: store.name,
+        status: log?.status || "missing",
+        createdAt: log?.created_at || null
+      };
+    });
+  }, [stores, orderLogs]);
 
-    if (error) throw error;
-    return data;
+  // For stats card: SUM all rows across all stores if "all"
+  let filteredChecklistRows = checklistRows;
+  if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
+    filteredChecklistRows = checklistRows.filter(row => String(row.store_id) === String(selectedTaskStoreId));
   }
-});
 
-const mergedOrderLog = useMemo(() => {
-  return stores.map(store => {
-    const log = orderLogs.find(l => l.store_id === store.id);
-    return {
-      storeName: store.name,
-      status: log?.status || "missing",
-      createdAt: log?.created_at || null
-    };
-  });
-}, [stores, orderLogs]);
-
-
-
-// For stats card: SUM all rows across all stores if "all"
-let filteredChecklistRows = checklistRows;
-if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
-  filteredChecklistRows = checklistRows.filter(row => String(row.store_id) === String(selectedTaskStoreId));
-}
-
-let totalTasks, completedTasks, percentComplete, openTasksStatDisplay;
-
-if (selectedTaskStoreId === "all") {
-  // For ALL STORES: count every row
-  totalTasks = checklistRows.length;
-  completedTasks = checklistRows.filter(row => row.status === "completed").length;
-  percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
-  openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
-} else {
-  // For single store
-  totalTasks = filteredChecklistRows.length;
-  completedTasks = filteredChecklistRows.filter(row => row.status === "completed").length;
-  percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
-  openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
-}
+  let totalTasks, completedTasks, percentComplete, openTasksStatDisplay;
+  if (selectedTaskStoreId === "all") {
+    totalTasks = checklistRows.length;
+    completedTasks = checklistRows.filter(row => row.status === "completed").length;
+    percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+    openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
+  } else {
+    totalTasks = filteredChecklistRows.length;
+    completedTasks = filteredChecklistRows.filter(row => row.status === "completed").length;
+    percentComplete = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+    openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
+  }
 
   // Fetch task titles for today's tasks (allDailyTasks)
   const { data: allDailyTasks = [] } = useQuery({
@@ -226,12 +203,7 @@ if (selectedTaskStoreId === "all") {
     enabled: !!today
   });
 
-console.log("ChecklistRows:", checklistRows);
-console.log("Pending count (raw):", checklistRows.filter(row => row.status === "pending").length);
-
-
-
-  // Map tasks for "Today's Tasks" list, based on selectedTaskStoreId
+  // Map tasks for "Today's Tasks" list
   const todaysTasksForList = useMemo(() => {
     let filteredRows = checklistRows;
     if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
@@ -244,32 +216,28 @@ console.log("Pending count (raw):", checklistRows.filter(row => row.status === "
     }));
   }, [checklistRows, allDailyTasks, stores, selectedTaskStoreId]);
 
-// Task complete handler
-const handleTaskComplete = async (id, newStatus) => {
-  setUpdatingTaskId(id); // Set the updating task
-  const { error } = await supabase
-    .from("daily_checklist_status")
-    .update({
-      status: newStatus,
-      completed_at: newStatus === "completed" ? new Date().toISOString() : null,
-      user_id: user.id // <-- ADD THIS LINE! This is required!
-    })
-    .eq("id", id);
+  // Task complete handler
+  const handleTaskComplete = async (id, newStatus) => {
+    setUpdatingTaskId(id);
+    const { error } = await supabase
+      .from("daily_checklist_status")
+      .update({
+        status: newStatus,
+        completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+        user_id: user.id
+      })
+      .eq("id", id);
 
-  if (error && error.code !== "409") {
-    toast({
-      title: "❌ Update Failed",
-      description: error.message || "Could not update task.",
-      variant: "destructive"
-    });
-  }
-
-  // Always refresh (even on 409) to show latest state
-  queryClient.invalidateQueries({ queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId] });
-  setUpdatingTaskId(null);
-};
-
-
+    if (error && error.code !== "409") {
+      toast({
+        title: "❌ Update Failed",
+        description: error.message || "Could not update task.",
+        variant: "destructive"
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId] });
+    setUpdatingTaskId(null);
+  };
 
   // Loading and error handling
   if (isAuthLoading || isLoadingStores) {
@@ -324,9 +292,9 @@ const handleTaskComplete = async (id, newStatus) => {
       </div>
       <Tabs defaultValue="overview" className="mb-6">
         <TabsContent value="overview">
-          {/* Only admin/regional see stats & chart */}
           {canViewStatsAndChart && (
             <>
+              {/* Stats cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <StatsCard
                   title="Maintenance Request"
@@ -336,8 +304,6 @@ const handleTaskComplete = async (id, newStatus) => {
                   iconBgColor="bg-blue-100"
                   change={{ value: "+1 location", isPositive: true, text: "since last month" }}
                 />
-
-                {/* TASKS COMPLETE CARD */}
                 <Card className="relative bg-yellow-50">
                   {/* Clipboard icon at top-left */}
                   <div className="absolute left-5 top-5 z-10">
@@ -354,7 +320,6 @@ const handleTaskComplete = async (id, newStatus) => {
                         : <span className="block text-5xl font-extrabold text-right">{completedTasks}/{totalTasks}</span>
                     }
                   </div>
-                  {/* Central content higher up */}
                   <div className="flex flex-col items-center pt-6 pb-2 relative z-0">
                     <CardTitle className="text-base text-center font-bold mb-2">Daily Checklist Tasks Complete</CardTitle>
                     <select
@@ -369,8 +334,7 @@ const handleTaskComplete = async (id, newStatus) => {
                     </select>
                   </div>
                 </Card>
-                <DailytaskListChart storeTaskData={storeTaskData}/>
-                {/* LOW STOCK (with dropdown inside card) */}
+                <DailytaskListChart storeTaskData={storeTaskData} />
                 <StatsCard
                   title={
                     <span className="flex flex-col">
@@ -396,146 +360,147 @@ const handleTaskComplete = async (id, newStatus) => {
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
               </div>
- {/* --- CHART + FRESHWAYS WIDGET --- */}
-<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
-  {/* Tasks Chart */}
-  <div className="lg:col-span-3">
-    <TasksLast30DaysChart
-      stores={stores}
-      selectedStoreId={selectedTaskStoreId}
-    />
-  </div>
 
-  {/* Freshways Widget */}
-  <Card className="relative bg-blue-50 border border-blue-100 shadow-sm">
-    <div className="absolute left-4 top-4">
-      <div className="rounded-full bg-blue-100 p-2">
-        <ShoppingCart className="h-6 w-6 text-blue-600" />
-      </div>
-    </div>
-    <CardHeader className="pl-20 pt-4 pb-2">
-      <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
-      <CardDescription className="text-sm text-gray-500">Today’s Delivery</CardDescription>
-    </CardHeader>
-    <CardContent className="px-5 pb-5">
-      {isLoadingOrders ? (
-        <p className="text-gray-500 text-sm">Loading...</p>
-      ) : mergedOrderLog.length === 0 ? (
-        <p className="text-gray-500 text-sm">No stores available</p>
-      ) : (
-        <table className="w-full text-sm text-gray-700">
-          <thead>
-            <tr className="text-left border-b text-xs text-gray-400">
-              <th className="py-1">Store</th>
-              <th className="py-1">Status</th>
-              <th className="py-1">Placed At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mergedOrderLog.map((log, idx) => (
-              <tr key={idx} className="border-b">
-                <td className="py-2">{log.storeName}</td>
-                <td className="py-2">
-                  {log.status === "placed" ? (
-                    <span className="text-green-600 font-semibold">Placed</span>
-                  ) : log.status === "missed" ? (
-                    <span className="text-red-600 font-semibold">Missed</span>
-                  ) : (
-                    <span className="text-yellow-600 font-semibold">No Entry</span>
-                  )}
-                </td>
-                <td className="py-2">
-                  {log.createdAt
-                    ? new Date(log.createdAt).toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </CardContent>
-  </Card>
-</div>
+              {/* --- CHART + FRESHWAYS WIDGET --- */}
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
+                {/* Tasks Chart (3/4 width on desktop) */}
+                <div className="lg:col-span-3">
+                  <TasksLast30DaysChart
+                    stores={stores}
+                    selectedStoreId={selectedTaskStoreId}
+                  />
+                </div>
+                {/* Freshways Widget (1/4 width on desktop) */}
+                <div>
+                  <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
+                    <div className="absolute left-4 top-4">
+                      <div className="rounded-full bg-blue-100 p-2">
+                        <ShoppingCart className="h-6 w-6 text-blue-600" />
+                      </div>
+                    </div>
+                    <CardHeader className="pl-20 pt-4 pb-2">
+                      <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
+                      <CardDescription className="text-sm text-gray-500">Today’s Delivery</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-5">
+                      {isLoadingOrders ? (
+                        <p className="text-gray-500 text-sm">Loading...</p>
+                      ) : mergedOrderLog.length === 0 ? (
+                        <p className="text-gray-500 text-sm">No stores available</p>
+                      ) : (
+                        <table className="w-full text-sm text-gray-700">
+                          <thead>
+                            <tr className="text-left border-b text-xs text-gray-400">
+                              <th className="py-1">Store</th>
+                              <th className="py-1">Status</th>
+                              <th className="py-1">Placed At</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mergedOrderLog.map((log, idx) => (
+                              <tr key={idx} className="border-b">
+                                <td className="py-2">{log.storeName}</td>
+                                <td className="py-2">
+                                  {log.status === "placed" ? (
+                                    <span className="text-green-600 font-semibold">Placed</span>
+                                  ) : log.status === "missed" ? (
+                                    <span className="text-red-600 font-semibold">Missed</span>
+                                  ) : (
+                                    <span className="text-yellow-600 font-semibold">No Entry</span>
+                                  )}
+                                </td>
+                                <td className="py-2">
+                                  {log.createdAt
+                                    ? new Date(log.createdAt).toLocaleString("en-GB", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </>
           )}
+
           {/* Today's Tasks Card */}
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-6">
-                            {["admin", "store"].includes(dashboardProfile?.permissions) && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">Today's Tasks</CardTitle>
-   <Link to="/daily-checklist" className="text-chai-gold hover:underline text-sm font-medium">
-  View All
-</Link>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {isLoadingTasks ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-chai-gold mx-auto my-3" />
-                    ) : todaysTasksForList.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No tasks for today</p>
-                    ) : (
-                      todaysTasksForList.slice(0, 3).map(task => (
-<TaskItem
-  key={task.id}
-  id={task.id}
-  title={task.title}
-  location={task.location}
-  dueDate={task.date}
-  completed={task.status === "completed"}
-  onComplete={(id, value) =>
-    handleTaskComplete(id, value ? "completed" : "pending")
-  }
-  isUpdating={updatingTaskId === task.id}
-
-/>
-
-
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>)}
+              {["admin", "store"].includes(dashboardProfile?.permissions) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">Today's Tasks</CardTitle>
+                      <Link to="/daily-checklist" className="text-chai-gold hover:underline text-sm font-medium">
+                        View All
+                      </Link>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {isLoadingTasks ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-chai-gold mx-auto my-3" />
+                      ) : todaysTasksForList.length === 0 ? (
+                        <p className="text-gray-500 text-sm">No tasks for today</p>
+                      ) : (
+                        todaysTasksForList.slice(0, 3).map(task => (
+                          <TaskItem
+                            key={task.id}
+                            id={task.id}
+                            title={task.title}
+                            location={task.location}
+                            dueDate={task.date}
+                            completed={task.status === "completed"}
+                            onComplete={(id, value) =>
+                              handleTaskComplete(id, value ? "completed" : "pending")
+                            }
+                            isUpdating={updatingTaskId === task.id}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {/* Recent Announcements */}
               {["admin", "regional"].includes(dashboardProfile?.permissions) && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">Recent Announcements</CardTitle>
-                    <a href="/announcements" className="text-chai-gold hover:underline text-sm font-medium">
-                      View All
-                    </a>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {announcements.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No recent announcements</p>
-                    ) : (
-                      announcements.slice(0, 2).map(announcement => (
-                        <AnnouncementItem
-                          key={announcement.id}
-                          title={announcement.title}
-                          description={announcement.content}
-                          date={announcement.created_at}
-                          isHighlighted={announcement.important}
-                        />
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>)}
-              {/* Chart moved here if you want managers to see it too, else keep above */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">Recent Announcements</CardTitle>
+                      <a href="/announcements" className="text-chai-gold hover:underline text-sm font-medium">
+                        View All
+                      </a>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {announcements.length === 0 ? (
+                        <p className="text-gray-500 text-sm">No recent announcements</p>
+                      ) : (
+                        announcements.slice(0, 2).map(announcement => (
+                          <AnnouncementItem
+                            key={announcement.id}
+                            title={announcement.title}
+                            description={announcement.content}
+                            date={announcement.created_at}
+                            isHighlighted={announcement.important}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -562,8 +527,6 @@ const handleTaskComplete = async (id, newStatus) => {
           {/* ... Audit Tab Content ... */}
         </TabsContent>
       </Tabs>
-      {/* Access Level Information (unchanged) */}
-      {/* ... You can include your access level cards here as in your existing file ... */}
     </DashboardLayout>
   );
 }
