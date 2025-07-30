@@ -203,29 +203,51 @@ export default function StockManagementView() {
     setDialogOpen(true);
   };
 
-  const handleSaveChanges = (updatedItem) => {
-    // Optionally: push changes to supabase here!
-    const index = inventoryData.findIndex(item =>
-      item.sku === editItem?.sku &&
-      item.storeId === editItem?.storeId
-    );
-    if (index !== -1) {
-      const updatedInventoryData = [...inventoryData];
-      updatedInventoryData[index] = {
-        ...updatedInventoryData[index],
-        ...updatedItem
-      };
-      setInventoryData(updatedInventoryData);
+const handleSaveChanges = async (updatedItem) => {
+  const { data: { user } } = await supabase.auth.getUser();
 
-      toast({
-        title: "Stock Updated",
-        description: `${updatedItem.product} stock has been updated successfully.`,
-      });
+  const { error } = await supabase
+    .from('store_stock_levels')
+    .upsert({
+      stock_item_id: updatedItem.sku, // or use actual `stock_item_id` if you have it
+      store_id: updatedItem.storeId,
+      quantity: updatedItem.stock,
+      last_updated: new Date().toISOString(),
+      daily_check: updatedItem.daily_check || false,
+      updated_by: user.id, // ✅ this is the key fix
+    });
 
-      setDialogOpen(false);
-      setEditItem(null);
-    }
-  };
+  if (error) {
+    toast({
+      title: "Error",
+      description: `Failed to update stock: ${error.message}`,
+      variant: "destructive",
+    });
+    return;
+  }
+
+  const index = inventoryData.findIndex(item =>
+    item.sku === editItem?.sku &&
+    item.storeId === editItem?.storeId
+  );
+  if (index !== -1) {
+    const updatedInventoryData = [...inventoryData];
+    updatedInventoryData[index] = {
+      ...updatedInventoryData[index],
+      ...updatedItem
+    };
+    setInventoryData(updatedInventoryData);
+
+    toast({
+      title: "Stock Updated",
+      description: `${updatedItem.product} stock has been updated successfully.`,
+    });
+
+    setDialogOpen(false);
+    setEditItem(null);
+  }
+};
+
 
   // UI helpers
   const getStatusBadgeClass = (status) => {

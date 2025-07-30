@@ -70,40 +70,61 @@ export default function DailyStockCheck() {
   }, [storeId]);
 
   // ✅ Save (update or insert) to store_stock_levels
-  const handleSaveStock = async (stockRow) => {
-    console.log("Trying to insert new stock row:", stockRow);
+const handleSaveStock = async (stockRow, user) => {
+  console.log("🧪 Upserting to store_stock_levels with data:", stockRow);
+  console.log("🧪 Double-check user.id === updated_by?", user.id === stockRow.updated_by);
 
-    const { data, error } = await supabase
-      .from("store_stock_levels")
-      .upsert(stockRow)
-      .select();
 
-    if (error) {
-      console.error("Error saving stock:", error);
-      alert("Failed to save stock.");
-      return;
-    }
+  const { data, error } = await supabase
+    .from("store_stock_levels")
+    .upsert(stockRow)
+    .select();
 
-    alert("Stock saved!");
-    await fetchStock();
-  };
+  if (error) {
+    console.error("❌ Supabase error:", error);
+    alert("Failed to save stock.");
+    return;
+  }
+
+  console.log("✅ Stock saved successfully:", data);
+  alert("Stock saved!");
+  await fetchStock();
+};
+
 
   // ✅ Handle Save click from UI
-  const handleSave = (item) => {
-    const quantity = Number(editing[item.id]);
-    if (isNaN(quantity)) return;
+const handleSave = async (item) => {
+  const quantity = Number(editing[item.id]);
+  if (isNaN(quantity)) return;
 
-    const stockRow = {
-      stock_item_id: item.id,
-      store_id: storeId,
-      quantity,
-      last_updated: new Date().toISOString(),
-      updated_by: profile?.id,
-      ...(item.store_stock_level_id && { id: item.store_stock_level_id })
-    };
+const {
+  data,
+  error: userError
+} = await supabase.auth.getUser();
 
-    handleSaveStock(stockRow);
+const user = data?.user;
+
+if (!user) {
+  console.error("❌ No user found:", userError);
+  return;
+}
+
+  const stockRow = {
+    stock_item_id: item.id,
+    store_id: storeId,
+    quantity,
+    last_updated: new Date().toISOString(),
+    updated_by: user.id,
+    ...(item.store_stock_level_id && { id: item.store_stock_level_id })
   };
+
+  console.log("🧾 Final payload to send:", stockRow);
+  console.log("👤 Current user ID:", user.id);
+
+  await handleSaveStock(stockRow, user);
+};
+
+
 
   // Edit quantity
   const handleEditChange = (id, value) => {
