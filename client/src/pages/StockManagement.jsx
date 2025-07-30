@@ -77,6 +77,8 @@ export default function StockManagementView() {
   const isStoreManager = currentUser?.permissions === 'store';
   const isArea = currentUser?.permissions === 'area';
   const isAdminOrRegional = currentUser?.permissions === 'admin' || currentUser?.permissions === 'regional';
+  const [chaiiwalaStores, setChaiiwalaStores] = useState([]);
+
 
   // Fetch inventory data (per-store, not global)
   useEffect(() => {
@@ -169,6 +171,23 @@ export default function StockManagementView() {
   const lowStockCount = inventoryData.filter(item => item.status === 'low_stock').length;
   const outOfStockCount = inventoryData.filter(item => item.status === 'out_of_stock').length;
   const drinksCount = inventoryData.filter(item => item.category === 'Drinks').length;
+
+  useEffect(() => {
+  async function fetchStores() {
+    const { data, error } = await supabase
+      .from('stores') // your Supabase table name
+      .select('id, name');
+
+    if (!error) {
+      setChaiiwalaStores(data);
+    }
+  }
+
+  if (isAdminOrRegional) {
+    fetchStores();
+  }
+}, [isAdminOrRegional]);
+
 
   // Sorting UI
   const handleSort = (field) => {
