@@ -20,6 +20,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
+import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
+
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -335,6 +337,8 @@ export default function DashboardPage() {
                   </div>
                 </Card>
                 <DailytaskListChart storeTaskData={storeTaskData} />
+                {/* Weekly Stock Check Compliance - Regional/Admin Only */}
+
                 <StatsCard
                   title={
                     <span className="flex flex-col">
@@ -359,6 +363,7 @@ export default function DashboardPage() {
                   iconBgColor="bg-red-100"
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
+                    <StockCheckComplianceWidget />
               </div>
 
               {/* --- CHART + FRESHWAYS WIDGET --- */}
