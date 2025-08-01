@@ -9,6 +9,8 @@ export default function DailyChecklist() {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [checklists, setChecklists] = useState([]);
+  const isSunday = new Date().getDay() === 0; // Sunday = 0
+
 
   useEffect(() => {
     async function fetchChecklist() {

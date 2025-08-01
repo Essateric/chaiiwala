@@ -9,6 +9,9 @@ export default function DailyStockCheck() {
   const { profile } = useAuth();
   const storeId = Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null;
 
+  const isSunday = new Date().getDay() === 0; // Sunday = 0
+
+
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -16,18 +19,19 @@ export default function DailyStockCheck() {
   const [search, setSearch] = useState('');
   const itemsPerPage = 10;
 
-  // ✅ Shared fetch function
   const fetchStock = async () => {
     if (!storeId) return;
 
     setLoading(true);
 
-    // 1. Get all daily_check items
-    const { data: items, error: itemError } = await supabase
+    let { data: items, error: itemError } = await supabase
       .from("stock_items")
       .select("*")
-      .eq("daily_check", true)
       .order("name", { ascending: true });
+
+    if (!itemError && !isSunday) {
+      items = items.filter(item => item.daily_check === true);
+    }
 
     if (itemError) {
       setStockItems([]);
@@ -37,7 +41,6 @@ export default function DailyStockCheck() {
 
     const itemIds = items.map(i => i.id);
 
-    // 2. Get store_stock_levels for this store
     let levels = [];
     if (itemIds.length > 0) {
       const { data: levelData, error: levelsError } = await supabase
@@ -49,7 +52,6 @@ export default function DailyStockCheck() {
       if (!levelsError && levelData) levels = levelData;
     }
 
-    // 3. Merge
     const levelsByItem = {};
     levels.forEach(level => {
       levelsByItem[level.stock_item_id] = level;
@@ -69,64 +71,57 @@ export default function DailyStockCheck() {
     fetchStock();
   }, [storeId]);
 
-  // ✅ Save (update or insert) to store_stock_levels
-const handleSaveStock = async (stockRow, user) => {
-  console.log("🧪 Upserting to store_stock_levels with data:", stockRow);
-  console.log("🧪 Double-check user.id === updated_by?", user.id === stockRow.updated_by);
+  const handleSaveStock = async (stockRow, user) => {
+    console.log("🧪 Upserting to store_stock_levels with data:", stockRow);
+    console.log("🧪 Double-check user.id === updated_by?", user.id === stockRow.updated_by);
 
+    const { data, error } = await supabase
+      .from("store_stock_levels")
+      .upsert(stockRow)
+      .select();
 
-  const { data, error } = await supabase
-    .from("store_stock_levels")
-    .upsert(stockRow)
-    .select();
+    if (error) {
+      console.error("❌ Supabase error:", error);
+      alert("Failed to save stock.");
+      return;
+    }
 
-  if (error) {
-    console.error("❌ Supabase error:", error);
-    alert("Failed to save stock.");
-    return;
-  }
-
-  console.log("✅ Stock saved successfully:", data);
-  alert("Stock saved!");
-  await fetchStock();
-};
-
-
-  // ✅ Handle Save click from UI
-const handleSave = async (item) => {
-  const quantity = Number(editing[item.id]);
-  if (isNaN(quantity)) return;
-
-const {
-  data,
-  error: userError
-} = await supabase.auth.getUser();
-
-const user = data?.user;
-
-if (!user) {
-  console.error("❌ No user found:", userError);
-  return;
-}
-
-  const stockRow = {
-    stock_item_id: item.id,
-    store_id: storeId,
-    quantity,
-    last_updated: new Date().toISOString(),
-    updated_by: user.id,
-    ...(item.store_stock_level_id && { id: item.store_stock_level_id })
+    console.log("✅ Stock saved successfully:", data);
+    alert("Stock saved!");
+    await fetchStock();
   };
 
-  console.log("🧾 Final payload to send:", stockRow);
-  console.log("👤 Current user ID:", user.id);
+  const handleSave = async (item) => {
+    const quantity = Number(editing[item.id]);
+    if (isNaN(quantity)) return;
 
-  await handleSaveStock(stockRow, user);
-};
+    const {
+      data,
+      error: userError
+    } = await supabase.auth.getUser();
 
+    const user = data?.user;
 
+    if (!user) {
+      console.error("❌ No user found:", userError);
+      return;
+    }
 
-  // Edit quantity
+    const stockRow = {
+      stock_item_id: item.id,
+      store_id: storeId,
+      quantity,
+      last_updated: new Date().toISOString(),
+      updated_by: user.id,
+      ...(item.store_stock_level_id && { id: item.store_stock_level_id })
+    };
+
+    console.log("🧾 Final payload to send:", stockRow);
+    console.log("👤 Current user ID:", user.id);
+
+    await handleSaveStock(stockRow, user);
+  };
+
   const handleEditChange = (id, value) => {
     setEditing(prev => ({
       ...prev,
@@ -134,7 +129,6 @@ if (!user) {
     }));
   };
 
-  // Filter + paginate
   const filteredStockItems = search
     ? stockItems.filter(item =>
         item.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -152,7 +146,11 @@ if (!user) {
     <Card className="mb-6">
       <CardHeader>
         <CardTitle>Daily Stock Check</CardTitle>
-        <p className="text-sm text-gray-500">Update today’s stock levels for all daily-check items.</p>
+        <p className="text-sm text-gray-500">
+          {isSunday
+            ? "Sunday Weekly Stock Check — update quantities for all stock items."
+            : "Update today’s stock levels for all daily-check items."}
+        </p>
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex items-center">
@@ -169,7 +167,7 @@ if (!user) {
         ) : (
           <>
             {pageItems.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No daily stock items found.</div>
+              <div className="p-4 text-center text-gray-500">No stock items found.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
