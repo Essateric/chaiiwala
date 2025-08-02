@@ -52,8 +52,6 @@ export async function handler(event) {
       <p><strong>Account Number:</strong> ${data.accountNumber}</p>
       <p><strong>Delivery Date:</strong> ${formattedDeliveryDate}</p>
       <p><strong>Store:</strong> ${data.store}</p>
-      <p><strong>Address:</strong> ${data.storeAddress}</p>
-      <p><strong>Phone:</strong> ${data.storePhone}</p>
       <p><strong>Total:</strong> <strong>£${data.totalPriceFormatted}</strong></p>
 
       <h3>🛒 Order Items</h3>
@@ -79,8 +77,9 @@ export async function handler(event) {
 
     const info = await transporter.sendMail({
       from: `"Freshways Orders" <${process.env.FRESHWAYS_ORDER_EMAIL_USER}>`,
-      to: 'essateric@gmail.com',
-      cc: ['usman.aftab@chaiiwala.co.uk'],
+      // to: ['gurjit@freshways.co.uk, vishvas.verma@freshways.co.uk'],
+      to: ['usman.aftab@chaiiwala.co.uk, essateric@gmail.com'],
+      cc: ['usman.aftab@chaiiwala.co.uk, essateric@gmail.com'],
       subject: `New Freshways Order: ${data.orderId}`,
       html: htmlBody
     });
