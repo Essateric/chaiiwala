@@ -193,16 +193,6 @@ useEffect(() => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="h-24 flex flex-col items-center justify-center gap-2" variant="outline">
-          <BuildingIcon className="h-8 w-8 text-blue-600" />
-          <span>Freshways Order</span>
-          {isOrderFormEnabled && (
-  <p className="text-sm text-blue-600 font-medium">{timeLeft}</p>
-)}
-
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         {isOrderDayValid && (
   <p className="text-sm font-semibold text-blue-600 mb-2 text-center">

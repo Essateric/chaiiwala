@@ -239,102 +239,55 @@ const [itemPrices, setItemPrices] = useState({});
                             <TableCell>{order.supplier_name}</TableCell>
                             <TableCell>{order.stores?.name || order.store_id}</TableCell>
                             <TableCell>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    View ({order.items?.length || 0})
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                  <div className="grid gap-2">
-                                    <div className="rounded-md bg-muted p-2">
-                                      <table className="w-full text-sm">
-                                        <thead>
-                                          <tr>
-                                            <th className="text-left">Item</th>
-                                            <th className="text-center">Qty</th>
-                                            <th className="text-right">Subtotal</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {order.items?.map((item, index) => (
-                                            <tr key={index}>
-                                              <td>{item.name}</td>
-                                              <td className="text-center">{item.quantity}</td>
-                                              <td className="text-right">{item.subtotal}</td>
-                                            </tr>
-                                          ))}
-                                          <tr className="border-t mt-2">
-                                            <td colSpan="2" className="pt-2 font-medium">Total</td>
-                                            <td className="pt-2 text-right font-medium">
-                                              £{Number(order.total_price).toFixed(2)}
-                                            </td>
-                                          </tr>
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </TableCell>
-                            <TableCell>{order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString() : 'N/A'}</TableCell>
-                            <TableCell>£{Number(order.total_price).toFixed(2)}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={order.status === 'Awaiting Confirmation' ? 'default' : 'secondary'}>
-                                {order.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVerticalIcon className="h-4 w-4" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-56" align="end">
-                                  <div className="grid gap-1">
-                                    {order.status === 'Awaiting Confirmation' && (
-                                      <Button
-                                        variant="ghost"
-                                        className="flex items-center justify-start px-2 h-9 gap-2 text-destructive hover:text-destructive"
-                                        onClick={async () => {
-                                          if (confirm(`Are you sure you want to cancel order ${order.order_display_id}?`)) {
-                                            const success = await updateOrderStatus(order.id, 'Cancelled');
-                                            if (success) {
-                                              alert(`Order ${order.order_display_id} cancelled successfully.`);
-                                              // The fetchOrders might need to be called again if not automatically re-fetching
-                                              // or if the local state update in useSupplierOrders isn't sufficient
-                                              // For now, the local state update in the hook should handle it.
-                                              // To ensure fresh data for all tabs after a status change:
-                                              fetchOrders({ supplier_name: 'Freshways' });
-                                            } else {
-                                              alert(`Failed to cancel order ${order.order_display_id}.`);
-                                            }
-                                          }
-                                        }}
-                                      >
-                                        <XIcon className="h-4 w-4" />
-                                        <span>Cancel Order</span>
-                                      </Button>
-                                    )}
-                                    {/* Add other actions based on status, e.g., Mark as Confirmed, Mark as Delivered */}
-                                    <Button
-                                      variant="ghost"
-                                      className="flex items-center justify-start px-2 h-9 gap-2 text-green-600 hover:text-green-600"
-                                      onClick={() => {
-                                        setCurrentOrderForReceipt(order);
-                                        setOpenReceiptDialog(true);
-                                      }}
-                                      // Potentially disable based on status
-                                      disabled={!['Awaiting Confirmation', 'Order Confirmed'].includes(order.status)}
-                                    >
-                                      <CheckIcon className="h-4 w-4" />
-                                      <span>Order Received</span>
-                                    </Button>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </TableCell>
+  {order.basket_url ? (
+    <a
+      href={order.basket_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 underline"
+    >
+      View Basket
+    </a>
+  ) : (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          View ({order.items?.length || 0})
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80">
+        <div className="grid gap-2">
+          <div className="rounded-md bg-muted p-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left">Item</th>
+                  <th className="text-center">Qty</th>
+                  <th className="text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items?.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.name || item.description}</td>
+                    <td className="text-center">{item.quantity || "-"}</td>
+                    <td className="text-right">{item.subtotal || "-"}</td>
+                  </tr>
+                ))}
+                <tr className="border-t mt-2">
+                  <td colSpan="2" className="pt-2 font-medium">Total</td>
+                  <td className="pt-2 text-right font-medium">
+                    £{Number(order.total_price).toFixed(2)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )}
+</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
