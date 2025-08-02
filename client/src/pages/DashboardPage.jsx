@@ -154,8 +154,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("freshways_order_log")
-        .select("store_id, status, created_at, stores ( name )")
-        .eq("delivery_date", today);
+        .select("store_id, status, created_at, stores ( name )");
 
       if (error) throw error;
       return data;
@@ -415,7 +414,7 @@ export default function DashboardPage() {
                                   )}
                                 </td>
                                 <td className="py-2">
-                                  {log.createdAt
+                                  {log.status === "placed" && log.createdAt
                                     ? new Date(log.createdAt).toLocaleString("en-GB", {
                                         day: "2-digit",
                                         month: "short",
