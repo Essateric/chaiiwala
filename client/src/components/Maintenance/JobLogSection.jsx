@@ -67,8 +67,9 @@ export default function JobLogSection() {
   const storeId = ["admin", "regional", "maintenance"].includes(profile?.permissions)
     ? null
     : profile?.store_id;
-
-  const { jobLogs, createJobLog, isCreating } = useJobLogs(storeId);
+const { jobLogs, createJobLog, isCreating } = useJobLogs(storeId, {
+  recentCompletedOnly: true,
+});
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState(undefined);

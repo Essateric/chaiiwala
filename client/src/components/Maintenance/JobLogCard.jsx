@@ -33,6 +33,7 @@ export default function JobLogCard({ log }) {
   const [editData, setEditData] = useState({ title: log.title, description: log.description });
   const [deleting, setDeleting] = useState(false);
 
+
   useEffect(() => {
     const fetchStaff = async () => {
       const { data, error } = await supabase.from("profiles").select("id, name");
@@ -69,15 +70,21 @@ export default function JobLogCard({ log }) {
   };
 
   const handleStatusChange = async (newStatus) => {
+    const updateData = { status: newStatus }
+
+    if (newStatus === "completed") {
+  updateData.completed_at = new Date().toISOString();
+}
+
     if (!log?.id) {
       console.error("Missing log ID");
       return;
     }
-    const { error } = await supabase
-      .from("joblogs")
-      .update({ status: newStatus })
-      .eq("id", log.id)
-        .is("deleted_at", null); 
+      const { error } = await supabase
+  .from("joblogs")
+  .update(updateData)
+  .eq("id", log.id)
+  .is("deleted_at", null);
     if (error) {
       alert("Failed to update status: " + error.message);
     } else {
@@ -237,9 +244,31 @@ const handleDelete = async () => {
         ) : (
           <>
             <DialogTitle>{log.title}</DialogTitle>
-            <DialogDescription>
-              Logged on {displayDate} by {log.loggedBy || "Unknown"}
-            </DialogDescription>
+         <DialogDescription>
+  Logged on {displayDate} by {log.loggedBy || "Unknown"}
+  {log.status === "completed" && log.completed_at && (
+    <div className="mt-1">
+      <strong>Completed on:</strong>{" "}
+      {format(new Date(log.completed_at), "d MMM yyyy, h:mmaaa")}
+    </div>
+  )}
+</DialogDescription>
+
+            <p className="text-sm mt-1">
+  <strong>Status:</strong>{" "}
+  <span
+    className={
+      log.status === "completed"
+        ? "text-green-600 font-semibold"
+        : log.status === "in_progress"
+        ? "text-yellow-600 font-semibold"
+        : "text-red-600 font-semibold"
+    }
+  >
+    {log.status?.replace("_", " ").toUpperCase() || "UNKNOWN"}
+  </span>
+</p>
+
           </>
         )}
 

@@ -1,16 +1,15 @@
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../hooks/use-toast.jsx";
-import { supabase } from "../lib/supabaseClient.js";
+import { subDays, startOfDay } from "date-fns";
 
-function useJobLogs(storeId) {
+function useJobLogs(storeId, { recentCompletedOnly = false } = {}) {
   const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // ✅ Fetch job logs based on storeId, JOIN stores!
   const { data: jobLogs = [], isLoading, error, refetch } = useQuery({
-    queryKey: ["joblogs", storeId], // include storeId so refetch works for filtered stores
+    queryKey: ["joblogs", storeId, recentCompletedOnly],
     queryFn: async () => {
       let query = supabase
         .from("joblogs")
@@ -22,12 +21,21 @@ function useJobLogs(storeId) {
             store_code
           )
         `)
-         .is("deleted_at", null) 
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (storeId) {
         query = query.eq("storeId", storeId);
       }
+
+if (recentCompletedOnly) {
+  const sevenDaysAgo = startOfDay(subDays(new Date(), 7)).toISOString();
+
+query = query.or(
+  `and(status.eq.completed,completed_at.gte.${sevenDaysAgo}),status.neq.completed`
+);
+
+}
 
       const { data, error } = await query;
       if (error) throw new Error(error.message);
@@ -36,7 +44,6 @@ function useJobLogs(storeId) {
     enabled: true,
   });
 
-  // ✅ Create job log
   const { mutateAsync: createJobLog, isPending: isCreating } = useMutation({
     mutationFn: async (jobLog) => {
       const { data, error } = await supabase.from("joblogs").insert([jobLog]);

@@ -20,13 +20,18 @@ export default function JobLogKanban({ jobLogs }) {
         <div key={status} className="min-w-[250px] w-full max-w-[300px] flex-shrink-0">
           <h2 className="text-lg font-semibold capitalize mb-2 text-center">{status.replace("_", " ")}</h2>
           <div className="space-y-2">
-            {grouped[status].length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center">No logs</div>
-            ) : (              grouped[status]
-  .filter((log) => log && typeof log === "object") // filter out bad entries
-  .map((log) => <JobLogCard key={log.id} log={log} />)
+        {grouped[status].length === 0 ? (
+  <div className="text-sm text-muted-foreground text-center">
+    {status === "completed"
+      ? "No maintenance jobs completed in the last 7 days."
+      : "No logs"}
+  </div>
+) : (
+  grouped[status]
+    .filter((log) => log && typeof log === "object")
+    .map((log) => <JobLogCard key={log.id} log={log} />)
+)}
 
-            )}
           </div>
         </div>
       ))}
