@@ -144,8 +144,9 @@ const handleSubmit = async (e) => {
       return;
     }
 
-    // Send email via Netlify Function
-const baseUrl = import.meta.env.DEV
+const isLocalhost = window.location.hostname === 'localhost';
+
+const baseUrl = isLocalhost
   ? 'http://localhost:8888/.netlify/functions'
   : '/.netlify/functions';
 
@@ -154,6 +155,7 @@ const response = await fetch(`${baseUrl}/sendFeedbackEmail`, {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
 });
+
 
     if (!response.ok) {
       const errorData = await response.json();
