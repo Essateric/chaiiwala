@@ -297,10 +297,7 @@ console.log("📦 deliveryDateISO:", deliveryDateISO);
       items: orderItems
     };
 
-const emailFunctionUrl =
-  window?.location?.hostname === 'localhost'
-    ? 'http://localhost:8888/.netlify/functions/sendFreshwaysOrderEmail'
-    : '/.netlify/functions/sendFreshwaysOrderEmail';
+const emailFunctionUrl = '/.netlify/functions/sendFreshwaysOrderEmail';
 
 const emailRes = await fetch(emailFunctionUrl, {
       method: 'POST',

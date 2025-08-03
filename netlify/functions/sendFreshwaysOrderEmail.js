@@ -77,9 +77,10 @@ export async function handler(event) {
 
     const info = await transporter.sendMail({
       from: `"Freshways Orders" <${process.env.FRESHWAYS_ORDER_EMAIL_USER}>`,
-      to: ['gurjit@freshways.co.uk, vishvas.verma@freshways.co.uk'],
+      // to: ['gurjit@freshways.co.uk, vishvas.verma@freshways.co.uk'],
+          to: ['usman.aftab@chaiiwala.co.uk, essateric@gmail.com'],
       cc: ['usman.aftab@chaiiwala.co.uk, essateric@gmail.com'],
-      subject: `New Freshways Order: ${data.orderId}`,
+      subject: `New Freshways Order Test Production: ${data.orderId}`,
       html: htmlBody
     });
 
