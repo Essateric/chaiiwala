@@ -11,6 +11,8 @@ import { supabase } from "../../lib/supabaseClient.js";
 import { useFreshwaysAcc } from "../../hooks/useFreshwaysAccs.jsx";
 import { formatDeliveryDateVerbose } from "../../lib/formatters.js";
 import React, { useEffect, useState } from "react"; // ✅ include useState
+import { useQueryClient } from "@tanstack/react-query";
+
 
 
 
@@ -71,6 +73,9 @@ const deliveryDay = validOrderDays[orderDay] ?? null;
 
 const isBeforeCutoff = currentHour < 12;
 const isOrderFormEnabled = isOrderDayValid && isBeforeCutoff;
+
+const queryClient = useQueryClient();
+
 
 function getNextDeliveryDate(deliveryDayStr) {
   const dayIndexMap = {
@@ -304,6 +309,8 @@ console.log("📦 deliveryDateISO:", deliveryDateISO);
     alert('Order saved and email sent successfully!');
     setSelectedItems({});
     setOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["freshways_order_log"] });
+
     window.location.reload();
   } catch (error) {
     console.error('Unexpected error during order submission:', error);

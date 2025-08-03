@@ -21,6 +21,8 @@ import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.j
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
+import { getFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
+import { formatDeliveryDateVerbose } from "../lib/formatters";
 
 
 export default function DashboardPage() {
@@ -29,17 +31,29 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
 
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
+  const deliveryDate = getFreshwaysDeliveryDate(); // ISO string like "2025-08-05"
 
   // Fetch all stores for dropdown
-  const { data: stores = [], isLoading: isLoadingStores } = useQuery({
-    queryKey: ["stores"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("stores").select("id, name");
-      if (error) throw error;
-      return data || [];
-    }
-  });
+const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
+  queryKey: ["freshways_order_log", deliveryDate],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("freshways_orders")
+      .select("store_id, created_at, status, stores(name)")
+      .eq("expected_delivery_date", deliveryDate);  // ✅ key change
+    if (error) throw error;
+    return data;
+  }
+});
 
+  const { data: stores = [], isLoading: isLoadingStores } = useQuery({
+  queryKey: ["stores"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("stores").select("*");
+    if (error) throw error;
+    return data;
+  }
+});
   // 2 dropdowns (one for tasks, one for stock), default "all"
   const [selectedTaskStoreId, setSelectedTaskStoreId] = useState("all");
   const [selectedStockStoreId, setSelectedStockStoreId] = useState("all");
@@ -134,6 +148,9 @@ export default function DashboardPage() {
     enabled: !!today
   });
 
+
+
+
   const storeTaskData = useMemo(() => {
     if (!stores.length) return [];
     // For each store, count number of completed tasks today
@@ -148,29 +165,25 @@ export default function DashboardPage() {
     });
   }, [stores, checklistRows]);
 
-  // Freshways Order Log
-  const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
-    queryKey: ["freshways_order_log", today],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("freshways_order_log")
-        .select("store_id, status, created_at, stores ( name )");
+const mergedOrderLog = useMemo(() => {
+  return stores.map(store => {
+    const storeOrders = orderLogs.filter(l => l.store_id === store.id);
 
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const mergedOrderLog = useMemo(() => {
-    return stores.map(store => {
-      const log = orderLogs.find(l => l.store_id === store.id);
-      return {
-        storeName: store.name,
-        status: log?.status || "missing",
-        createdAt: log?.created_at || null
-      };
+    // Filter only orders created BEFORE 11 AM
+    const earlyOrder = storeOrders.find(order => {
+      const orderTime = new Date(order.created_at);
+      return orderTime.getHours() < 11;
     });
-  }, [stores, orderLogs]);
+
+    return {
+      storeName: store.name,
+      status: earlyOrder ? "placed" : "missed",
+      createdAt: earlyOrder?.created_at || null
+    };
+  });
+}, [stores, orderLogs]);
+
+
 
   // For stats card: SUM all rows across all stores if "all"
   let filteredChecklistRows = checklistRows;
@@ -236,8 +249,9 @@ export default function DashboardPage() {
         variant: "destructive"
       });
     }
-    queryClient.invalidateQueries({ queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId] });
+    queryClient.invalidateQueries(["freshways_order_log", deliveryDate]);
     setUpdatingTaskId(null);
+
   };
 
   // Loading and error handling
@@ -384,7 +398,9 @@ export default function DashboardPage() {
                     </div>
                     <CardHeader className="pl-20 pt-4 pb-2">
                       <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
-                      <CardDescription className="text-sm text-gray-500">Today’s Delivery</CardDescription>
+<CardDescription className="text-sm text-gray-500">
+  for delivery on {formatDeliveryDateVerbose(deliveryDate)}
+</CardDescription>
                     </CardHeader>
                     <CardContent className="px-5 pb-5">
                       {isLoadingOrders ? (

@@ -1,11 +1,9 @@
-// src/lib/formatters.js
-
 export function formatDeliveryDateVerbose(dateStr) {
   const date = new Date(dateStr);
-  const day = date.toLocaleDateString("en-GB", { weekday: "short" }); // e.g. Sat
+  const day = date.toLocaleDateString("en-GB", { weekday: "long" }); // e.g. Monday
   const dayNum = date.getDate();
-  const month = date.toLocaleDateString("en-GB", { month: "long" }); // e.g. July
-  const year = date.getFullYear();
+  const month = date.toLocaleDateString("en-GB", { month: "short" }); // e.g. Aug
+  const year = `'${date.getFullYear().toString().slice(-2)}`; // '25
 
   const suffix =
     dayNum === 1 || dayNum === 21 || dayNum === 31
