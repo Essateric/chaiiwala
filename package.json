@@ -64,6 +64,7 @@
     "memorystore": "^1.6.7",
     "n8n": "^1.92.2",
     "netlify-cli": "^19.1.5",
+    "node": "^22.18.0",
     "nodemailer": "^7.0.5",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
