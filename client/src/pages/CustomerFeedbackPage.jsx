@@ -146,11 +146,7 @@ const handleSubmit = async (e) => {
 
 const isLocalhost = window.location.hostname === 'localhost';
 
-const baseUrl = isLocalhost
-  ? 'http://localhost:8888/.netlify/functions'
-  : '/.netlify/functions';
-
-const response = await fetch(`${baseUrl}/sendFeedbackEmail`, {
+const response = await fetch('/.netlify/functions/sendFeedbackEmail', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
