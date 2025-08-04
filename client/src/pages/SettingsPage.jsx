@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/UseAuth"; // Make sure this import matches your file casing!
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useToast } from "../hooks/use-toast.jsx";
+import { useAuth } from "../hooks/UseAuth.jsx"; // Make sure this import matches your file casing!
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/ui/tabs";
+} from "../components/ui/tabs.jsx";
 import {
   Card,
   CardContent,
@@ -15,25 +15,18 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+} from "../components/ui/card.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Button } from "../components/ui/button.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.jsx";
+import { Switch } from "../components/ui/switch.jsx";
+import { Separator } from "../components/ui/separator.jsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.jsx";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog.jsx";
 import { Edit, Trash2, Plus, Shield, Tag, Package } from 'lucide-react';
+import { supabase } from "../lib/supabaseClient.js"; // Adjust path if needed
 
-// --- Stock Management State/Mocks (you would load from API/DB in real app)
-const initialStockConfig = [
-  { id: 1, itemCode: "BP401", name: "Masala Beans", lowStockThreshold: 5, category: "Food", price: 3.99, sku: "CHW-MB-001", daily_check: false },
-  { id: 2, itemCode: "BP402", name: "Daal", lowStockThreshold: 4, category: "Food", price: 2.99, sku: "CHW-DA-001", daily_check: false },
-  { id: 3, itemCode: "BP440", name: "Mogo Sauce", lowStockThreshold: 6, category: "Food", price: 1.99, sku: "CHW-MS-001", daily_check: false },
-  { id: 4, itemCode: "DP196", name: "Orange Juice (12x250ml)", lowStockThreshold: 3, category: "Drinks", price: 6.99, sku: "CHW-OJ-001", daily_check: false },
-  { id: 5, itemCode: "FPFC204", name: "Karak Chaii Sugar free (50 per box)", lowStockThreshold: 2, category: "Drinks", price: 24.99, sku: "CHW-KC-001", daily_check: false },
-];
 
 export default function SettingsPage() {
   // --- Auth & Role
@@ -58,20 +51,30 @@ export default function SettingsPage() {
     taskAssignments: true,
     announcements: true,
   });
+  const [systemSettings, setSystemSettings] = useState({
+  lowStockThreshold: 20, // You can set default value here
+});
+const defaultItem = {
+  name: "",
+  lowStockThreshold: 1,
+  category: "Food",
+  price: 0.00,
+  sku: "",
+  daily_check: false,
+  id: undefined,
+  itemCode: "",
+};
+const initialStockConfig = [];
+
+
 
   // --- Admin/Business settings
   const [stockConfig, setStockConfig] = useState(initialStockConfig);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newItem, setNewItem] = useState({
-    name: "",
-    lowStockThreshold: 5,
-    category: "Food",
-    price: 0.00,
-    sku: "",
-    daily_check: false,
-  });
+const [newItem, setNewItem] = useState({ ...defaultItem });
+
   // Categories mock (replace with your fetch logic)
   const [categories, setCategories] = useState([
     { id: 1, name: "Food", prefix: "BP", description: "Edible items" },
@@ -111,28 +114,73 @@ export default function SettingsPage() {
   };
 
   // --- Stock management handlers (mock logic)
-  const handleEditItem = (item) => { setEditItem(item); setDialogOpen(true); };
-  const handleSaveChanges = () => {
-    if (editItem) {
-      const updatedConfig = stockConfig.map(item => item.id === editItem.id ? editItem : item);
-      setStockConfig(updatedConfig);
-      toast({ title: "Settings Updated", description: `${editItem.name} threshold has been updated.` });
-      setDialogOpen(false); setEditItem(null);
-    }
-  };
-  const handleAddItem = () => {
-    if (!newItem.name) {
-      toast({ title: "Validation Error", description: "Product name is required.", variant: "destructive" });
+const handleEditItem = (item) => {
+  const merged = { ...defaultItem, ...item };
+  console.log("Opening edit dialog with item:", merged);
+  setEditItem(merged); // Ensures all keys exist!
+  setDialogOpen(true);
+};
+
+
+const handleSaveChanges = async () => {
+  if (editItem) {
+    // 1. Update Supabase table
+    const { error } = await supabase
+      .from('stock_items')
+      .update({
+        low_stock_threshold: editItem.lowStockThreshold,
+        daily_check: editItem.daily_check,
+        // add other editable fields here as needed
+      })
+      .eq('id', editItem.id);
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to update threshold.", variant: "destructive" });
       return;
     }
-    const itemCode = generateItemCode(newItem.category, newItem.name);
-    const newId = Math.max(0, ...stockConfig.map(item => item.id)) + 1;
-    const itemToAdd = { ...newItem, itemCode, id: newId };
-    setStockConfig([...stockConfig, itemToAdd]);
-    setNewItem({ name: "", lowStockThreshold: 5, category: "Food", price: 0.00, sku: "", daily_check: false });
-    setIsAddDialogOpen(false);
-    toast({ title: "Item Added", description: `${newItem.name} has been added to stock configuration.` });
-  };
+
+    // 2. Update local React state for instant UI feedback
+    const updatedConfig = stockConfig.map(item =>
+      item.id === editItem.id ? editItem : item
+    );
+    setStockConfig(updatedConfig);
+    toast({ title: "Settings Updated", description: `${editItem.name} threshold has been updated.` });
+    setDialogOpen(false);
+    setEditItem(null);
+  }
+};
+
+const handleAddItem = async () => {
+  if (!newItem.name) {
+    toast({ title: "Validation Error", description: "Product name is required.", variant: "destructive" });
+    return;
+  }
+  const itemCode = generateItemCode(newItem.category, newItem.name);
+  const { data, error } = await supabase
+    .from('stock_items')
+    .insert([{
+      sku: newItem.sku,
+      name: newItem.name,
+      category: newItem.category,
+      low_stock_threshold: newItem.lowStockThreshold,
+      price: newItem.price,
+      daily_check: newItem.daily_check,
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    toast({ title: "Error", description: "Failed to add item.", variant: "destructive" });
+    return;
+  }
+  // Use ID returned from Supabase for consistency
+  setStockConfig([...stockConfig, { ...newItem, itemCode, id: data.id }]);
+setNewItem({ ...defaultItem });
+  setIsAddDialogOpen(false);
+  toast({ title: "Item Added", description: `${newItem.name} has been added to stock configuration.` });
+};
+
+
   const handleDeleteItem = (id) => {
     setStockConfig(stockConfig.filter(item => item.id !== id));
     toast({ title: "Item Removed", description: "Item has been removed from stock configuration." });
@@ -182,24 +230,40 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} />
+              <Input
+  id="name"
+  value={profileForm.name ?? ""}
+  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" value={profileForm.email} onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} />
+              <Input
+  id="email"
+  type="email"
+  value={profileForm.email ?? ""}
+  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+/>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} />
+                <Label htmlFor="phone">Phone Number</Label><Input
+  id="phone"
+  value={profileForm.phone ?? ""}
+  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Input id="role" value={
-                  user?.role === "admin" ? "Administrator" :
-                  user?.role === "regional" ? "Regional Manager" :
-                  user?.role === "store" ? "Store Manager" :
-                  "Staff"
-                } disabled />
+       <Input
+  id="role"
+  value={
+    user?.role === "admin" ? "Administrator" :
+    user?.role === "regional" ? "Regional Manager" :
+    user?.role === "store" ? "Store Manager" :
+    "Staff"
+  }
+  disabled
+/>
               </div>
             </CardContent>
             <CardFooter>
@@ -218,15 +282,30 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} />
+               <Input
+  id="current-password"
+  type="password"
+  value={passwordForm.currentPassword ?? ""}
+  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} />
+             <Input
+  id="new-password"
+  type="password"
+  value={passwordForm.newPassword ?? ""}
+  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} />
+   <Input
+  id="confirm-password"
+  type="password"
+  value={passwordForm.confirmPassword ?? ""}
+  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+/>
               </div>
             </CardContent>
             <CardFooter>
@@ -346,6 +425,7 @@ export default function SettingsPage() {
             </Card>
             {/* Edit Item Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              {editItem && (
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Edit Stock Item</DialogTitle>
@@ -353,9 +433,23 @@ export default function SettingsPage() {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <Label htmlFor="threshold">Low Stock Threshold</Label>
-                  <Input id="threshold" type="number" value={editItem?.lowStockThreshold || 0} min={1}
-                    onChange={(e) => setEditItem({...editItem, lowStockThreshold: parseInt(e.target.value)})}
-                  />
+{console.log("editItem at render:", editItem)}
+
+<Input
+  id="threshold"
+  type="number"
+  value={editItem?.lowStockThreshold ?? ""}
+  min={1}
+  onChange={e => {
+    const val = e.target.value;
+    console.log("Input changed! Raw value:", val, "Setting:", val === "" ? "" : parseInt(val, 10));
+    setEditItem({ ...editItem, lowStockThreshold: val === "" ? "" : parseInt(val, 10) });
+    
+  }}
+/>
+
+
+{/* 
                   <div className="flex items-center gap-2">
                     <Label htmlFor="edit-daily-check">Daily Check</Label>
                     <Switch
@@ -365,14 +459,14 @@ export default function SettingsPage() {
                         setEditItem({ ...editItem, daily_check: checked })
                       }
                     />
-                  </div>
+                  </div> */}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
                   <Button onClick={handleSaveChanges} className="bg-chai-gold hover:bg-amber-600">Save Changes</Button>
                 </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </DialogContent>)}
+</Dialog>
             {/* Add Item Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogContent className="sm:max-w-md">
@@ -382,7 +476,12 @@ export default function SettingsPage() {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <Label htmlFor="new-item-name">Name</Label>
-                  <Input id="new-item-name" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} placeholder="e.g. Masala Beans" />
+                <Input
+  id="new-item-name"
+  value={newItem.name ?? ""}
+  onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+  placeholder="e.g. Masala Beans"
+/>
                   <Label htmlFor="new-item-category">Category</Label>
                   <select id="new-item-category" value={newItem.category} className="w-full p-2 border rounded"
                     onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}>
@@ -394,24 +493,41 @@ export default function SettingsPage() {
                     <option value="Miscellaneous">Miscellaneous</option>
                     <option value="Other">Other</option>
                   </select>
-                  <Label htmlFor="new-threshold">Low Stock Threshold</Label>
-                  <Input id="new-threshold" type="number" value={newItem.lowStockThreshold} min={1}
-                    onChange={(e) => setNewItem({ ...newItem, lowStockThreshold: parseInt(e.target.value) })}
-                  />
+              <Input
+  id="new-threshold"
+  type="number"
+  value={newItem.lowStockThreshold === "" || newItem.lowStockThreshold === undefined || newItem.lowStockThreshold === null ? "" : newItem.lowStockThreshold}
+  min={1}
+  onChange={e => {
+    const val = e.target.value;
+    setNewItem({ ...newItem, lowStockThreshold: val === "" ? "" : parseInt(val, 10) });
+  }}
+/>
                   <Label htmlFor="new-price">Price</Label>
-                  <Input id="new-price" type="number" value={newItem.price} min={0}
-                    onChange={(e) => setNewItem({ ...newItem, price: parseFloat(e.target.value) })}
-                  />
+          <<Input
+  id="new-price"
+  type="number"
+  value={newItem.price === "" || newItem.price === undefined || newItem.price === null ? "" : newItem.price}
+  min={0}
+  onChange={e => {
+    const val = e.target.value;
+    setNewItem({ ...newItem, price: val === "" ? "" : parseFloat(val) });
+  }}
+/>
                   <Label htmlFor="new-sku">SKU</Label>
-                  <Input id="new-sku" value={newItem.sku} onChange={(e) => setNewItem({ ...newItem, sku: e.target.value })} />
-                  <div className="flex items-center gap-2">
+           <Input
+  id="new-sku"
+  value={newItem.sku ?? ""}
+  onChange={(e) => setNewItem({ ...newItem, sku: e.target.value })}
+/>
+                  {/* <div className="flex items-center gap-2">
                     <Label htmlFor="add-daily-check">Daily Check</Label>
                     <Switch
                       id="add-daily-check"
                       checked={!!newItem.daily_check}
                       onCheckedChange={checked => setNewItem({ ...newItem, daily_check: checked })}
                     />
-                  </div>
+                  </div> */}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
@@ -470,11 +586,27 @@ export default function SettingsPage() {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <Label htmlFor="categoryName">Category Name</Label>
-                  <Input id="categoryName" value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} placeholder="e.g. Drinks, Food" />
+                <Input
+  id="categoryName"
+  value={newCategory.name ?? ""}
+  onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+  placeholder="e.g. Drinks, Food"
+/>
                   <Label htmlFor="categoryPrefix">Prefix Code</Label>
-                  <Input id="categoryPrefix" value={newCategory.prefix} onChange={(e) => setNewCategory({ ...newCategory, prefix: e.target.value.toUpperCase() })} placeholder="e.g. DP, BP" maxLength={5} />
+                  <Input
+  id="categoryPrefix"
+  value={newCategory.prefix ?? ""}
+  onChange={(e) => setNewCategory({ ...newCategory, prefix: e.target.value.toUpperCase() })}
+  placeholder="e.g. DP, BP"
+  maxLength={5}
+/>
                   <Label htmlFor="categoryDescription">Description (Optional)</Label>
-                  <Input id="categoryDescription" value={newCategory.description} onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })} placeholder="Brief description" />
+                <Input
+  id="categoryDescription"
+  value={newCategory.description ?? ""}
+  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+  placeholder="Brief description"
+/>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
@@ -534,7 +666,14 @@ export default function SettingsPage() {
                 <Separator />
                 <div className="space-y-2">
                   <Label htmlFor="low-stock-threshold">Low Stock Threshold (%)</Label>
-                  <Input id="low-stock-threshold" type="number" defaultValue="20" min="1" max="100" />
+<Input
+  id="low-stock-threshold"
+  type="number"
+  value={systemSettings.lowStockThreshold ?? 20}
+  min={1}
+  max={100}
+  onChange={e => setSystemSettings({ ...systemSettings, lowStockThreshold: parseInt(e.target.value) })}
+/>
                   <p className="text-sm text-gray-500">Default percentage for triggering low stock alerts</p>
                 </div>
               </CardContent>
