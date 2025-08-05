@@ -1,120 +1,122 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient.js";
+import { getStatusFromQty } from "../lib/utils.js";
 
-export function useInventory(storeId) {
-  // Fetch stores data
-  const { data: stores = [] } = useQuery({
-    queryKey: ['/api/stores'],
-    queryFn: async () => {
-      const response = await fetch('/api/stores');
-      if (!response.ok) {
-        throw new Error('Failed to fetch stores');
-      }
-      return response.json();
-    }
-  });
+/**
+ * Custom React hook to fetch inventory stock levels, with role-based filtering.
+ *
+ * @param {Object}   params
+ * @param {Object}   params.currentUser      - The current user (must include .permissions)
+ * @param {string}   params.storeFilter      - Store ID to filter for (or "all" for everything)
+ * @param {Array}    params.chaiiwalaStores  - Array of { id, name } for all stores
+ *
+ * @returns {Object} { inventoryData, loading, error }
+ */
+export function useInventoryData({ currentUser, storeFilter, chaiiwalaStores }) {
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch inventory data
-  const { data: inventory, isLoading, error } = useQuery({
-    queryKey: ['/api/inventory', storeId],
-    queryFn: async () => {
-      const response = await fetch('/api/inventory');
-      if (!response.ok) {
-        throw new Error('Failed to fetch inventory data');
-      }
-      const data = await response.json();
-
-      if (storeId) {
-        return data.filter(item => item.storeId === storeId);
-      } else {
-        // Combine inventory for "All Stores" view
-        const skuGroups = {};
-
-        data.forEach(item => {
-          if (!skuGroups[item.sku]) {
-            skuGroups[item.sku] = [];
-          }
-          skuGroups[item.sku].push(item);
-        });
-
-        const combinedInventory = Object.values(skuGroups).map(group => {
-          const baseItem = { ...group[0] };
-          const storeBreakdown = group.map(item => {
-            const store = stores.find(s => s.id === item.storeId);
-            return {
-              storeId: item.storeId,
-              name: store ? store.name : `Unknown Location (ID: ${item.storeId})`,
-              quantity: item.quantity,
-            };
-          });
-
-          return {
-            ...baseItem,
-            storeBreakdown,
-          };
-        });
-
-        return combinedInventory;
-      }
-    }
-  });
-
-  // Fetch low stock items
-  const { data: lowStockItems, isLoading: isLoadingLowStock } = useQuery({
-    queryKey: ['/api/inventory/low-stock', storeId],
-    queryFn: async () => {
-      const response = await fetch('/api/inventory');
-      if (!response.ok) {
-        throw new Error('Failed to fetch inventory data');
-      }
-      const data = await response.json();
-
-      const lowStockData = data.filter(
-        item => item.status === 'low_stock' || item.status === 'out_of_stock'
-      );
-
-      return storeId
-        ? lowStockData.filter(item => item.storeId === storeId)
-        : lowStockData;
-    }
-  });
-
-  // Create a new inventory item
-  const createItemMutation = useMutation({
-    mutationFn: async (item) => {
-      const res = await apiRequest("POST", "/api/inventory", item);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory/low-stock', storeId] });
-    }
-  });
-
-  // Update an existing inventory item
-  const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      const res = await apiRequest("PATCH", `/api/inventory/${id}`, data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory/low-stock', storeId] });
-    }
-  });
-
-  const createItem = (item) => createItemMutation.mutateAsync(item);
-  const updateItem = (id, data) => updateItemMutation.mutateAsync({ id, data });
-
-  return {
-    inventory: inventory || [],
-    lowStockItems: lowStockItems || [],
-    isLoading,
-    isLoadingLowStock,
-    error,
-    createItem,
-    updateItem,
-    isCreating: createItemMutation.isPending,
-    isUpdating: updateItemMutation.isPending,
+  // Helper to get store name by ID
+  const getStoreName = (storeId) => {
+    if (!Array.isArray(chaiiwalaStores)) return "Unknown Store";
+    const store = chaiiwalaStores.find((store) => Number(store.id) === Number(storeId));
+    return store ? store.name : "Unknown Store";
   };
+
+  useEffect(() => {
+    let isMounted = true; // Avoid setting state on unmounted component
+
+    async function fetchStock() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // If currentUser is not ready, skip
+        if (!currentUser || !currentUser.permissions) {
+          setInventoryData([]);
+          setLoading(false);
+          return;
+        }
+
+        // Base Supabase query for store_stock_levels
+        let query = supabase
+          .from("store_stock_levels")
+          .select(`
+  id,
+  store_id,
+  stock_item_id,
+  quantity,
+  last_updated,
+  daily_check,
+  stock_items (
+    sku,
+    product_name,
+    price,
+    category
+  )
+`);
+
+        // Filter by user role
+        if (currentUser.permissions === "store") {
+          // Only this store's stock
+          const userStoreId = currentUser.store_id || currentUser.storeId;
+          if (userStoreId) query = query.eq("store_id", userStoreId);
+        } else if (
+          currentUser.permissions === "area" &&
+          Array.isArray(currentUser.store_ids) &&
+          currentUser.store_ids.length > 0
+        ) {
+          // Area manager: filter for their stores
+          query = query.in("store_id", currentUser.store_ids);
+        } else if (
+          (currentUser.permissions === "admin" || currentUser.permissions === "regional") &&
+          storeFilter !== "all"
+        ) {
+          // Admin/regional can filter by store (if storeFilter provided)
+          query = query.eq("store_id", Number(storeFilter));
+        }
+
+        const { data, error } = await query;
+
+        if (!isMounted) return;
+
+        if (error) {
+          setInventoryData([]);
+          setError(error);
+        } else {
+          setInventoryData(
+            (data || []).map((row) => ({
+              id: row.id,
+              storeId: row.store_id,
+              storeName: getStoreName(row.store_id),
+              sku: row.stock_items?.sku,
+              product: row.stock_items?.product_name,
+              price: Number(row.stock_items?.price),
+              category: row.stock_items?.category,
+              stock: row.quantity,
+              status: getStatusFromQty(row.quantity),
+              daily_check: !!row.daily_check,
+            }))
+          );
+          setError(null);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        setInventoryData([]);
+        setError(err);
+      }
+      setLoading(false);
+    }
+
+    fetchStock();
+
+    // Clean up function to prevent setting state on unmounted component
+    return () => {
+      isMounted = false;
+    };
+    // Only rerun when these change
+  }, [currentUser, storeFilter, chaiiwalaStores]);
+
+  return { inventoryData, loading, error };
 }

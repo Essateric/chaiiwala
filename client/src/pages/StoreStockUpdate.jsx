@@ -333,13 +333,14 @@ export default function StoreStockUpdatePage() {
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
-                                <Input
-                                  type="number"
-                                  value={editedQuantity}
-                                  onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center"
-                                  min="0"
-                                />
+  <Input
+  type="number"
+  step="any"
+  value={editedQuantity}
+  onChange={(e) => handleQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+  className="w-16 text-center"
+  min="0"
+/>
                                 <Button 
                                   variant="outline" 
                                   size="icon" 
