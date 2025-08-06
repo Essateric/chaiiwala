@@ -104,22 +104,24 @@ export default function StockOrdersPage() {
     // Example: Fetch all Freshways orders with specific statuses.
     // You might want to add store_id filter if applicable for the user.
     // For simplicity, fetching all for now, RLS should handle store visibility.
-    if (statusFilters.length > 0) {
-      // The hook's fetchOrders doesn't directly support OR on statuses,
-      // so we might need to call it multiple times or adjust the hook.
-      // For now, let's fetch all Freshways orders when a tab is active,
-      // and let getFilteredOrders handle the display logic for specific statuses per tab.
-      // This is simpler than multiple specific fetches until the hook supports 'IN' array for statuses.
-      if (activeTab === "pending") {
-        fetchOrders({ supplier_name: 'Freshways' }); // Fetch all Freshways, getFilteredOrders will pick relevant ones
-      } else if (activeTab === "received") {
-        fetchOrders({ supplier_name: 'Freshways' }); // Fetch all Freshways then filter locally
-      }
-    } else {
-       fetchOrders({ supplier_name: 'Freshways' }); // Fetch all Freshways if no specific tab status
-    }
+// Helper: Should we filter by store?
+const shouldFilterByStore = !(
+  profile?.permissions === "admin" ||
+  profile?.permissions === "regional"
+);
 
+// Get store ids if not admin/regional
+const storeIdsForQuery = shouldFilterByStore
+  ? allowedStores.map((s) => s.id)
+  : undefined;
+
+fetchOrders({
+  supplier_name: "Freshways",
+  store_ids: allowedStores.map(store => store.id),
+});
   }, [fetchOrders, activeTab, profile]); // Add profile if store_id filtering depends on it
+
+
 
 
   const getFilteredOrders = () => {

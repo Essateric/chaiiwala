@@ -17,6 +17,8 @@ export function useSupplierOrders() {
   const fetchOrders = useCallback(async (filters = {}) => {
     setLoading(true);
     setError(null);
+
+
     try {
       let query = supabase.from('freshways_orders').select(`
         *,
@@ -34,6 +36,12 @@ export function useSupplierOrders() {
         query = query.eq('supplier_name', filters.supplier_name);
       }
       // Add more filters as needed (e.g., date range)
+      if (filters.store_ids && Array.isArray(filters.store_ids) && filters.store_ids.length > 0) {
+  query = query.in('store_id', filters.store_ids);
+}
+if (filters.supplier_name) {
+  query = query.eq('supplier_name', filters.supplier_name);
+}
 
       query = query.order('created_at', { ascending: false }); // Default order
 
