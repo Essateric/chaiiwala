@@ -22,7 +22,27 @@ import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
 import { getFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
-import { formatDeliveryDateVerbose } from "../lib/formatters";
+import { formatDeliveryDateVerbose } from "../lib/formatters.js";
+import { getMostRecentFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
+import {
+  getOrderDateForTodayDelivery,
+  isTodayDeliveryDay,
+  getTodayDeliveryDay,
+} from "../lib/getFreshwaysDeliveryDate.jsx";
+// Get the most recent delivery date (today if valid, else yesterday, else last valid)
+const deliveryDateISO = getMostRecentFreshwaysDeliveryDate();
+const today = new Date();
+
+let deliveryDateStr = null;
+let orderDeadlineDate = null;
+
+if (isTodayDeliveryDay(today)) {
+  deliveryDateStr = today.toISOString().split("T")[0]; // Use today as delivery date
+  orderDeadlineDate = getOrderDateForTodayDelivery(today); // JS Date for cutoff
+} else {
+  deliveryDateStr = getMostRecentFreshwaysDeliveryDate(today); // Fallback to most recent delivery
+  orderDeadlineDate = null;
+}
 
 
 export default function DashboardPage() {
@@ -31,20 +51,22 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
 
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
-  const deliveryDate = getFreshwaysDeliveryDate(); // ISO string like "2025-08-05"
+const deliveryDate = getMostRecentFreshwaysDeliveryDate();
 
-  // Fetch all stores for dropdown
+
+
 const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
   queryKey: ["freshways_order_log", deliveryDate],
   queryFn: async () => {
     const { data, error } = await supabase
       .from("freshways_orders")
       .select("store_id, created_at, status, stores(name)")
-      .eq("expected_delivery_date", deliveryDate);  // ✅ key change
+      .eq("expected_delivery_date", deliveryDate); // THIS is now the most recent delivery date
     if (error) throw error;
     return data;
   }
 });
+
 
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
   queryKey: ["stores"],
@@ -168,12 +190,14 @@ const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
 const mergedOrderLog = useMemo(() => {
   return stores.map(store => {
     const storeOrders = orderLogs.filter(l => l.store_id === store.id);
-
-    // Filter only orders created BEFORE 11 AM
-    const earlyOrder = storeOrders.find(order => {
-      const orderTime = new Date(order.created_at);
-      return orderTime.getHours() < 11;
-    });
+    let earlyOrder = null;
+    if (orderDeadlineDate) {
+      // Only orders placed before cutoff
+      earlyOrder = storeOrders.find(order => new Date(order.created_at) <= orderDeadlineDate);
+    } else {
+      // fallback
+      earlyOrder = storeOrders[0];
+    }
 
     return {
       storeName: store.name,
@@ -181,8 +205,7 @@ const mergedOrderLog = useMemo(() => {
       createdAt: earlyOrder?.created_at || null
     };
   });
-}, [stores, orderLogs]);
-
+}, [stores, orderLogs, orderDeadlineDate]);
 
 
   // For stats card: SUM all rows across all stores if "all"
@@ -398,7 +421,7 @@ const mergedOrderLog = useMemo(() => {
                     </div>
                     <CardHeader className="pl-20 pt-4 pb-2">
                       <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
-<CardDescription className="text-sm text-gray-500">
+<CardDescription>
   for delivery on {formatDeliveryDateVerbose(deliveryDate)}
 </CardDescription>
                     </CardHeader>

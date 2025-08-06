@@ -12,8 +12,7 @@ import { useFreshwaysAcc } from "../../hooks/useFreshwaysAccs.jsx";
 import { formatDeliveryDateVerbose } from "../../lib/formatters.js";
 import React, { useEffect, useState } from "react"; // ✅ include useState
 import { useQueryClient } from "@tanstack/react-query";
-
-
+import { getFreshwaysDeliveryDate } from "../../lib/getFreshwaysDeliveryDate.jsx";
 
 
 export default function FreshwaysOrderDialog({
@@ -61,6 +60,10 @@ const validOrderDays = {
   Friday: "Saturday",
   Saturday: "Monday",
 };
+
+
+
+
 
  const today = new Date();
 // TEMP: Force today to be Monday (for testing)
@@ -151,9 +154,6 @@ if (!deliveryDateISO) {
     </Dialog>
   );
 }
-
-
-
 // 👇 Utility to calculate actual delivery date based on day name
 
 
@@ -164,13 +164,15 @@ if (!(deliveryDate instanceof Date) || isNaN(deliveryDate)) {
 
 // Countdown from midnight until 11AM on the DELIVERY day
 const [timeLeft, setTimeLeft] = useState("");
-
 useEffect(() => {
-  const updateCountdown = () => {
-    if (!deliveryDay) return;
+  if (!deliveryDateISO) {
+    setTimeLeft("No valid delivery date found");
+    return;
+  }
 
-    const deliveryDateObj = getNextDeliveryDate(deliveryDay); // e.g. next Saturday
-    deliveryDateObj.setHours(11, 0, 0, 0); // 11:00 AM
+  const updateCountdown = () => {
+    const deliveryDateObj = new Date(deliveryDateISO);
+    deliveryDateObj.setHours(11, 0, 0, 0); // 11:00 AM on delivery day
 
     const now = new Date();
     const diff = deliveryDateObj - now;
@@ -183,23 +185,20 @@ useEffect(() => {
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       setTimeLeft(
-        `⏳ ${hours}h ${minutes}m ${seconds}s left to order for delivery on ${deliveryDay}`
+        `⏳ ${hours}h ${minutes}m ${seconds}s left to order for delivery on ${formattedDeliveryDate}`
       );
     }
   };
 
   updateCountdown();
-  const interval = setInterval(updateCountdown, 1000); // update every second now
+  const interval = setInterval(updateCountdown, 1000);
   return () => clearInterval(interval);
-}, [deliveryDay]);
-
-
-
+}, [deliveryDateISO, formattedDeliveryDate]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[500px]">
-        {isOrderDayValid && (
+{deliveryDateISO && (
   <p className="text-sm font-semibold text-blue-600 mb-2 text-center">
     ⏰ {timeLeft}
   </p>
@@ -426,15 +425,15 @@ const emailRes = await fetch(emailFunctionUrl, {
   <Label htmlFor="delivery-date" className="text-right">
     Delivery Date
   </Label>
-  <Input
-    id="delivery-date"
-    name="delivery-date"
-    type="text"
-    className="col-span-3"
-    value={formatDeliveryDateVerbose(deliveryDate)}
-    readOnly
-    required
-  />
+ <Input
+  id="delivery-date"
+  name="delivery-date"
+  type="text"
+  className="col-span-3"
+  value={formattedDeliveryDate}
+  readOnly
+  required
+/>
   <input type="hidden" name="delivery-date-raw" value={deliveryDateISO} />
 </div>
 
