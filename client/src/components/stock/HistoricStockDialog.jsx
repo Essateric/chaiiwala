@@ -57,31 +57,31 @@ export default function HistoricStockDialog({
     fetchProducts();
   }, [selectedStoreState]);
 
-  // Fetch product history
-  useEffect(() => {
-    if (!selectedStoreState || !selectedProduct) return;
-    async function fetchHistory() {
-      const daysArr = getPastNDates(nDays);
+// Fetch product history for selected product
+useEffect(() => {
+  if (!selectedStore || !selectedProduct) return;
+  async function fetchHistory() {
+    const daysArr = getPastNDates(nDays);
+    let { data, error } = await supabase
+      .from("stock_history") // <-- use your new table here!
+      .select("*")
+      .eq("store_id", selectedStore.id)
+      .eq("stock_item_id", selectedProduct.stock_item_id)
+      .in("date", daysArr);
 
-      let { data, error } = await supabase
-        .from("store_stock_levels")
-        .select("*")
-        .eq("store_id", selectedStoreState.id)
-        .eq("stock_item_id", selectedProduct.stock_item_id)
-        .in("date", daysArr);
+    // (Optional: debug)
+    console.log('Fetched history data:', data, error);
 
-      if (!error) {
-        const map = {};
-        data.forEach((row) => {
-          map[row.date] = row.quantity;
-        });
-        setHistoryRows(daysArr.map((date) => ({ date, quantity: map[date] ?? "-" })));
-      } else {
-        setHistoryRows([]);
-      }
+    if (!error) {
+      const map = {};
+      data.forEach(row => { map[row.date] = row.quantity; });
+      setHistoryRows(daysArr.map(date => ({ date, quantity: map[date] ?? "-" })));
+    } else {
+      setHistoryRows([]);
     }
-    fetchHistory();
-  }, [selectedStoreState, selectedProduct, nDays]);
+  }
+  fetchHistory();
+}, [selectedStore, selectedProduct, nDays]);
 
   useEffect(() => {
     if (!open) {
