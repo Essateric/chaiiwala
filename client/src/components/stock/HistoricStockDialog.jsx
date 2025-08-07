@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "../../components/ui/table.jsx";
 import { DialogFooter } from "../../components/ui/dialog.jsx";
+import { Input } from "../../components/ui/input.jsx";
 import { getPastNDates } from "../../lib/utils.js";
 
 export default function HistoricStockDialog({
@@ -24,6 +25,10 @@ export default function HistoricStockDialog({
   const [storeProducts, setStoreProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [historyRows, setHistoryRows] = useState([]);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
+
   const isRegional = user?.permissions === "admin" || user?.permissions === "regional";
   const isStoreManager = user?.permissions === "store";
   const nDays = isRegional ? 14 : 7;
@@ -55,33 +60,32 @@ export default function HistoricStockDialog({
       }
     }
     fetchProducts();
+    setCurrentPage(1); // Reset to first page on store change
+    setSearch("");     // Reset search on store change
   }, [selectedStoreState]);
 
-// Fetch product history for selected product
-useEffect(() => {
-  if (!selectedStore || !selectedProduct) return;
-  async function fetchHistory() {
+  // Fetch product history for selected product
+  useEffect(() => {
+    if (!selectedStore || !selectedProduct) return;
     const daysArr = getPastNDates(nDays);
-    let { data, error } = await supabase
-      .from("stock_history") // <-- use your new table here!
-      .select("*")
-      .eq("store_id", selectedStore.id)
-      .eq("stock_item_id", selectedProduct.stock_item_id)
-      .in("date", daysArr);
+    async function fetchHistory() {
+      let { data, error } = await supabase
+        .from("stock_history")
+        .select("*")
+        .eq("store_id", selectedStore.id)
+        .eq("stock_item_id", selectedProduct.stock_item_id)
+        .in("date", daysArr);
 
-    // (Optional: debug)
-    console.log('Fetched history data:', data, error);
-
-    if (!error) {
-      const map = {};
-      data.forEach(row => { map[row.date] = row.quantity; });
-      setHistoryRows(daysArr.map(date => ({ date, quantity: map[date] ?? "-" })));
-    } else {
-      setHistoryRows([]);
+      if (!error) {
+        const map = {};
+        data.forEach(row => { map[row.date] = row.quantity; });
+        setHistoryRows(daysArr.map(date => ({ date, quantity: map[date] ?? "-" })));
+      } else {
+        setHistoryRows([]);
+      }
     }
-  }
-  fetchHistory();
-}, [selectedStore, selectedProduct, nDays]);
+    fetchHistory();
+  }, [selectedStore, selectedProduct, nDays]);
 
   useEffect(() => {
     if (!open) {
@@ -89,8 +93,30 @@ useEffect(() => {
       setSelectedProduct(null);
       setStoreProducts([]);
       setHistoryRows([]);
+      setCurrentPage(1);
+      setSearch("");
     }
   }, [open, selectedStore]);
+
+  // --- Filtering & Pagination for products table ---
+  let filteredProducts = storeProducts;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredProducts = filteredProducts.filter(
+      (row) =>
+        (row.stock_items?.product_name || "").toLowerCase().includes(searchLower) ||
+        (row.stock_items?.sku || "").toLowerCase().includes(searchLower)
+    );
+  }
+
+  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const handleNextPage = () => setCurrentPage((page) => Math.min(page + 1, totalPages));
+  const handlePrevPage = () => setCurrentPage((page) => Math.max(page - 1, 1));
 
   if (!open) return null;
 
@@ -102,6 +128,18 @@ useEffect(() => {
             <h4 className="text-lg font-semibold">
               Products in {selectedStoreState.name}
             </h4>
+          </div>
+          {/* Search bar */}
+          <div className="mb-4 flex">
+            <Input
+              placeholder="Search product name or SKU..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            />
           </div>
           {storeProducts.length === 0 ? (
             <div>No products found for this store.</div>
@@ -117,7 +155,7 @@ useEffect(() => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {storeProducts.map((row) => (
+                  {paginatedProducts.map((row) => (
                     <TableRow key={row.stock_item_id}>
                       <TableCell>{row.stock_items?.product_name}</TableCell>
                       <TableCell>{row.stock_items?.sku}</TableCell>
@@ -133,8 +171,39 @@ useEffect(() => {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {paginatedProducts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        No products found.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
+              {/* Pagination controls */}
+              <div className="flex justify-between items-center py-2">
+                <div>
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={handlePrevPage}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={handleNextPage}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>

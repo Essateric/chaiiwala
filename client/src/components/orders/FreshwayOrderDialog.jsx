@@ -96,8 +96,6 @@ function getNextDeliveryDate(deliveryDayStr) {
   nextDeliveryDate.setDate(today.getDate() + daysUntilDelivery);
   return nextDeliveryDate;
 }
-
-
 let deliveryDate = null;
 let deliveryDateISO = null;
 
@@ -125,6 +123,12 @@ if (deliveryDay) {
     console.error("❌ Invalid deliveryDate object returned");
   }
 }
+
+// 👇 Move this line HERE, after deliveryDateISO is set!
+const formattedDeliveryDate = deliveryDateISO
+  ? formatDeliveryDateVerbose(deliveryDateISO)
+  : "";
+
 
 if (!deliveryDateISO) {
   return (
