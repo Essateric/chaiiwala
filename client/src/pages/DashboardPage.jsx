@@ -23,12 +23,15 @@ import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
 import { getFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
 import { formatDeliveryDateVerbose } from "../lib/formatters.js";
-import { getMostRecentFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
 import {
+  getMostRecentFreshwaysDeliveryDate,
   getOrderDateForTodayDelivery,
   isTodayDeliveryDay,
-  getTodayDeliveryDay,
+  isOrderDay,
+  getOrderCutoffDate
 } from "../lib/getFreshwaysDeliveryDate.jsx";
+
+
 // Get the most recent delivery date (today if valid, else yesterday, else last valid)
 const deliveryDateISO = getMostRecentFreshwaysDeliveryDate();
 const today = new Date();
@@ -55,18 +58,26 @@ const deliveryDate = getMostRecentFreshwaysDeliveryDate();
 
 
 
-const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
-  queryKey: ["freshways_order_log", deliveryDate],
+const now = new Date();
+const todayIsOrderDay = isOrderDay(now);
+const cutoff11 = getOrderCutoffDate(now);
+
+const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+const endOfToday   = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+
+const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
+  queryKey: ["freshways_order_log_today", startOfToday.toISOString()],
   queryFn: async () => {
     const { data, error } = await supabase
       .from("freshways_orders")
-      .select("store_id, created_at, status, stores(name)")
-      .eq("expected_delivery_date", deliveryDate); // THIS is now the most recent delivery date
+      .select("id, store_id, created_at, stores(name)")
+      .gte("created_at", startOfToday.toISOString())
+      .lte("created_at", endOfToday.toISOString())
+      .order("created_at", { ascending: true });
     if (error) throw error;
-    return data;
+    return data || [];
   }
 });
-
 
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
   queryKey: ["stores"],
@@ -189,23 +200,30 @@ const { data: orderLogs = [], isLoading: isLoadingOrders } = useQuery({
 
 const mergedOrderLog = useMemo(() => {
   return stores.map(store => {
-    const storeOrders = orderLogs.filter(l => l.store_id === store.id);
-    let earlyOrder = null;
-    if (orderDeadlineDate) {
-      // Only orders placed before cutoff
-      earlyOrder = storeOrders.find(order => new Date(order.created_at) <= orderDeadlineDate);
-    } else {
-      // fallback
-      earlyOrder = storeOrders[0];
+    const todays = orderLogsToday.filter(o => o.store_id === store.id);
+    const earliest = todays[0] ? new Date(todays[0].created_at) : null;
+
+    if (!todayIsOrderDay) {
+      return { storeName: store.name, status: "no_order_day", createdAt: null };
     }
 
-    return {
-      storeName: store.name,
-      status: earlyOrder ? "placed" : "missed",
-      createdAt: earlyOrder?.created_at || null
-    };
+    if (now < cutoff11) {
+      if (earliest && earliest <= cutoff11) {
+        return { storeName: store.name, status: "placed", createdAt: earliest };
+      }
+      return { storeName: store.name, status: "pending", createdAt: null };
+    }
+
+    if (earliest && earliest <= cutoff11) {
+      return { storeName: store.name, status: "placed", createdAt: earliest };
+    }
+    if (todays.length > 0) {
+      return { storeName: store.name, status: "missed_late", createdAt: new Date(todays[0].created_at) };
+    }
+    return { storeName: store.name, status: "missed", createdAt: null };
   });
-}, [stores, orderLogs, orderDeadlineDate]);
+}, [stores, orderLogsToday, todayIsOrderDay, now, cutoff11]);
+
 
 
   // For stats card: SUM all rows across all stores if "all"

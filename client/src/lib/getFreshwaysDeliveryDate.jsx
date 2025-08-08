@@ -24,6 +24,20 @@ const dayIndexMap = {
   Thursday: 4, Friday: 5, Saturday: 6,
 };
 
+// 👉 Single source of truth for the 11:00 cutoff
+export function getOrderCutoffDate(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(11, 0, 0, 0);
+  return d;
+}
+
+// 👉 Check if a date is a valid ORDER day (Mon, Tue, Thu, Fri, Sat)
+export function isOrderDay(date = new Date()) {
+  const name = date.toLocaleDateString("en-GB", { weekday: "long" });
+  return validOrderDays.includes(name);
+}
+
+
 // --- Returns next Freshways delivery date (YYYY-MM-DD) ---
 export function getFreshwaysDeliveryDate(today = new Date()) {
   const cutoffHour = 11;

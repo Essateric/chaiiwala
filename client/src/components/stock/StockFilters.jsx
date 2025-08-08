@@ -1,13 +1,13 @@
 import React from "react";
 import { Search, Filter, Store } from "lucide-react";
-import { Input } from "../../components/ui/input";
+import { Input } from "../../components/ui/input.jsx";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select";
+} from "../../components/ui/select.jsx";
 
 export default function StockFilters({
   search,

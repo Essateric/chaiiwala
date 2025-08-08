@@ -12,7 +12,12 @@ import { useFreshwaysAcc } from "../../hooks/useFreshwaysAccs.jsx";
 import { formatDeliveryDateVerbose } from "../../lib/formatters.js";
 import React, { useEffect, useState } from "react"; // ✅ include useState
 import { useQueryClient } from "@tanstack/react-query";
-import { getFreshwaysDeliveryDate } from "../../lib/getFreshwaysDeliveryDate.jsx";
+import {
+  getFreshwaysDeliveryDate,
+  isOrderDay,
+  getOrderCutoffDate
+} from "../../lib/getFreshwaysDeliveryDate.jsx";
+
 
 
 export default function FreshwaysOrderDialog({
@@ -61,143 +66,52 @@ const validOrderDays = {
   Saturday: "Monday",
 };
 
-
-
-
-
  const today = new Date();
 // TEMP: Force today to be Monday (for testing)
 // const today = new Date("2025-07-24"); // Replace with any known valid order date
 
-const orderDay = today.toLocaleDateString("en-GB", { weekday: "long" });
-const currentHour = today.getHours();
-const isOrderDayValid = Object.keys(validOrderDays).includes(orderDay);
-const deliveryDay = validOrderDays[orderDay] ?? null;
+const queryClient = useQueryClient(); // ✅ keep this line
 
-const isBeforeCutoff = currentHour < 12;
-const isOrderFormEnabled = isOrderDayValid && isBeforeCutoff;
+// --- Unified 11:00 logic ---
+const now = new Date();
+const todayIsOrderDay = isOrderDay(now);
+const cutoff11 = getOrderCutoffDate(now);
 
-const queryClient = useQueryClient();
-
-
-function getNextDeliveryDate(deliveryDayStr) {
-  const dayIndexMap = {
-    Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
-    Thursday: 4, Friday: 5, Saturday: 6,
-  };
-  const targetDayIndex = dayIndexMap[deliveryDayStr];
-  const today = new Date();
-  const currentDayIndex = today.getDay();
-
-  let daysUntilDelivery = (targetDayIndex - currentDayIndex + 7) % 7;
-  if (daysUntilDelivery === 0) daysUntilDelivery = 7; // ensure it's in the future
-
-  const nextDeliveryDate = new Date(today);
-  nextDeliveryDate.setDate(today.getDate() + daysUntilDelivery);
-  return nextDeliveryDate;
-}
-let deliveryDate = null;
-let deliveryDateISO = null;
-
-// If today is not a valid order day, find next valid one
-let nextValidOrderDay = null;
-if (!isOrderDayValid) {
-  const todayIndex = today.getDay(); // 0 = Sunday, 1 = Monday, ...
-  const orderedDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  for (let i = 1; i <= 7; i++) {
-    const nextDayIndex = (todayIndex + i) % 7;
-    const nextDayName = orderedDays[nextDayIndex];
-    if (validOrderDays[nextDayName]) {
-      nextValidOrderDay = nextDayName;
-      break;
-    }
-  }
-}
-
-if (deliveryDay) {
-  deliveryDate = getNextDeliveryDate(deliveryDay);
-  if (deliveryDate instanceof Date && !isNaN(deliveryDate)) {
-    deliveryDateISO = deliveryDate.toISOString().split("T")[0];
-  } else {
-    console.error("❌ Invalid deliveryDate object returned");
-  }
-}
-
-// 👇 Move this line HERE, after deliveryDateISO is set!
+// This delivery date will always be correct for the widget & database
+const deliveryDateISO = getFreshwaysDeliveryDate(now);
 const formattedDeliveryDate = deliveryDateISO
   ? formatDeliveryDateVerbose(deliveryDateISO)
   : "";
 
-
-if (!deliveryDateISO) {
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="text-center py-8">
-  <DialogHeader>
-    <DialogTitle className="text-red-500">
-      🚫 Orders not accepted today ({orderDay})
-    </DialogTitle>
-    <DialogDescription>
-      Please try again on a valid order day.
-    </DialogDescription>
-  </DialogHeader>
-
-  <DialogFooter className="mt-6 justify-center">
-    <Button
-      variant="outline"
-      onClick={() => {
-        setOpen(false);
-      }}
-    >
-      Close
-    </Button>
-  </DialogFooter>
-</DialogContent>
-
-    </Dialog>
-  );
-}
-// 👇 Utility to calculate actual delivery date based on day name
-
-
-if (!(deliveryDate instanceof Date) || isNaN(deliveryDate)) {
-  console.error("❌ Invalid deliveryDate:", deliveryDate, "from deliveryDay:", deliveryDay);
-  return null; // or fallback logic
-}
+// Optional: if you still need a boolean for UI enabling
+const isOrderFormEnabled = todayIsOrderDay && now < cutoff11;
 
 // Countdown from midnight until 11AM on the DELIVERY day
 const [timeLeft, setTimeLeft] = useState("");
+
 useEffect(() => {
-  if (!deliveryDateISO) {
-    setTimeLeft("No valid delivery date found");
+  if (!todayIsOrderDay) {
+    setTimeLeft("Next order day countdown starts at 00:00.");
     return;
   }
 
-  const updateCountdown = () => {
-    const deliveryDateObj = new Date(deliveryDateISO);
-    deliveryDateObj.setHours(11, 0, 0, 0); // 11:00 AM on delivery day
-
-    const now = new Date();
-    const diff = deliveryDateObj - now;
-
+  const tick = () => {
+    const diff = cutoff11 - new Date();
     if (diff <= 0) {
-      setTimeLeft("Order window closed");
-    } else {
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setTimeLeft(
-        `⏳ ${hours}h ${minutes}m ${seconds}s left to order for delivery on ${formattedDeliveryDate}`
-      );
+      setTimeLeft("Order window closed (after 11:00).");
+      return;
     }
+    const h = Math.floor(diff / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const s = Math.floor((diff % (1000 * 60)) / 1000);
+    setTimeLeft(`⏳ ${h}h ${m}m ${s}s until 11:00 cut-off`);
   };
 
-  updateCountdown();
-  const interval = setInterval(updateCountdown, 1000);
-  return () => clearInterval(interval);
-}, [deliveryDateISO, formattedDeliveryDate]);
+  tick();
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+}, [todayIsOrderDay, cutoff11]);
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -218,10 +132,9 @@ useEffect(() => {
   </div>
 )  : (
   <div>
-    {!isOrderDayValid && (
+    {!todayIsOrderDay && (
       <p className="text-red-600 font-medium text-center mb-2">
-        🚫 Orders are not accepted today ({orderDay}).<br />
-        You can place your next order on <strong>{nextValidOrderDay}</strong>.
+🚫 Orders are not accepted today.
       </p>
     )}
 
@@ -458,7 +371,7 @@ const emailRes = await fetch(emailFunctionUrl, {
               Cancel
             </Button>
             
-<Button type="submit" disabled={!isOrderDayValid || timeLeft === "Order window closed"}>
+<Button type="submit" disabled={!isOrderFormEnabled}>
   Place Order
 </Button>
 
