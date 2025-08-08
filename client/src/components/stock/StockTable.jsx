@@ -7,8 +7,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../components/ui/table";
-import { Button } from "../../components/ui/button";
+} from "../../components/ui/table.jsx";
+import { Button } from "../../components/ui/button.jsx";
 
 export default function StockTable({
   rows,

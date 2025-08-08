@@ -3,9 +3,7 @@ import { supabase } from "../lib/supabaseClient.js";
 import { useAuth } from "../hooks/UseAuth.jsx";
 import { useToast } from "../hooks/use-toast.jsx";
 import { useInventoryData } from "../hooks/useInventoryData.jsx";
-import {
-  Search, Filter, ArrowUpDown, Store
-} from "lucide-react";
+import { Search, Filter, Store } from "lucide-react";
 import {
   Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow
 } from "../components/ui/table.jsx";
@@ -22,156 +20,185 @@ import {
 } from "../components/ui/card.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { getStatusFromQty } from "../lib/utils.js";
+import StockTable from "../components/stock/StockTable.jsx";
 
-// --- MAIN COMPONENT ---
+// 🔹 Import the EXTERNAL modal (the one with the search field + fixed copy)
+import HistoricStockDialog from "../components/stock/HistoricStockDialog.jsx";
+
 export default function StockManagementView() {
-  // Get user profile and toast
   const { profile } = useAuth();
   const currentUser = profile;
   const { toast } = useToast();
 
-  // Store management (store list for filters and cards)
+  // Stores and modal state
   const [chaiiwalaStores, setChaiiwalaStores] = useState([]);
   const [selectedHistoricStore, setSelectedHistoricStore] = useState(null);
 
-  // Filtering, sorting, pagination
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [storeFilter, setStoreFilter] = useState('all');
-  const [sort, setSort] = useState({ field: '', direction: '' });
+  // Filters / sorting / pagination
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [storeFilter, setStoreFilter] = useState("all");
+  const [sort, setSort] = useState({ field: "", direction: "" });
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Edit Dialog
+  // Edit item dialog
   const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Permissions
-  const isStoreManager = currentUser?.permissions === 'store';
-  const isArea = currentUser?.permissions === 'area';
-  const isAdminOrRegional = currentUser?.permissions === 'admin' || currentUser?.permissions === 'regional';
+  const isStoreManager = currentUser?.permissions === "store";
+  const isArea = currentUser?.permissions === "area";
+  const isAdminOrRegional = currentUser?.permissions === "admin" || currentUser?.permissions === "regional";
 
-  // --- Get all inventory data and storeCards from the hook ---
+  // Inventory data + store cards
   const { inventoryData, loading, storeCards } = useInventoryData({
     currentUser,
     storeFilter,
     chaiiwalaStores,
   });
 
-  // --- On mount: Fetch stores for filter dropdown and cards ---
+  // Fetch stores (for filter + cards)
   useEffect(() => {
     async function fetchStores() {
-      const { data, error } = await supabase.from('stores').select('id, name');
+      const { data, error } = await supabase.from("stores").select("id, name");
       if (!error && data) setChaiiwalaStores(data);
     }
     fetchStores();
   }, []);
 
-  // --- Filter and sort inventory for table display ---
+  // Filtering / sorting
   let filteredData = inventoryData;
   if (search) {
-    const searchLower = search.toLowerCase();
-    filteredData = filteredData.filter(item =>
-      (item.product || '').toLowerCase().includes(searchLower) ||
-      (item.sku || '').toLowerCase().includes(searchLower)
+    const s = search.toLowerCase();
+    filteredData = filteredData.filter(
+      (item) =>
+        (item.product || "").toLowerCase().includes(s) ||
+        (item.sku || "").toLowerCase().includes(s)
     );
   }
-  if (categoryFilter !== 'all') filteredData = filteredData.filter(item => item.category === categoryFilter);
-  if (statusFilter !== 'all') filteredData = filteredData.filter(item => item.status === statusFilter);
+  if (categoryFilter !== "all") filteredData = filteredData.filter((i) => i.category === categoryFilter);
+  if (statusFilter !== "all") filteredData = filteredData.filter((i) => i.status === statusFilter);
+
   if (sort.field) {
     filteredData = [...filteredData].sort((a, b) => {
       const aValue = a[sort.field];
       const bValue = b[sort.field];
       if (aValue && bValue) {
-        if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+        if (aValue < bValue) return sort.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sort.direction === "asc" ? 1 : -1;
       }
       return 0;
     });
   }
+
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedRows = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedRows = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // --- Table sorting handler ---
   const handleSort = (field) => {
     setSort({
       field,
-      direction: sort.field === field && sort.direction === 'asc' ? 'desc' : 'asc'
+      direction: sort.field === field && sort.direction === "asc" ? "desc" : "asc",
     });
   };
 
-  // --- Editing ---
+  // Editing
   const handleEditItem = (item) => {
     setEditItem(item);
     setDialogOpen(true);
   };
-  const handleSaveChanges = async (updatedItem) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from('store_stock_levels')
-      .upsert({
-        stock_item_id: updatedItem.sku, // Or use the real stock_item_id if you have it
-        store_id: updatedItem.storeId,
-        quantity: updatedItem.stock,
-        last_updated: new Date().toISOString(),
-        updated_by: user.id,
-      });
-    if (error) {
-      toast({
-        title: "Error",
-        description: `Failed to update stock: ${error.message}`,
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({
-      title: "Stock Updated",
-      description: `${updatedItem.product} stock has been updated successfully.`,
-    });
-    setDialogOpen(false);
-    setEditItem(null);
-    // Optionally: trigger a refresh if needed
-  };
 
-  // --- UI helpers ---
+const handleSaveChanges = async (updatedItem) => {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 1) Get the current/old quantity for this store+item
+  const { data: existing, error: getErr } = await supabase
+    .from('store_stock_levels')
+    .select('quantity')
+    .eq('store_id', updatedItem.storeId)
+    .eq('stock_item_id', updatedItem.sku) // or real stock_item_id if different
+    .maybeSingle();
+
+  if (getErr) {
+    toast({ title: "Error", description: getErr.message, variant: "destructive" });
+    return;
+  }
+
+  const oldQty = existing?.quantity ?? 0;
+  const newQty = updatedItem.stock;
+
+  // 2) Upsert new quantity
+  const { error: upsertErr } = await supabase
+    .from('store_stock_levels')
+    .upsert({
+      stock_item_id: updatedItem.sku,    // use real ID if you have it
+      store_id: updatedItem.storeId,
+      quantity: newQty,
+      last_updated: new Date().toISOString(),
+      updated_by: user.id,
+    });
+
+  if (upsertErr) {
+    toast({ title: "Error", description: `Failed to update stock: ${upsertErr.message}`, variant: "destructive" });
+    return;
+  }
+
+  // 3) Insert history entry (use your real columns)
+  await supabase.from('stock_history').insert({
+    store_id: updatedItem.storeId,
+    stock_item_id: updatedItem.sku,   // use real ID if different
+    old_quantity: oldQty,
+    new_quantity: newQty,
+    updated_by: user.id,
+    changed_at: new Date().toISOString(), // add this column if you don’t have one
+  });
+
+  toast({
+    title: "Stock Updated",
+    description: `${updatedItem.product} stock has been updated successfully.`,
+  });
+
+  setDialogOpen(false);
+  setEditItem(null);
+};
+
+
+  // UI helpers
   const getStatusBadgeClass = (status) => {
     switch (status) {
-      case 'in_stock': return 'bg-green-100 text-green-800';
-      case 'low_stock': return 'bg-yellow-100 text-yellow-800';
-      case 'out_of_stock': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "in_stock": return "bg-green-100 text-green-800";
+      case "low_stock": return "bg-yellow-100 text-yellow-800";
+      case "out_of_stock": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
+
   const getStatusText = (status) => {
     switch (status) {
-      case 'in_stock': return 'In Stock';
-      case 'low_stock': return 'Low Stock';
-      case 'out_of_stock': return 'Out of Stock';
+      case "in_stock": return "In Stock";
+      case "low_stock": return "Low Stock";
+      case "out_of_stock": return "Out of Stock";
       default: return status;
     }
   };
 
   const currentStoreName =
     isStoreManager && currentUser?.store_id
-      ? chaiiwalaStores.find(store => store.id === currentUser.store_id)?.name
+      ? chaiiwalaStores.find((s) => s.id === currentUser.store_id)?.name
       : (isStoreManager && currentUser?.storeId)
-        ? chaiiwalaStores.find(store => store.id === currentUser.storeId)?.name
-        : '';
+        ? chaiiwalaStores.find((s) => s.id === currentUser.storeId)?.name
+        : "";
 
   const showStoreFilter = isAdminOrRegional;
   const showStoreColumn = isAdminOrRegional || isArea;
 
   if (loading) return <div>Loading...</div>;
 
-  // --- MAIN RENDER ---
   return (
     <DashboardLayout title="Stock Management">
       <div className="container mx-auto p-4">
-        {/* HEADER */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Stock Management</h1>
@@ -183,19 +210,19 @@ export default function StockManagementView() {
               <span className="text-sm text-chai-gold font-semibold">{currentUser?.name}</span>
             </div>
           </div>
-          {/* Historic modal */}
+
+          {/* 🔹 External Historic modal (no inline component anymore) */}
           {selectedHistoricStore && (
             <HistoricStockDialog
               open={!!selectedHistoricStore}
               onClose={() => setSelectedHistoricStore(null)}
               user={currentUser}
-              stores={chaiiwalaStores}
               selectedStore={selectedHistoricStore}
             />
           )}
         </div>
 
-        {/* If Store Manager: Show store name at top */}
+        {/* Store manager banner */}
         {isStoreManager && currentStoreName && (
           <div className="mb-4 p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
             <div className="flex items-center">
@@ -207,33 +234,34 @@ export default function StockManagementView() {
           </div>
         )}
 
-        {/* STORE CARDS (show total stock per store) */}
+        {/* Store cards -> open historic modal */}
         {isAdminOrRegional && (
-        <div className="mb-10">
-          <h2 className="text-lg font-bold mb-4">Historic Stock by Store</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 max-w-5xl">
-            {storeCards.map(store => (
-              <Card
-                key={store.id}
-                className="cursor-pointer transition hover:shadow-xl border border-gray-200 bg-white"
-                onClick={() => setSelectedHistoricStore(store)}
-              >
-                <CardHeader className="flex items-center gap-2 pb-0">
-                  <Store className="text-chai-gold" />
-                  <span className="font-bold text-base">{store.name}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-mono font-bold text-gray-800">
-                    {store.totalQuantity}
-                  </div>
-                  <div className="text-sm text-gray-500">Total Stock</div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="mb-10">
+            <h2 className="text-lg font-bold mb-4">Historic Stock by Store</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 max-w-5xl">
+              {storeCards.map((store) => (
+                <Card
+                  key={store.id}
+                  className="cursor-pointer transition hover:shadow-xl border border-gray-200 bg-white"
+                  onClick={() => setSelectedHistoricStore(store)}
+                >
+                  <CardHeader className="flex items-center gap-2 pb-0">
+                    <Store className="text-chai-gold" />
+                    <span className="font-bold text-base">{store.name}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-mono font-bold text-gray-800">
+                      {store.totalQuantity}
+                    </div>
+                    <div className="text-sm text-gray-500">Total Stock</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>)}
+        )}
 
-        {/* FILTERS */}
+        {/* Filters */}
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <div className="relative md:w-1/3">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -256,6 +284,7 @@ export default function StockManagementView() {
                 <SelectItem value="Drinks">Drinks</SelectItem>
               </SelectContent>
             </Select>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px]">
                 <Filter className="mr-2 h-4 w-4" />
@@ -268,6 +297,7 @@ export default function StockManagementView() {
                 <SelectItem value="out_of_stock">Out of Stock</SelectItem>
               </SelectContent>
             </Select>
+
             {showStoreFilter && (
               <Select value={storeFilter} onValueChange={setStoreFilter}>
                 <SelectTrigger className="w-[170px]">
@@ -276,7 +306,7 @@ export default function StockManagementView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Stores</SelectItem>
-                  {chaiiwalaStores.map(store => (
+                  {chaiiwalaStores.map((store) => (
                     <SelectItem key={store.id} value={String(store.id)}>
                       {store.name}
                     </SelectItem>
@@ -287,113 +317,31 @@ export default function StockManagementView() {
           </div>
         </div>
 
-        {/* STOCK TABLE */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableCaption>
-                Stock of Chaiiwala products as of {new Date().toLocaleDateString()}
-              </TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">
-                    <button type="button" className="flex items-center" onClick={() => handleSort('sku')}>
-                      SKU<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button type="button" className="flex items-center" onClick={() => handleSort('product')}>
-                      Product Name<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  {showStoreColumn && (
-                    <TableHead>
-                      <button type="button" className="flex items-center" onClick={() => handleSort('storeName')}>
-                        Store<ArrowUpDown className="ml-2 h-4 w-4" />
-                      </button>
-                    </TableHead>
-                  )}
-                  <TableHead className="text-right">
-                    <button type="button" className="flex items-center ml-auto" onClick={() => handleSort('price')}>
-                      Price<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <button type="button" className="flex items-center mx-auto" onClick={() => handleSort('stock')}>
-                      Quantity<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button type="button" className="flex items-center" onClick={() => handleSort('category')}>
-                      Category<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button type="button" className="flex items-center" onClick={() => handleSort('status')}>
-                      Status<ArrowUpDown className="ml-2 h-4 w-4" />
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                ) : paginatedRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      {isStoreManager
-                        ? `No products found for your store (${currentStoreName})`
-                        : "No products found matching your criteria"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedRows.map((item) => (
-                    <TableRow key={item.sku + '-' + item.storeId}>
-                      <TableCell>{item.sku}</TableCell>
-                      <TableCell>{item.product}</TableCell>
-                      {showStoreColumn && (
-                        <TableCell>{item.storeName || "-"}</TableCell>
-                      )}
-                      <TableCell className="text-right">£{item.price?.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{item.stock}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(item.status)}`}>
-                          {getStatusText(item.status)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          onClick={() => handleEditItem(item)}
-                        >
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-            <div className="flex justify-between items-center p-4 bg-white border-t">
-              <div>Page {currentPage} of {totalPages || 1}</div>
-              <div className="space-x-2">
-                <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>Start</Button>
-                <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>Previous</Button>
-                <Button type="button" variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(currentPage + 1)}>Next</Button>
-              </div>
-            </div>
+        {/* Stock table */}
+        <StockTable
+          rows={paginatedRows}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          showStoreColumn={showStoreColumn}
+          handleSort={handleSort}
+          getStatusBadgeClass={getStatusBadgeClass}
+          getStatusText={getStatusText}
+          handleEditItem={handleEditItem}
+          currentStoreName={currentStoreName}
+          isStoreManager={isStoreManager}
+        />
+
+        {/* Table pagination footer */}
+        <div className="flex justify-between items-center p-4 bg-white border-t">
+          <div>Page {currentPage} of {totalPages || 1}</div>
+          <div className="space-x-2">
+            <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>Start</Button>
+            <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>Previous</Button>
+            <Button type="button" variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>
           </div>
         </div>
 
-        {/* Edit Inventory Item Dialog */}
+        {/* Edit Inventory Item Dialog (unchanged) */}
         {dialogOpen && editItem && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogContent className="sm:max-w-md">
@@ -403,19 +351,23 @@ export default function StockManagementView() {
                   Update quantity and status for {editItem.product}
                 </DialogDescription>
               </DialogHeader>
+
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">SKU:</div>
                   <div className="col-span-3 font-mono">{editItem.sku}</div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Product:</div>
                   <div className="col-span-3 font-semibold">{editItem.product}</div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Price:</div>
                   <div className="col-span-3">£{editItem.price?.toFixed(2)}</div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">Quantity:</label>
                   <div className="col-span-3">
@@ -425,29 +377,31 @@ export default function StockManagementView() {
                       className="col-span-3"
                       value={editItem.stock}
                       min={0}
-                      onChange={e => {
+                      onChange={(e) => {
                         const qty = parseInt(e.target.value) || 0;
                         setEditItem({
                           ...editItem,
                           stock: qty,
-                          status: getStatusFromQty(qty)
+                          status: getStatusFromQty(qty),
                         });
                       }}
                     />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Daily Check:</div>
                   <div className="col-span-3 flex items-center">
                     <input
                       type="checkbox"
                       checked={!!editItem.daily_check}
-                      onChange={e => setEditItem({ ...editItem, daily_check: e.target.checked })}
+                      onChange={(e) => setEditItem({ ...editItem, daily_check: e.target.checked })}
                       className="mr-2"
                     />
                     <span className="text-xs text-gray-600">Show on daily stock check list</span>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Status:</div>
                   <div className="col-span-3">
@@ -459,11 +413,13 @@ export default function StockManagementView() {
                     </div>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Store:</div>
                   <div className="col-span-3">{editItem.storeName}</div>
                 </div>
               </div>
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
@@ -477,174 +433,5 @@ export default function StockManagementView() {
         )}
       </div>
     </DashboardLayout>
-  );
-}
-
-// ---- HistoricStockDialog (unchanged, just for reference) ----
-function HistoricStockDialog({ open, onClose, user, stores, selectedStore }) {
-  const [storeProducts, setStoreProducts] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [historyRows, setHistoryRows] = useState([]);
-  const isRegional = user?.permissions === "admin" || user?.permissions === "regional";
-  const nDays = isRegional ? 14 : 7;
-
-  // Fetch products for this store
-  useEffect(() => {
-    if (!selectedStore) return;
-    async function fetchProducts() {
-      let { data: stockData, error } = await supabase
-        .from("store_stock_levels")
-        .select(`
-          stock_item_id,
-          quantity,
-          stock_items (
-            name,
-            sku
-          )
-        `)
-        .eq("store_id", selectedStore.id);
-
-      if (!error) {
-        const unique = {};
-        (stockData || []).forEach(row => {
-          if (!unique[row.stock_item_id]) unique[row.stock_item_id] = row;
-        });
-        setStoreProducts(Object.values(unique));
-      } else {
-        setStoreProducts([]);
-      }
-    }
-    fetchProducts();
-  }, [selectedStore]);
-
-  // Fetch product history for selected product
-  useEffect(() => {
-    if (!selectedStore || !selectedProduct) return;
-    async function fetchHistory() {
-      let { data, error } = await supabase
-        .from("stock_history")
-        .select("*")
-        .eq("store_id", selectedStore.id)
-        .eq("stock_item_id", selectedProduct.stock_item_id)
-        .order("date", { ascending: true });
-
-      if (!error && data) {
-        setHistoryRows(data); // Just set what is returned
-      } else {
-        setHistoryRows([]);
-      }
-    }
-    fetchHistory();
-  }, [selectedStore, selectedProduct]);
-
-  // Reset on dialog close
-  useEffect(() => {
-    if (!open) {
-      setSelectedProduct(null);
-      setStoreProducts([]);
-      setHistoryRows([]);
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onClose} >
-      <DialogContent className="w-[800px] max-w-full rounded-lg">
-        {!selectedProduct ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Products in {selectedStore?.name}</DialogTitle>
-              <DialogDescription>
-                Edit the stock quantity and details for this product.
-              </DialogDescription>
-            </DialogHeader>
-            {storeProducts.length === 0 ? (
-              <div>No products found for this store.</div>
-            ) : (
-              <div className="overflow-x-auto max-h-[40vh]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead >Last Stock Qty</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {storeProducts.map(row => (
-                      <TableRow key={row.stock_item_id}>
-                        <TableCell className="whitespace-normal break-words max-w-[300px]">
-                          {row.stock_items?.name}
-                        </TableCell>
-                        <TableCell className="whitespace-normal break-words max-w-[250px]">{row.stock_items?.sku}</TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                        <TableCell
-                          className="min-w-[120px] pr-4 text-center align-middle whitespace-nowrap flex items-center justify-center"
-                        >
-                          <Button
-                            variant="outline"
-                            size="md"
-                            onClick={() => setSelectedProduct(row)}
-                            className="w-full rounded bg-yellow-500 hover:bg-yellow-600 text-black whitespace-normal break-words align-left"
-                          >
-                            View {isRegional ? "14d" : "7d"} History
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>Close</Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>{selectedProduct.stock_items?.product_name}</DialogTitle>
-              <DialogDescription>
-                SKU: {selectedProduct.stock_items?.sku}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Stock Qty</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {historyRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center">
-                        No changes recorded for this product
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    historyRows.map(row => (
-                      <TableRow key={row.date}>
-                        <TableCell>{row.date}</TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedProduct(null)}>
-                Back to Products
-              </Button>
-              <Button variant="outline" onClick={onClose}>Close</Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
