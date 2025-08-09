@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card.jsx";
 import { Button } from "../../components/ui/button.jsx";
@@ -11,12 +11,12 @@ export default function DailyStockCheck() {
 
   const isSunday = new Date().getDay() === 0; // Sunday = 0
 
-
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const itemsPerPage = 10;
 
   const fetchStock = async () => {
@@ -30,7 +30,7 @@ export default function DailyStockCheck() {
       .order("name", { ascending: true });
 
     if (!itemError && !isSunday) {
-      items = items.filter(item => item.daily_check === true);
+      items = items.filter((item) => item.daily_check === true);
     }
 
     if (itemError) {
@@ -39,7 +39,7 @@ export default function DailyStockCheck() {
       return;
     }
 
-    const itemIds = items.map(i => i.id);
+    const itemIds = items.map((i) => i.id);
 
     let levels = [];
     if (itemIds.length > 0) {
@@ -53,11 +53,11 @@ export default function DailyStockCheck() {
     }
 
     const levelsByItem = {};
-    levels.forEach(level => {
+    levels.forEach((level) => {
       levelsByItem[level.stock_item_id] = level;
     });
 
-    const merged = items.map(item => ({
+    const merged = items.map((item) => ({
       ...item,
       current_qty: levelsByItem[item.id]?.quantity ?? 0,
       store_stock_level_id: levelsByItem[item.id]?.id ?? null,
@@ -69,78 +69,121 @@ export default function DailyStockCheck() {
 
   useEffect(() => {
     fetchStock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
-  const handleSaveStock = async (stockRow, user) => {
-    console.log("🧪 Upserting to store_stock_levels with data:", stockRow);
-    console.log("🧪 Double-check user.id === updated_by?", user.id === stockRow.updated_by);
-
-    const { data, error } = await supabase
-      .from("store_stock_levels")
-      .upsert(stockRow)
-      .select();
-
-    if (error) {
-      console.error("❌ Supabase error:", error);
-      alert("Failed to save stock.");
-      return;
-    }
-
-    console.log("✅ Stock saved successfully:", data);
-    alert("Stock saved!");
-    await fetchStock();
-  };
-
-  const handleSave = async (item) => {
-    const quantity = Number(editing[item.id]);
-    if (isNaN(quantity)) return;
-
-    const {
-      data,
-      error: userError
-    } = await supabase.auth.getUser();
-
-    const user = data?.user;
-
-    if (!user) {
-      console.error("❌ No user found:", userError);
-      return;
-    }
-
-    const stockRow = {
-      stock_item_id: item.id,
-      store_id: storeId,
-      quantity,
-      last_updated: new Date().toISOString(),
-      updated_by: user.id,
-      ...(item.store_stock_level_id && { id: item.store_stock_level_id })
-    };
-
-    console.log("🧾 Final payload to send:", stockRow);
-    console.log("👤 Current user ID:", user.id);
-
-    await handleSaveStock(stockRow, user);
-  };
-
   const handleEditChange = (id, value) => {
-    setEditing(prev => ({
+    // Allow empty for “clear”, but guard negative values
+    const v = value === "" ? "" : Math.max(0, Number(value));
+    setEditing((prev) => ({
       ...prev,
-      [id]: value
+      [id]: value === "" ? "" : String(v),
     }));
   };
 
-  const filteredStockItems = search
-    ? stockItems.filter(item =>
-        item.name?.toLowerCase().includes(search.toLowerCase()) ||
-        item.sku?.toLowerCase().includes(search.toLowerCase())
-      )
-    : stockItems;
+  // Filtering
+  const filteredStockItems = useMemo(() => {
+    if (!search) return stockItems;
+    const q = search.toLowerCase();
+    return stockItems.filter(
+      (item) =>
+        item.name?.toLowerCase().includes(q) ||
+        item.sku?.toLowerCase().includes(q)
+    );
+  }, [stockItems, search]);
 
-  const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage);
-  const pageItems = filteredStockItems.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Pagination
+  const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage) || 1;
+
+  // Keep currentPage in range if filtering changes total
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pageItems = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = currentPage * itemsPerPage;
+    return filteredStockItems.slice(start, end);
+  }, [filteredStockItems, currentPage]);
+
+  // Determine which edits on this page are valid and changed
+  const pageChanges = useMemo(() => {
+    return pageItems
+      .map((item) => {
+        const raw = editing[item.id];
+        if (typeof raw === "undefined" || raw === "") return null;
+        const qty = Number(raw);
+        if (Number.isNaN(qty)) return null;
+        if (qty === item.current_qty) return null;
+        return { item, qty };
+      })
+      .filter(Boolean);
+  }, [pageItems, editing]);
+
+  const hasPageChanges = pageChanges.length > 0;
+
+  const handleSavePage = async () => {
+    if (!storeId || !hasPageChanges) return;
+    setSaving(true);
+
+    try {
+      const {
+        data: authData,
+        error: userError
+      } = await supabase.auth.getUser();
+
+      const user = authData?.user;
+      if (!user) {
+        console.error("❌ No user found:", userError);
+        alert("Could not find current user.");
+        setSaving(false);
+        return;
+      }
+
+      // Build batched rows for upsert
+      const now = new Date().toISOString();
+      const rows = pageChanges.map(({ item, qty }) => ({
+        id: item.store_stock_level_id ?? undefined,
+        stock_item_id: item.id,
+        store_id: storeId,
+        quantity: qty,
+        last_updated: now,
+        updated_by: user.id,
+      }));
+
+      const { data, error } = await supabase
+        .from("store_stock_levels")
+        .upsert(rows)
+        .select();
+
+      if (error) {
+        console.error("❌ Supabase error:", error);
+        alert("Failed to save this page.");
+        setSaving(false);
+        return;
+      }
+
+      // Refresh and clear only the edited entries for this page
+      await fetchStock();
+
+      setEditing((prev) => {
+        const next = { ...prev };
+        pageItems.forEach((item) => {
+          if (typeof next[item.id] !== "undefined") {
+            // Clear only values that were actually changed/saved
+            const wasChanged = pageChanges.some((c) => c.item.id === item.id);
+            if (wasChanged) delete next[item.id];
+          }
+        });
+        return next;
+      });
+
+      console.log("✅ Page saved successfully:", data);
+      alert("Saved this page!");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Card className="mb-6">
@@ -153,13 +196,23 @@ export default function DailyStockCheck() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex items-center">
+        <div className="mb-4 flex items-center justify-between gap-4">
           <Input
             placeholder="Search by name or SKU..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-64"
           />
+
+          {/* Save current page button (top-right for convenience) */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleSavePage}
+            disabled={!hasPageChanges || saving || loading}
+          >
+            {saving ? "Saving..." : "Save This Page"}
+          </Button>
         </div>
 
         {loading ? (
@@ -178,7 +231,6 @@ export default function DailyStockCheck() {
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Category</th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Current Qty</th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">New Qty</th>
-                      <th className="px-4 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -195,36 +247,23 @@ export default function DailyStockCheck() {
                             value={editing[item.id] ?? ""}
                             onChange={(e) => handleEditChange(item.id, e.target.value)}
                             placeholder="Qty"
-                            className="w-20"
+                            className="w-24"
                           />
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSave(item)}
-                            disabled={
-                              typeof editing[item.id] === "undefined" ||
-                              editing[item.id] === "" ||
-                              isNaN(Number(editing[item.id]))
-                            }
-                          >
-                            Save
-                          </Button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                <div className="flex justify-between items-center mt-4">
-                  <span>Page {currentPage} of {totalPages || 1}</span>
-                  <div className="space-x-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                  <span>Page {currentPage} of {totalPages}</span>
+
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={currentPage === 1}
-                      onClick={() => setCurrentPage((prev) => prev - 1)}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     >
                       Prev
                     </Button>
@@ -232,9 +271,19 @@ export default function DailyStockCheck() {
                       variant="outline"
                       size="sm"
                       disabled={currentPage === totalPages || totalPages === 0}
-                      onClick={() => setCurrentPage((prev) => prev + 1)}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     >
                       Next
+                    </Button>
+
+                    {/* Duplicate Save at bottom for easy access */}
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleSavePage}
+                      disabled={!hasPageChanges || saving || loading}
+                    >
+                      {saving ? "Saving..." : "Save This Page"}
                     </Button>
                   </div>
                 </div>
