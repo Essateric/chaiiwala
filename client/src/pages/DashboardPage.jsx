@@ -30,6 +30,8 @@ import {
   isOrderDay,
   getOrderCutoffDate
 } from "../lib/getFreshwaysDeliveryDate.jsx";
+import MaintenanceRequestsPie from "../components/Maintenance/MaintenanceRequestsPie.jsx";
+
 
 
 // Get the most recent delivery date (today if valid, else yesterday, else last valid)
@@ -64,6 +66,7 @@ const cutoff11 = getOrderCutoffDate(now);
 
 const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
 const endOfToday   = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+
 
 const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
   queryKey: ["freshways_order_log_today", startOfToday.toISOString()],
@@ -352,14 +355,12 @@ const mergedOrderLog = useMemo(() => {
             <>
               {/* Stats cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <StatsCard
-                  title="Maintenance Request"
-                  value={stores.length}
-                  icon={Building}
-                  iconColor="text-blue-600"
-                  iconBgColor="bg-blue-100"
-                  change={{ value: "+1 location", isPositive: true, text: "since last month" }}
-                />
+<MaintenanceRequestsPie
+  daysBack={14}
+  icon={Building}
+  iconColor="text-blue-600"
+  iconBgColor="bg-blue-100"
+/>
                 <Card className="relative bg-yellow-50">
                   {/* Clipboard icon at top-left */}
                   <div className="absolute left-5 top-5 z-10">
