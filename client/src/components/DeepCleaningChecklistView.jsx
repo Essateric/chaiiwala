@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabaseClient";
 
 export default function DeepCleaningChecklistView({ profile }) {
   const { toast } = useToast();
-
   const [stores, setStores] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -18,6 +17,32 @@ export default function DeepCleaningChecklistView({ profile }) {
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date())); // NEW
   const [isLoading, setIsLoading] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const isAdminOrRegional =
+  profile?.permissions === "admin" || profile?.permissions === "regional";
+
+const tasksByStore = React.useMemo(() => {
+  if (!isAdminOrRegional || selectedStore !== "auto") return [];
+  const map = new Map();
+  for (const t of tasks) {
+    const key = t.store_id;
+    if (!map.has(key)) {
+      map.set(key, { store_id: key, store_name: t.store_name || "Unknown", items: [] });
+    }
+    map.get(key).items.push(t);
+  }
+  // sort stores and tasks (pending first, then by time)
+  return Array.from(map.values())
+    .sort((a, b) => a.store_name.localeCompare(b.store_name))
+    .map(group => ({
+      ...group,
+      items: group.items.sort((a, b) => {
+        if (!!a.completed_at !== !!b.completed_at) return a.completed_at ? 1 : -1;
+        return new Date(a.start) - new Date(b.start);
+      })
+    }));
+}, [isAdminOrRegional, selectedStore, tasks]);
+
+  
 
   // Load stores + task types once
   useEffect(() => {

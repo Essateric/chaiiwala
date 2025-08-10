@@ -14,6 +14,7 @@ import { useToast } from "../hooks/use-toast.jsx";
 import { useAuth } from "../hooks/UseAuth.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { supabase } from "../lib/supabaseClient.js";
+import { useNavigate } from "react-router-dom";
 
 const TASKS_PER_PAGE = 10;
 const DAYS_SHOWN = 7;

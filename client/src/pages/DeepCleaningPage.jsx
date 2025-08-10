@@ -16,9 +16,9 @@ import { useToast } from '../hooks/use-toast.jsx';
 import { useAuth } from '../hooks/UseAuth.jsx';
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { supabase } from "../lib/supabaseClient.js";
-import DeepCleaningKanban from "../components/DeepCleaningKanban.jsx";
 import DeepCleaningFormComponent from "../components/DeepCleaningForm.jsx";
 import DeepCleaningChecklistView from "../components/DeepCleaningChecklistView.jsx";
+import DeepCleaningAdminDayView from "../components/DeepCleaningAdminDayView.jsx";
 
 // Calendar localizer setup
 const locales = { 'en-US': enUS };
@@ -53,15 +53,6 @@ export default function DeepCleaningPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [events, setEvents] = useState([]);
-
-  const [view, setView] = useState(
-  profile?.permissions === "store" ? "checklist" : "kanban"
-);
-useEffect(() => {
-  if (profile) {
-    setView(profile.permissions === "store" ? "checklist" : "kanban");
-  }
-}, [profile]);
 
   // Fetch stores
   useEffect(() => {
@@ -312,27 +303,12 @@ if (!resolvedStoreId || resolvedStoreId === '') {
  return (
   <DashboardLayout title="Deep Cleaning">
     {/* Toggle at top of page */}
-    <div className="flex items-center justify-end gap-2 mb-3">
-      <Button
-        variant={view === "checklist" ? "default" : "outline"}
-        onClick={() => setView("checklist")}
-      >
-        Checklist
-      </Button>
-      <Button
-        variant={view === "kanban" ? "default" : "outline"}
-        onClick={() => setView("kanban")}
-      >
-        Kanban
-      </Button>
-    </div>
+{profile?.permissions === "store" ? (
+  <DeepCleaningChecklistView profile={profile} />
+) : (
+  <DeepCleaningAdminDayView profile={profile} />
+)}
 
-    {/* Conditional render based on view */}
-    {view === "checklist" ? (
-      <DeepCleaningChecklistView profile={profile} />
-    ) : (
-      <DeepCleaningKanban />
-    )}
 
     {/* Modals below */}
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
