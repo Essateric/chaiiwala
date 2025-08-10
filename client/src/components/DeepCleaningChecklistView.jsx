@@ -1,24 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { startOfDay, endOfDay, format } from "date-fns";
-import { CheckCircle2, Circle, Plus, Loader2 } from "lucide-react";
+import { startOfDay, endOfDay, format, addDays } from "date-fns";
+import { CheckCircle2, Circle, Plus, Loader2, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import DeepCleaningFormComponent from "@/components/DeepCleaningForm.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function DeepCleaningChecklistView({ profile }) {
   const { toast } = useToast();
+
   const [stores, setStores] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [selectedStore, setSelectedStore] = useState("auto");
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date())); // NEW
   const [isLoading, setIsLoading] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
-
-  const todayStart = startOfDay(new Date());
-  const todayEnd = endOfDay(new Date());
 
   // Load stores + task types once
   useEffect(() => {
@@ -30,52 +29,53 @@ export default function DeepCleaningChecklistView({ profile }) {
     })();
   }, []);
 
-  // Resolve which store the user is viewing
+  // Resolved store logic
   const resolvedStoreId = useMemo(() => {
     if (profile?.permissions === "store") return profile.store_ids?.[0] ?? null;
-    if (selectedStore === "auto") return null; // admin/regional – show "All" summary
+    if (selectedStore === "auto") return null; // admin/regional → All stores
     return Number(selectedStore);
   }, [profile, selectedStore]);
-
-  // Load today's tasks for the chosen scope
-  const loadTasks = async () => {
-    setIsLoading(true);
-    let { data } = await supabase
-      .from("deep_cleaning")
-      .select("*")
-      .gte("start", todayStart.toISOString())
-      .lte("start", todayEnd.toISOString());
-
-    data = data || [];
-
-    // Visibility rules
-    if (profile?.permissions === "store") {
-      data = data.filter(t => t.store_id === profile.store_ids?.[0]);
-    } else if (resolvedStoreId) {
-      data = data.filter(t => t.store_id === resolvedStoreId);
-    } else {
-      // admin/regional + "All" => keep all
-    }
-
-    setTasks(data);
-    setIsLoading(false);
-  };
-
-  useEffect(() => { loadTasks(); /* eslint-disable-next-line */ }, [profile, resolvedStoreId]);
 
   const visibleStores =
     profile?.permissions === "admin"
       ? stores
       : stores.filter(s => profile?.store_ids?.includes(s.id));
 
-  const total = tasks.length;
+  const dayStart = startOfDay(selectedDate);
+  const dayEnd = endOfDay(selectedDate);
+
+  // Fetch tasks for the selected date
+  const loadTasks = async () => {
+    setIsLoading(true);
+    let { data } = await supabase
+      .from("deep_cleaning")
+      .select("*")
+      .gte("start", dayStart.toISOString())
+      .lte("start", dayEnd.toISOString());
+
+    data = data || [];
+
+    if (profile?.permissions === "store") {
+      data = data.filter(t => t.store_id === profile.store_ids?.[0]);
+    } else if (resolvedStoreId) {
+      data = data.filter(t => t.store_id === resolvedStoreId);
+    }
+
+    setTasks(data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (profile) loadTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, resolvedStoreId, selectedDate]);
+
   const done = tasks.filter(t => !!t.completed_at).length;
+  const total = tasks.length;
 
   const toggleComplete = async (task) => {
     const completed_at = task.completed_at ? null : new Date().toISOString();
-    const { error } = await supabase.from("deep_cleaning")
-      .update({ completed_at })
-      .eq("id", task.id);
+    const { error } = await supabase.from("deep_cleaning").update({ completed_at }).eq("id", task.id);
     if (error) {
       toast({ title: "Error", description: "Could not update task.", variant: "destructive" });
       return;
@@ -83,18 +83,29 @@ export default function DeepCleaningChecklistView({ profile }) {
     setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, completed_at } : t)));
   };
 
+  // Date navigation handlers
+  const goPrev = () => setSelectedDate(d => addDays(d, -1));
+  const goNext = () => setSelectedDate(d => addDays(d, 1));
+  const goToday = () => setSelectedDate(startOfDay(new Date()));
+
   return (
     <div className="space-y-4">
+      {/* Header / Filters */}
       <div className="rounded-lg border bg-muted/30 p-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-white">Daily Store Deep Cleaning</h2>
             <p className="text-sm text-gray-300">
-              Tasks for <span className="font-medium">{format(todayStart, "EEE, MMM d yyyy")}</span>
+              {format(dayStart, "EEEE, MMM d yyyy")}
+            </p>
+            <p className="text-sm text-gray-300">
+              <span className="font-medium">{done} of {total}</span> tasks
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+        {/* Right controls */}
+          <div className="flex flex-col gap-2 items-stretch md:flex-row md:items-center">
+            {/* Admin/Regional store filter */}
             {(profile?.permissions === "admin" || profile?.permissions === "regional") && (
               <Select value={selectedStore} onValueChange={setSelectedStore}>
                 <SelectTrigger className="w-[220px]">
@@ -109,24 +120,41 @@ export default function DeepCleaningChecklistView({ profile }) {
               </Select>
             )}
 
-            <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => setIsAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Add Task
-            </Button>
-          </div>
-        </div>
+            {/* Date controls */}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={goPrev}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <input
+                type="date"
+                className="flex h-9 w-[150px] rounded-md border border-input bg-background px-3 py-1 text-sm"
+                value={format(selectedDate, "yyyy-MM-dd")}
+                onChange={(e) => setSelectedDate(new Date(e.target.value + "T00:00:00"))}
+              />
+              <Button variant="outline" size="sm" onClick={goNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={goToday}>
+                <CalIcon className="h-4 w-4 mr-1" /> Today
+              </Button>
 
-        <div className="mt-3 text-sm text-gray-200">
-          <span className="font-medium">{done} of {total}</span> tasks
+              {/* Quick Add */}
+              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => setIsAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Add Task
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* List */}
       <div className="rounded-lg bg-white p-2">
         {isLoading ? (
           <div className="flex items-center gap-2 p-4 text-sm text-gray-600">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading today’s tasks…
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading tasks…
           </div>
         ) : tasks.length === 0 ? (
-          <div className="p-4 text-sm text-gray-600">No tasks for today.</div>
+          <div className="p-4 text-sm text-gray-600">No tasks for this day.</div>
         ) : (
           <ul className="divide-y">
             {tasks
@@ -151,9 +179,12 @@ export default function DeepCleaningChecklistView({ profile }) {
                       </div>
                     </div>
 
-                    <Button size="sm" variant={isDone ? "outline" : "default"}
+                    <Button
+                      size="sm"
+                      variant={isDone ? "outline" : "default"}
                       className={isDone ? "" : "bg-green-600 hover:bg-green-700"}
-                      onClick={() => toggleComplete(t)}>
+                      onClick={() => toggleComplete(t)}
+                    >
                       {isDone ? "Undo" : "Mark Done"}
                     </Button>
                   </li>
@@ -163,20 +194,24 @@ export default function DeepCleaningChecklistView({ profile }) {
         )}
       </div>
 
-      {/* Quick add dialog (shares your existing form) */}
+      {/* Quick add (uses your shared form) */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Add Deep Cleaning Task</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Add Deep Cleaning Task</DialogTitle>
+            <DialogDescription>
+              Schedule for {format(selectedDate, "MMMM dd, yyyy")}
+            </DialogDescription>
+          </DialogHeader>
           <DeepCleaningFormComponent
             profile={profile}
             stores={stores}
             cleaningTasks={taskTypes}
-            selectedDate={new Date()}
+            selectedDate={selectedDate}
             onSubmit={async (payload) => {
-              // Reuse your page-level submission logic pattern:
-              // Minimal: set date=Today here & insert; then refresh list.
-              const start = new Date();
-              const end = new Date();
+              // Build start/end from selectedDate + form times
+              const start = new Date(selectedDate);
+              const end = new Date(selectedDate);
               if (payload.anytime) {
                 start.setHours(0,0,0,0); end.setHours(23,59,59,999);
               } else {
