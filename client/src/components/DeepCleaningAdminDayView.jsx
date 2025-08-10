@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { startOfDay, endOfDay, format, addDays } from "date-fns";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronRight as CaretRight, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as CaretRight, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button.jsx";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/ui/select.jsx";
 import { useToast } from "../hooks/use-toast.jsx";
 import { supabase } from "../lib/supabaseClient.js";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog.jsx";
+import DeepCleaningFormComponent from "../components/DeepCleaningForm.jsx";
 
 export default function DeepCleaningAdminDayView({ profile }) {
   const { toast } = useToast();
@@ -16,9 +18,19 @@ export default function DeepCleaningAdminDayView({ profile }) {
   const [storeOpen, setStoreOpen] = useState({}); // { [store_id]: boolean }
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "pending" | "completed"
   const [search, setSearch] = useState("");
+const [taskTypes, setTaskTypes] = useState([]);
+
 
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
+
+  useEffect(() => {
+  (async () => {
+    const { data } = await supabase.from("deep_cleaning_tasks").select("id, dc_task");
+    setTaskTypes(data || []);
+  })();
+}, []);
+
 
   // Load stores
   useEffect(() => {
@@ -104,6 +116,7 @@ export default function DeepCleaningAdminDayView({ profile }) {
   const goPrev = () => setSelectedDate(d => addDays(d, -1));
   const goNext = () => setSelectedDate(d => addDays(d, 1));
   const goToday = () => setSelectedDate(startOfDay(new Date()));
+    const [isAddOpen, setIsAddOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -125,6 +138,9 @@ export default function DeepCleaningAdminDayView({ profile }) {
               />
               <Button variant="outline" size="sm" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
               <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
+              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => setIsAddOpen(true)}>
+  <Plus className="h-4 w-4 mr-2" /> Add Task
+</Button>
             </div>
 
             {/* Status filter */}
@@ -234,6 +250,73 @@ export default function DeepCleaningAdminDayView({ profile }) {
           })}
         </div>
       )}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+  <DialogContent className="sm:max-w-[425px]">
+    <DialogHeader>
+      <DialogTitle>Add Deep Cleaning Task</DialogTitle>
+      <DialogDescription>
+        Schedule for {format(selectedDate, "MMMM dd, yyyy")}
+      </DialogDescription>
+    </DialogHeader>
+
+    <DeepCleaningFormComponent
+      profile={profile}
+      stores={stores}
+      cleaningTasks={taskTypes}
+      selectedDate={selectedDate}
+      onSubmit={async (payload) => {
+        // Build start/end from selectedDate + form times
+        const start = new Date(selectedDate);
+        const end = new Date(selectedDate);
+        if (payload.anytime) {
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+        } else {
+          const [sh, sm] = payload.startTime.split(":").map(Number);
+          const [eh, em] = payload.endTime.split(":").map(Number);
+          start.setHours(sh, sm, 0, 0);
+          end.setHours(eh, em, 0, 0);
+        }
+
+        // Admin/Regional must choose a store in the form
+        const finalStoreId = Number(
+          profile?.permissions === "store" ? profile.store_ids?.[0] : payload.storeId
+        );
+        if (!finalStoreId) {
+          toast({ title: "Missing Store", description: "Please select a store.", variant: "destructive" });
+          return;
+        }
+
+        const storeName = stores.find(s => s.id === finalStoreId)?.name || "";
+
+        const { error } = await supabase.from("deep_cleaning").insert([{
+          task: payload.task,
+          start: start.toISOString(),
+          end_time: end.toISOString(),
+          store_id: finalStoreId,
+          store_name: storeName,
+          created_by: profile?.id,
+          created_at: new Date().toISOString(),
+          anytime: payload.anytime,
+        }]);
+
+        if (error) {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+          return;
+        }
+
+        toast({ title: "Task added", description: `${payload.task} for ${storeName}` });
+        setIsAddOpen(false);
+        loadTasks(); // refresh the day view
+      }}
+      isLoading={isLoading}
+      setIsModalOpen={setIsAddOpen}
+    />
+  </DialogContent>
+</Dialog>
+
     </div>
+    
   );
+  
 }
