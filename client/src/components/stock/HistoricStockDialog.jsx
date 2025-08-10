@@ -106,7 +106,7 @@ function ProductHistoryTable({ historyRows, product, onBack }) {
     historyRows.map((row, i) => (
       <tr key={(row.changed_at || "") + (row.updated_by || "") + i}>
         <td className="p-2">{new Date(row.changed_at).toLocaleString()}</td>
-        <td className="p-2">{row.updated_by || "-"}</td>
+<td className="p-2">{row.updated_by_name}</td>
         <td className="p-2">{row.old_quantity}</td>
         <td className="p-2">{row.new_quantity}</td>
       </tr>
@@ -178,8 +178,9 @@ useEffect(() => {
     // inclusive nDays window (e.g., 14 -> today and previous 13 days)
     start.setDate(end.getDate() - (nDays - 1));
 
-    const { data, error } = await supabase
-      .from("stock_history_changes") // <— audit table
+    // 1) Fetch history rows (no join)
+    const { data: changes, error: changesError } = await supabase
+      .from("stock_history_changes") // audit table
       .select("changed_at, updated_by, old_quantity, new_quantity")
       .eq("store_id", selectedStore.id)
       .eq("stock_item_id", selectedProduct.stock_item_id)
@@ -187,11 +188,42 @@ useEffect(() => {
       .lte("changed_at", end.toISOString())
       .order("changed_at", { ascending: false });
 
-    setHistoryRows(error ? [] : (data ?? []));
+    if (changesError) {
+      setHistoryRows([]);
+      return;
+    }
+
+    // 2) Get distinct updater ids and map to names from profiles
+    const ids = Array.from(
+      new Set((changes ?? []).map(r => r.updated_by).filter(Boolean))
+    );
+
+    let nameMap = {};
+    if (ids.length) {
+      const { data: profs, error: profErr } = await supabase
+        .from("profiles")
+        .select("auth_id, first_name, name")
+        .in("auth_id", ids);
+
+      if (!profErr && profs) {
+        nameMap = Object.fromEntries(
+          profs.map(p => [p.auth_id, p.first_name || p.name || p.auth_id])
+        );
+      }
+    }
+
+    // 3) Attach display name (fallback to id or "-")
+    setHistoryRows(
+      (changes ?? []).map(r => ({
+        ...r,
+        updated_by_name: nameMap[r.updated_by] || r.updated_by || "-"
+      }))
+    );
   };
 
   load();
 }, [selectedStore, selectedProduct, nDays]);
+
 
 
 

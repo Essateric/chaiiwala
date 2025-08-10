@@ -18,6 +18,7 @@ import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { supabase } from "../lib/supabaseClient.js";
 import DeepCleaningKanban from "../components/DeepCleaningKanban.jsx";
 import DeepCleaningFormComponent from "../components/DeepCleaningForm.jsx";
+import DeepCleaningChecklistView from "../components/DeepCleaningChecklistView.jsx";
 
 // Calendar localizer setup
 const locales = { 'en-US': enUS };
@@ -52,6 +53,15 @@ export default function DeepCleaningPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [events, setEvents] = useState([]);
+
+  const [view, setView] = useState(
+  profile?.permissions === "store" ? "checklist" : "kanban"
+);
+useEffect(() => {
+  if (profile) {
+    setView(profile.permissions === "store" ? "checklist" : "kanban");
+  }
+}, [profile]);
 
   // Fetch stores
   useEffect(() => {
@@ -299,66 +309,73 @@ if (!resolvedStoreId || resolvedStoreId === '') {
     return `${event.task}${timeLabel}`;
   };
 
-  return (
-    <>
+ return (
+  <DashboardLayout title="Deep Cleaning">
+    {/* Toggle at top of page */}
+    <div className="flex items-center justify-end gap-2 mb-3">
+      <Button
+        variant={view === "checklist" ? "default" : "outline"}
+        onClick={() => setView("checklist")}
+      >
+        Checklist
+      </Button>
+      <Button
+        variant={view === "kanban" ? "default" : "outline"}
+        onClick={() => setView("kanban")}
+      >
+        Kanban
+      </Button>
+    </div>
+
+    {/* Conditional render based on view */}
+    {view === "checklist" ? (
+      <DeepCleaningChecklistView profile={profile} />
+    ) : (
       <DeepCleaningKanban />
+    )}
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Deep Cleaning Task</DialogTitle>
-            <DialogDescription>
-              {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
-            </DialogDescription>
-          </DialogHeader>
-          <DeepCleaningFormComponent
-            profile={profile}
-            stores={stores}
-            cleaningTasks={cleaningTasks}
-            selectedDate={selectedDate}
-            onSubmit={onSubmit}
-            isLoading={isLoading}
-            setIsModalOpen={setIsModalOpen}
-          />
-        </DialogContent>
-      </Dialog>
+    {/* Modals below */}
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Add Deep Cleaning Task</DialogTitle>
+          <DialogDescription>
+            {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
+          </DialogDescription>
+        </DialogHeader>
+        <DeepCleaningFormComponent
+          profile={profile}
+          stores={stores}
+          cleaningTasks={cleaningTasks}
+          selectedDate={selectedDate}
+          onSubmit={onSubmit}
+          isLoading={isLoading}
+          setIsModalOpen={setIsModalOpen}
+        />
+      </DialogContent>
+    </Dialog>
 
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Task Details</DialogTitle>
-            <DialogDescription>
-              {selectedTask?.task}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTask && (
-            <div className="mb-4">
-              <div><b>Date:</b> {format(selectedTask.start, "PPPP")}</div>
-              <div><b>Store:</b> {selectedTask.store_name}</div>
-              <div><b>Status:</b> {selectedTask.completed_at ? "Complete" : "Incomplete"}</div>
-              <div><b>Created:</b> {format(selectedTask.created_at || selectedTask.start, "PPpp")}</div>
-              {selectedTask.completed_at && (
-                <div><b>Completed:</b> {format(selectedTask.completed_at, "PPpp")}</div>
-              )}
-              {selectedTask.anytime ? (
-                <div><b>Time:</b> Anytime</div>
-              ) : (
-                <div><b>Time:</b> {format(selectedTask.start, 'HH:mm')} - {format(selectedTask.end, 'HH:mm')}</div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              Close
+    <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Task Details</DialogTitle>
+          <DialogDescription>{selectedTask?.task}</DialogDescription>
+        </DialogHeader>
+        {/* Task details */}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+            Close
+          </Button>
+          {!selectedTask?.completed_at && (
+            <Button
+              onClick={markTaskComplete}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              Mark Complete
             </Button>
-            {!selectedTask?.completed_at && (
-              <Button onClick={markTaskComplete} className="bg-green-600 text-white hover:bg-green-700">
-                Mark Complete
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </DashboardLayout>
+);}

@@ -2,18 +2,18 @@ import React, { useState, useEffect } from "react";
 import { format, addDays, subDays, startOfDay } from "date-fns";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "../components/ui/dialog.jsx";
+import { Button } from "../components/ui/button.jsx";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+} from "../components/ui/select.jsx";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "../components/ui/form.jsx";
 import { useForm } from "react-hook-form";
 import { Loader2, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/UseAuth";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "../hooks/use-toast.jsx";
+import { useAuth } from "../hooks/UseAuth.jsx";
+import DashboardLayout from "../components/layout/DashboardLayout.jsx";
+import { supabase } from "../lib/supabaseClient.js";
 
 const TASKS_PER_PAGE = 10;
 const DAYS_SHOWN = 7;
