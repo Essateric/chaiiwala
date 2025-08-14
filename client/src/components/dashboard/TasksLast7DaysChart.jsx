@@ -4,28 +4,28 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } f
 import { Loader2 } from "lucide-react";
 
 /**
- * Shows last 30 days of task status counts for checklist, for either
+ * Shows last 7 days of task status counts for checklist, for either
  * a specific store or all stores together.
  *
  * @param {Array} stores - Array of store objects (optional, for future)
  * @param {string|number} selectedStoreId - "all" or a specific store ID
  */
-export default function TasksLast30DaysChart({ stores, selectedStoreId }) {
+export default function TasksLast7DaysChart({ stores, selectedStoreId }) {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 useEffect(() => {
   async function fetchData() {
     setLoading(true);
-    // 1. Array of last 30 days as YYYY-MM-DD
+    // 1. Array of last 7 days as YYYY-MM-DD
     const today = new Date();
     let dates = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       dates.push(d.toISOString().split("T")[0]);
     }
 
-    // 2. Fetch all relevant rows for 30 days, all stores or single
+    // 2. Fetch all relevant rows for 7 days, all stores or single
     let query = supabase
       .from("daily_checklist_status")
       .select("store_id, date, status")
@@ -78,7 +78,7 @@ useEffect(() => {
   return (
     <div className="bg-white rounded-xl shadow p-4 mt-6">
       <div className="flex justify-between items-center mb-3">
-        <h3 className="font-bold text-lg">Tasks (Last 30 Days)</h3>
+        <h3 className="font-bold text-lg">Tasks (Last 7 Days)</h3>
       </div>
       {loading ? (
         <div className="flex justify-center items-center h-48">

@@ -169,6 +169,8 @@ const response = await fetch('/.netlify/functions/sendFeedbackEmail', {
 
 
 
+
+
   // Load store names for dropdown
   useEffect(() => {
     async function fetchStores() {
@@ -184,18 +186,27 @@ const response = await fetch('/.netlify/functions/sendFeedbackEmail', {
   }, []);
 
   // StarRating component
-  const StarRating = (props) => (
+// StarRating component
+const StarRating = ({ label, value, onChange }) => {
+  const getColorClass = (star) => {
+    if (star <= value) {
+      if (value <= 2) return 'text-red-500';
+      if (value <= 4) return 'text-orange-500';
+      return 'text-green-500';
+    }
+    return 'text-gray-300 hover:text-yellow-200';
+  };
+
+  return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-gray-700">{props.label}</label>
+      <label className="text-sm font-medium text-gray-700">{label}</label>
       <div className="flex space-x-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
-            onClick={() => props.onChange(star)}
-            className={`p-1 transition-colors ${
-              star <= props.value ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-200'
-            }`}
+            onClick={() => onChange(star)}
+            className={`p-1 transition-colors ${getColorClass(star)}`}
           >
             <Star className="w-6 h-6 fill-current" />
           </button>
@@ -203,6 +214,7 @@ const response = await fetch('/.netlify/functions/sendFeedbackEmail', {
       </div>
     </div>
   );
+};
 
   // YesNoQuestion component
   const YesNoQuestion = (props) => (

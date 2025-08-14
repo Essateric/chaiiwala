@@ -17,7 +17,7 @@ import { supabase } from "../lib/supabaseClient.js";
 import { useState, useEffect, useMemo } from "react";
 import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import TasksLast30DaysChart from "../components/dashboard/TasksLast30DaysChart.jsx";
+import TasksLast7DaysChart from "../components/dashboard/TasksLast7DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
@@ -419,79 +419,73 @@ const mergedOrderLog = useMemo(() => {
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
                     <StockCheckComplianceWidget />
+                     {/* Freshways Widget */}
+    <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
+      <div className="absolute left-4 top-4">
+        <div className="rounded-full bg-blue-100 p-2">
+          <ShoppingCart className="h-6 w-6 text-blue-600" />
+        </div>
+      </div>
+      <CardHeader className="pl-20 pt-4 pb-2">
+        <CardTitle className="text-base font-bold text-gray-800">
+          Freshways Order Status
+        </CardTitle>
+        <CardDescription>
+          for delivery on {formatDeliveryDateVerbose(deliveryDate)}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-5 pb-5">
+        {isLoadingOrders ? (
+          <p className="text-gray-500 text-sm">Loading...</p>
+        ) : mergedOrderLog.length === 0 ? (
+          <p className="text-gray-500 text-sm">No stores available</p>
+        ) : (
+          <table className="w-full text-sm text-gray-700">
+            <thead>
+              <tr className="text-left border-b text-xs text-gray-400">
+                <th className="py-1">Store</th>
+                <th className="py-1">Status</th>
+                <th className="py-1">Placed At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mergedOrderLog.map((log, idx) => (
+                <tr key={idx} className="border-b">
+                  <td className="py-2">{log.storeName}</td>
+                  <td className="py-2">
+                    {log.status === "placed" ? (
+                      <span className="text-green-600 font-semibold">Placed</span>
+                    ) : log.status === "missed" ? (
+                      <span className="text-red-600 font-semibold">Missed</span>
+                    ) : (
+                      <span className="text-yellow-600 font-semibold">No Entry</span>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {log.status === "placed" && log.createdAt
+                      ? new Date(log.createdAt).toLocaleString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
+      <TasksLast7DaysChart
+      stores={stores}
+      selectedStoreId={selectedTaskStoreId}
+    />
               </div>
 
-              {/* --- CHART + FRESHWAYS WIDGET --- */}
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
-                {/* Tasks Chart (3/4 width on desktop) */}
-                <div className="lg:col-span-3">
-                  <TasksLast30DaysChart
-                    stores={stores}
-                    selectedStoreId={selectedTaskStoreId}
-                  />
-                </div>
-                {/* Freshways Widget (1/4 width on desktop) */}
-                <div>
-                  <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
-                    <div className="absolute left-4 top-4">
-                      <div className="rounded-full bg-blue-100 p-2">
-                        <ShoppingCart className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                    <CardHeader className="pl-20 pt-4 pb-2">
-                      <CardTitle className="text-base font-bold text-gray-800">Freshways Order Status</CardTitle>
-<CardDescription>
-  for delivery on {formatDeliveryDateVerbose(deliveryDate)}
-</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-5 pb-5">
-                      {isLoadingOrders ? (
-                        <p className="text-gray-500 text-sm">Loading...</p>
-                      ) : mergedOrderLog.length === 0 ? (
-                        <p className="text-gray-500 text-sm">No stores available</p>
-                      ) : (
-                        <table className="w-full text-sm text-gray-700">
-                          <thead>
-                            <tr className="text-left border-b text-xs text-gray-400">
-                              <th className="py-1">Store</th>
-                              <th className="py-1">Status</th>
-                              <th className="py-1">Placed At</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {mergedOrderLog.map((log, idx) => (
-                              <tr key={idx} className="border-b">
-                                <td className="py-2">{log.storeName}</td>
-                                <td className="py-2">
-                                  {log.status === "placed" ? (
-                                    <span className="text-green-600 font-semibold">Placed</span>
-                                  ) : log.status === "missed" ? (
-                                    <span className="text-red-600 font-semibold">Missed</span>
-                                  ) : (
-                                    <span className="text-yellow-600 font-semibold">No Entry</span>
-                                  )}
-                                </td>
-                                <td className="py-2">
-                                  {log.status === "placed" && log.createdAt
-                                    ? new Date(log.createdAt).toLocaleString("en-GB", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "2-digit",
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })
-                                    : "—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </>
+              </>
           )}
 
           {/* Today's Tasks Card */}
