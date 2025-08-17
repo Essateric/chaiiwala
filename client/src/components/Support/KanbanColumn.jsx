@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useAuth } from "../../hooks/UseAuth.jsx";
-import CommentSection from "./CommentSection.jsx"; // Adjust path if needed
-
+import CommentSection from "./CommentSection.jsx";
 
 // Modal for showing full ticket details, with delete button if allowed
 function TicketModal({ ticket, onClose, canDelete, onDelete }) {
@@ -13,7 +12,9 @@ function TicketModal({ ticket, onClose, canDelete, onDelete }) {
           className="absolute top-2 right-3 text-2xl font-bold text-gray-500 hover:text-black"
           onClick={onClose}
           aria-label="Close"
-        >×</button>
+        >
+          ×
+        </button>
         <h2 className="text-lg font-bold mb-2">{ticket.page}</h2>
         <div className="mb-2 text-sm text-gray-600">
           Logged: {new Date(ticket.created_at).toLocaleString()}
@@ -33,18 +34,25 @@ function TicketModal({ ticket, onClose, canDelete, onDelete }) {
           </ol>
         </div>
         <div className="mb-2 text-sm text-gray-600">By: {ticket.user_name}</div>
+
         {ticket.screenshot_url && (
           <div className="my-2">
-            <a href={ticket.screenshot_url} target="_blank" rel="noopener noreferrer">
-      <img
-        src={ticket.screenshot_url}
-        alt="Screenshot"
-        style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
-      />
-    </a>
+            <a
+              href={ticket.screenshot_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src={ticket.screenshot_url}
+                alt="Screenshot"
+                style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
+              />
+            </a>
           </div>
         )}
- <CommentSection ticketId={ticket.id} />
+
+        <CommentSection ticketId={ticket.id} />
+
         {canDelete && ticket.status !== "completed" && (
           <div className="mt-4">
             <button
@@ -75,6 +83,7 @@ export default function KanbanColumn({
   tickets,
   refresh,
   showRoleAndStore = false,
+  children, // <-- will render pagination controls passed from parent
 }) {
   const supabase = useSupabaseClient();
   const { user, profile } = useAuth();
@@ -108,7 +117,7 @@ export default function KanbanColumn({
       alert("Error updating ticket: " + error.message);
       return;
     }
-    refresh(); // reload tickets
+    refresh();
   }
 
   // Delete ticket (only if allowed)
@@ -123,83 +132,101 @@ export default function KanbanColumn({
     refresh();
   }
 
+  // Container is flex column, list scrolls, footer (children) stays visible
   return (
-    <div className="flex-1 min-w-[250px] bg-gray-50 p-2 rounded shadow">
+    <div className="flex-1 min-w-[250px] bg-gray-50 p-2 rounded shadow flex flex-col">
       <h3 className="font-semibold mb-2">{title}</h3>
-      {tickets
-        .filter((t) => t.status === status)
-        .map((ticket) => (
-          <div
-            key={ticket.id}
-            className="p-2 bg-white rounded border shadow mb-3 hover:bg-yellow-50 cursor-pointer transition"
-            onClick={() => setSelectedTicket(ticket)}
-          >
-            <div className="font-bold">{ticket.page}</div>
-            {ticket.error_message && (
-              <div className="text-xs text-gray-700">{ticket.error_message}</div>
-            )}
-            <div className="mt-1 mb-1">
-              <b className="text-xs">Steps:</b>
-              <ol className="list-decimal ml-4 text-xs">
-                {Array.isArray(ticket.replication_steps) &&
-                  ticket.replication_steps.map((step, idx) => (
-                    <li key={idx}>{step}</li>
-                  ))}
-              </ol>
-            </div>
-            <div className="text-xs text-gray-500">By: {ticket.user_name}</div>
-            {showRoleAndStore && (
-              <div className="text-xs text-gray-500">
-                <b>Role:</b> {ticket.user_role || "-"} | <b>Store:</b>{" "}
-                {ticket.store || "-"}
+
+      {/* Scrollable ticket list */}
+      <div className="flex-1 overflow-y-auto">
+        {(tickets || [])
+          .filter((t) => t.status === status) // keep your original guard
+          .map((ticket) => (
+            <div
+              key={ticket.id}
+              className="p-2 bg-white rounded border shadow mb-3 hover:bg-yellow-50 cursor-pointer transition"
+              onClick={() => setSelectedTicket(ticket)}
+            >
+              <div className="font-bold">{ticket.page}</div>
+              {ticket.error_message && (
+                <div className="text-xs text-gray-700">{ticket.error_message}</div>
+              )}
+              <div className="mt-1 mb-1">
+                <b className="text-xs">Steps:</b>
+                <ol className="list-decimal ml-4 text-xs">
+                  {Array.isArray(ticket.replication_steps) &&
+                    ticket.replication_steps.map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                </ol>
               </div>
-            )}
-            {/* Image Preview */}
-{ticket.screenshot_url && (
-  <div>
-    <div style={{ fontSize: 10, color: 'gray' }}>
-      Image URL: <a href={ticket.screenshot_url} target="_blank">{ticket.screenshot_url}</a>
-    </div>
-    <a href={ticket.screenshot_url} target="_blank" rel="noopener noreferrer">
-      <img
-        src={ticket.screenshot_url}
-        alt="Screenshot"
-        style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
-      />
-    </a>
-  </div>
-)}
+              <div className="text-xs text-gray-500">By: {ticket.user_name}</div>
+              {showRoleAndStore && (
+                <div className="text-xs text-gray-500">
+                  <b>Role:</b> {ticket.user_role || "-"} | <b>Store:</b>{" "}
+                  {ticket.store || "-"}
+                </div>
+              )}
 
+              {ticket.screenshot_url && (
+                <div>
+                  <div style={{ fontSize: 10, color: "gray" }}>
+                    Image URL:{" "}
+                    <a href={ticket.screenshot_url} target="_blank" rel="noreferrer">
+                      {ticket.screenshot_url}
+                    </a>
+                  </div>
+                  <a
+                    href={ticket.screenshot_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      src={ticket.screenshot_url}
+                      alt="Screenshot"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "200px",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </a>
+                </div>
+              )}
 
-            {/* Status move links */}
-            <div className="mt-1 text-xs">
-              {getNextStatuses(ticket.status).map((st) => (
-                <span
-                  key={st}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    moveTicket(ticket.id, st);
-                  }}
-                  className={`mr-2 underline cursor-pointer ${
-                    updatingId === ticket.id
-                      ? "opacity-50 pointer-events-none"
-                      : ""
-                  }`}
-                  style={{
-                    color:
-                      st === "completed"
-                        ? "green"
-                        : st === "in progress"
-                        ? "#005"
-                        : "#000",
-                  }}
-                >
-                  {st}
-                </span>
-              ))}
+              {/* Status move links */}
+              <div className="mt-1 text-xs">
+                {getNextStatuses(ticket.status).map((st) => (
+                  <span
+                    key={st}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveTicket(ticket.id, st);
+                    }}
+                    className={`mr-2 underline cursor-pointer ${
+                      updatingId === ticket.id ? "opacity-50 pointer-events-none" : ""
+                    }`}
+                    style={{
+                      color:
+                        st === "completed"
+                          ? "green"
+                          : st === "in progress"
+                          ? "#005"
+                          : "#000",
+                    }}
+                  >
+                    {st}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+      </div>
+
+      {/* Pagination footer passed in from parent */}
+      {children ? (
+        <div className="mt-2 pt-2 border-t border-gray-200">{children}</div>
+      ) : null}
 
       {/* Modal for ticket details */}
       {selectedTicket && (
