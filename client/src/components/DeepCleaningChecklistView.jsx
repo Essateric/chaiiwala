@@ -1,117 +1,216 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { startOfDay, endOfDay, format, addDays } from "date-fns";
-import { CheckCircle2, Circle, Plus, Loader2, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
+import {
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  format,
+  addDays,
+  isSameDay,
+} from "date-fns";
+import { Check, Square, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import DeepCleaningFormComponent from "@/components/DeepCleaningForm.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
+// DeepCleaningChecklistView (Weekly Matrix) — Plain JavaScript (no TypeScript)
 export default function DeepCleaningChecklistView({ profile }) {
   const { toast } = useToast();
   const [stores, setStores] = useState([]);
-  const [taskTypes, setTaskTypes] = useState([]);
-  const [tasks, setTasks] = useState([]);
   const [selectedStore, setSelectedStore] = useState("auto");
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date())); // NEW
+  const [weekAnchor, setWeekAnchor] = useState(new Date());
   const [isLoading, setIsLoading] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const isAdminOrRegional =
-  profile?.permissions === "admin" || profile?.permissions === "regional";
+  const [rows, setRows] = useState([]);
+  const [taskTypes, setTaskTypes] = useState([]);
 
-const tasksByStore = React.useMemo(() => {
-  if (!isAdminOrRegional || selectedStore !== "auto") return [];
-  const map = new Map();
-  for (const t of tasks) {
-    const key = t.store_id;
-    if (!map.has(key)) {
-      map.set(key, { store_id: key, store_name: t.store_name || "Unknown", items: [] });
-    }
-    map.get(key).items.push(t);
-  }
-  // sort stores and tasks (pending first, then by time)
-  return Array.from(map.values())
-    .sort((a, b) => a.store_name.localeCompare(b.store_name))
-    .map(group => ({
-      ...group,
-      items: group.items.sort((a, b) => {
-        if (!!a.completed_at !== !!b.completed_at) return a.completed_at ? 1 : -1;
-        return new Date(a.start) - new Date(b.start);
-      })
-    }));
-}, [isAdminOrRegional, selectedStore, tasks]);
+  const isAdminOrRegional = profile?.permissions === "admin" || profile?.permissions === "regional";
 
-  
+  // Fallback task list (client's list)
+  const DEFAULT_TASKS = [
+    "Bins area(inside/out)",
+    "Door Mats",
+    "Skirting board",
+    "Remove gums from under tables/chairs",
+    "Table legs & Backs",
+    "Chair legs and backs",
+    "Booth Seating /padded seats",
+    "Mirrors",
+    "Outside Signage",
+    "Shop front and window",
+    "Outside barriers and poles",
+    "Outside point of sale(A frame etc)",
+    "Shutters",
+    "Fly zappers",
+    "Drinks Fridge",
+    "Cake fridge",
+    "Ice Machine",
+    "Behind counters and shelving",
+    "Fryer(change oil)",
+    "Canopy",
+    "Air vents",
+    "Stockroom",
+    "Behind sink and cookers",
+    "All kitchen fridge in/out and seals",
+    "Grill (change sheet)",
+    "Fire extingushers(all)",
+    "Urn taps and seals",
+    "Mop bucket and change mop heads",
+    "Stairs (brush and mop)",
+    "Gray tiles and white walls",
+    "Pasty oven and trays",
+  ];
 
   // Load stores + task types once
   useEffect(() => {
     (async () => {
       const { data: storeRows } = await supabase.from("stores").select("id,name");
       setStores(storeRows || []);
-      const { data: types } = await supabase.from("deep_cleaning_tasks").select("id,dc_task");
-      setTaskTypes(types || []);
+
+      const { data: types } = await supabase
+        .from("deep_cleaning_tasks")
+        .select("id,dc_task")
+        .order("id", { ascending: true });
+
+      const list = (types || []).map((t) => t.dc_task).filter(Boolean);
+      setTaskTypes(list.length ? list : DEFAULT_TASKS);
     })();
   }, []);
 
-  // Resolved store logic
+  // Week boundaries (Mon–Sun)
+  const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor]);
+  const weekEnd = useMemo(() => endOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor]);
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  // Store resolution
   const resolvedStoreId = useMemo(() => {
-    if (profile?.permissions === "store") return profile.store_ids?.[0] ?? null;
-    if (selectedStore === "auto") return null; // admin/regional → All stores
+    if (profile?.permissions === "store") return (profile.store_ids && profile.store_ids[0]) || null;
+    if (selectedStore === "auto") return null; // force selection for ticking
     return Number(selectedStore);
   }, [profile, selectedStore]);
 
-  const visibleStores =
-    profile?.permissions === "admin"
-      ? stores
-      : stores.filter(s => profile?.store_ids?.includes(s.id));
+  const visibleStores = profile?.permissions === "admin" ? stores : stores.filter((s) => (profile?.store_ids || []).includes(s.id));
 
-  const dayStart = startOfDay(selectedDate);
-  const dayEnd = endOfDay(selectedDate);
-
-  // Fetch tasks for the selected date
-  const loadTasks = async () => {
+  // Load deep_cleaning rows within this week
+  const loadWeek = async () => {
     setIsLoading(true);
-    let { data } = await supabase
+    let query = supabase
       .from("deep_cleaning")
-      .select("*")
-      .gte("start", dayStart.toISOString())
-      .lte("start", dayEnd.toISOString());
+      .select("id, task, start, end_time, completed_at, store_id, store_name, anytime")
+      .gte("start", weekStart.toISOString())
+      .lte("start", weekEnd.toISOString());
 
-    data = data || [];
+    const { data, error } = await query;
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+    let filtered = data || [];
 
     if (profile?.permissions === "store") {
-      data = data.filter(t => t.store_id === profile.store_ids?.[0]);
+      filtered = filtered.filter((t) => t.store_id === (profile.store_ids && profile.store_ids[0]));
     } else if (resolvedStoreId) {
-      data = data.filter(t => t.store_id === resolvedStoreId);
+      filtered = filtered.filter((t) => t.store_id === resolvedStoreId);
     }
 
-    setTasks(data);
+    setRows(filtered);
     setIsLoading(false);
   };
 
   useEffect(() => {
-    if (profile) loadTasks();
+    if (profile) loadWeek();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, resolvedStoreId, selectedDate]);
+  }, [profile, resolvedStoreId, weekStart.toISOString()]);
 
-  const done = tasks.filter(t => !!t.completed_at).length;
-  const total = tasks.length;
-
-  const toggleComplete = async (task) => {
-    const completed_at = task.completed_at ? null : new Date().toISOString();
-    const { error } = await supabase.from("deep_cleaning").update({ completed_at }).eq("id", task.id);
-    if (error) {
-      toast({ title: "Error", description: "Could not update task.", variant: "destructive" });
-      return;
+  // Fast lookup map: key = task|YYYY-MM-DD|storeId
+  const cellMap = useMemo(() => {
+    const m = new Map();
+    for (const r of rows) {
+      const key = `${r.task}|${format(new Date(r.start), "yyyy-MM-dd")}|${r.store_id}`;
+      m.set(key, r);
     }
-    setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, completed_at } : t)));
+    return m;
+  }, [rows]);
+
+  const tickState = (task, date) => {
+    if (!resolvedStoreId) return false;
+    const key = `${task}|${format(date, "yyyy-MM-dd")}|${resolvedStoreId}`;
+    const row = cellMap.get(key);
+    return !!row && !!row.completed_at;
   };
 
-  // Date navigation handlers
-  const goPrev = () => setSelectedDate(d => addDays(d, -1));
-  const goNext = () => setSelectedDate(d => addDays(d, 1));
-  const goToday = () => setSelectedDate(startOfDay(new Date()));
+  const handleToggle = async (task, date) => {
+    if (!resolvedStoreId) {
+      toast({ title: "Choose a store", description: "Select a store to tick cells.", variant: "destructive" });
+      return;
+    }
+    const dateKey = format(date, "yyyy-MM-dd");
+    const key = `${task}|${dateKey}|${resolvedStoreId}`;
+    const existing = cellMap.get(key);
+
+    if (existing) {
+      const newCompletedAt = existing.completed_at ? null : new Date().toISOString();
+      const { error } = await supabase
+        .from("deep_cleaning")
+        .update({ completed_at: newCompletedAt })
+        .eq("id", existing.id);
+      if (error) {
+        toast({ title: "Error", description: "Could not update.", variant: "destructive" });
+        return;
+      }
+      setRows((prev) => prev.map((r) => (r.id === existing.id ? { ...r, completed_at: newCompletedAt } : r)));
+      return;
+    }
+
+    // Insert new completed cell
+    const dayStartISO = new Date(date);
+    dayStartISO.setHours(0, 0, 0, 0);
+    const dayEndISO = new Date(date);
+    dayEndISO.setHours(23, 59, 59, 999);
+
+    const storeName = (stores.find((s) => s.id === resolvedStoreId) || {}).name || "";
+
+    const payload = {
+      task,
+      start: dayStartISO.toISOString(),
+      end_time: dayEndISO.toISOString(),
+      store_id: resolvedStoreId,
+      store_name: storeName,
+      created_by: profile?.id,
+      created_at: new Date().toISOString(),
+      anytime: true,
+      completed_at: new Date().toISOString(),
+    };
+
+    const { data: inserted, error } = await supabase.from("deep_cleaning").insert([payload]).select();
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setRows((prev) => [...prev, inserted[0]]);
+  };
+
+  // Progress for the selected store
+  const totalCells = resolvedStoreId ? taskTypes.length * 7 : 0;
+  const doneCells = useMemo(() => {
+    if (!resolvedStoreId) return 0;
+    let count = 0;
+    for (let i = 0; i < taskTypes.length; i++) {
+      for (let j = 0; j < days.length; j++) if (tickState(taskTypes[i], days[j])) count++;
+    }
+    return count;
+  }, [taskTypes, days, rows, resolvedStoreId]);
+
+  const goPrevWeek = () => setWeekAnchor((d) => addWeeks(d, -1));
+  const goNextWeek = () => setWeekAnchor((d) => addWeeks(d, 1));
+  const goThisWeek = () => setWeekAnchor(new Date());
+
+  const DayHeader = ({ d }) => (
+    <div className="text-xs font-semibold text-gray-700 text-center">
+      <div>{format(d, "EEE")}</div>
+      <div className="text-[11px] text-gray-500">{format(d, "d MMM")}</div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -119,162 +218,109 @@ const tasksByStore = React.useMemo(() => {
       <div className="rounded-lg border bg-muted/30 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-white">Daily Store Deep Cleaning</h2>
+            <h2 className="text-xl font-semibold text-white">Weekly Store Deep Cleaning</h2>
             <p className="text-sm text-gray-300">
-              {format(dayStart, "EEEE, MMM d yyyy")}
+              Week of {format(weekStart, "EEE, d MMM yyyy")} – {format(weekEnd, "EEE, d MMM yyyy")}
             </p>
-            <p className="text-sm text-gray-300">
-              <span className="font-medium">{done} of {total}</span> tasks
-            </p>
+            {resolvedStoreId ? (
+              <p className="text-sm text-gray-300">
+                <span className="font-medium">{doneCells}</span> / {totalCells} cells ticked
+              </p>
+            ) : null}
           </div>
 
-        {/* Right controls */}
           <div className="flex flex-col gap-2 items-stretch md:flex-row md:items-center">
-            {/* Admin/Regional store filter */}
-            {(profile?.permissions === "admin" || profile?.permissions === "regional") && (
+            {isAdminOrRegional ? (
               <Select value={selectedStore} onValueChange={setSelectedStore}>
                 <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder="Choose store" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">All Stores</SelectItem>
+                  <SelectItem value="auto">Select a store…</SelectItem>
                   {visibleStores.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
+            ) : null}
 
-            {/* Date controls */}
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={goPrev}>
+              <Button variant="outline" size="sm" onClick={goPrevWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <input
-                type="date"
-                className="flex h-9 w-[150px] rounded-md border border-input bg-background px-3 py-1 text-sm"
-                value={format(selectedDate, "yyyy-MM-dd")}
-                onChange={(e) => setSelectedDate(new Date(e.target.value + "T00:00:00"))}
-              />
-              <Button variant="outline" size="sm" onClick={goNext}>
+              <Button variant="outline" size="sm" onClick={goThisWeek}>
+                <CalIcon className="h-4 w-4 mr-1" /> This week
+              </Button>
+              <Button variant="outline" size="sm" onClick={goNextWeek}>
                 <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToday}>
-                <CalIcon className="h-4 w-4 mr-1" /> Today
-              </Button>
-
-              {/* Quick Add */}
-              <Button className="bg-chai-gold hover:bg-yellow-600" onClick={() => setIsAddOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Add Task
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* List */}
-      <div className="rounded-lg bg-white p-2">
-        {isLoading ? (
-          <div className="flex items-center gap-2 p-4 text-sm text-gray-600">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading tasks…
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="p-4 text-sm text-gray-600">No tasks for this day.</div>
-        ) : (
-          <ul className="divide-y">
-            {tasks
-              .sort((a, b) => (a.anytime === b.anytime ? 0 : a.anytime ? 1 : -1))
-              .map((t) => {
-                const isDone = !!t.completed_at;
-                const timeLabel = t.anytime
-                  ? "Anytime"
-                  : `${format(new Date(t.start), "HH:mm")} - ${format(new Date(t.end_time), "HH:mm")}`;
-                return (
-                  <li key={t.id} className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {isDone ? <CheckCircle2 className="text-green-600 shrink-0" /> : <Circle className="text-gray-400 shrink-0" />}
-                      <div className="min-w-0">
-                        <div className={`text-sm font-medium ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
-                          {t.task}
-                          {(profile?.permissions !== "store" && t.store_name) && (
-                            <span className="ml-2 text-xs text-gray-500">— {t.store_name}</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">{timeLabel}</div>
-                      </div>
-                    </div>
+      {/* Matrix */}
+      <div className="rounded-lg bg-white p-2 overflow-x-auto">
+        <table className="w-full border-collapse min-w-[800px]">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-2 text-left text-sm font-semibold text-gray-700 sticky left-0 bg-gray-100 z-10">Deep Cleaning Tasks</th>
+              {days.map((d) => (
+                <th key={d.toISOString()} className="p-2 text-sm font-semibold text-gray-700">
+                  <DayHeader d={d} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="p-4 text-sm text-gray-600">Loading…</td>
+              </tr>
+            ) : (
+              taskTypes.map((task) => (
+                <tr key={task} className="border-t">
+                  <td className="p-2 text-sm text-gray-800 sticky left-0 bg-white z-10 max-w-[320px]">{task}</td>
+                  {days.map((d) => {
+                    const done = tickState(task, d);
+                    const isToday = isSameDay(d, new Date());
+                    return (
+                      <td key={task + format(d, "yyyy-MM-dd")} className={`p-2 text-center align-middle ${isToday ? "bg-amber-50" : ""}`}>
+                        <button
+                          className={`inline-flex items-center justify-center w-8 h-8 rounded-md border transition ${
+                            done
+                              ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                              : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                          } ${resolvedStoreId ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+                          onClick={() => handleToggle(task, d)}
+                          disabled={!resolvedStoreId}
+                          aria-label={`Toggle ${task} for ${format(d, "EEE d MMM")}`}
+                        >
+                          {done ? <Check className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
 
-                    <Button
-                      size="sm"
-                      variant={isDone ? "outline" : "default"}
-                      className={isDone ? "" : "bg-green-600 hover:bg-green-700"}
-                      onClick={() => toggleComplete(t)}
-                    >
-                      {isDone ? "Undo" : "Mark Done"}
-                    </Button>
-                  </li>
-                );
-              })}
-          </ul>
-        )}
+        {!resolvedStoreId ? (
+          <p className="text-xs text-gray-500 p-2">Select a store to enable ticking.</p>
+        ) : null}
       </div>
 
-      {/* Quick add (uses your shared form) */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Deep Cleaning Task</DialogTitle>
-            <DialogDescription>
-              Schedule for {format(selectedDate, "MMMM dd, yyyy")}
-            </DialogDescription>
-          </DialogHeader>
-          <DeepCleaningFormComponent
-            profile={profile}
-            stores={stores}
-            cleaningTasks={taskTypes}
-            selectedDate={selectedDate}
-            onSubmit={async (payload) => {
-              // Build start/end from selectedDate + form times
-              const start = new Date(selectedDate);
-              const end = new Date(selectedDate);
-              if (payload.anytime) {
-                start.setHours(0,0,0,0); end.setHours(23,59,59,999);
-              } else {
-                const [sh, sm] = payload.startTime.split(":").map(Number);
-                const [eh, em] = payload.endTime.split(":").map(Number);
-                start.setHours(sh, sm, 0, 0); end.setHours(eh, em, 0, 0);
-              }
-
-              const finalStoreId = profile?.permissions === "store"
-                ? profile.store_ids?.[0]
-                : Number(payload.storeId);
-
-              const storeName = stores.find(s => s.id === finalStoreId)?.name || "";
-
-              const { error } = await supabase.from("deep_cleaning").insert([{
-                task: payload.task,
-                start: start.toISOString(),
-                end_time: end.toISOString(),
-                store_id: finalStoreId,
-                store_name: storeName,
-                created_by: profile?.id,
-                created_at: new Date().toISOString(),
-                anytime: payload.anytime
-              }]);
-
-              if (error) {
-                toast({ title: "Error", description: error.message, variant: "destructive" });
-                return;
-              }
-              toast({ title: "Task added", description: `${payload.task} for ${storeName}` });
-              setIsAddOpen(false);
-              loadTasks();
-            }}
-            isLoading={isLoading}
-            setIsModalOpen={setIsAddOpen}
-          />
-        </DialogContent>
-      </Dialog>
+      <div className="text-xs text-gray-500 px-1">
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Matrix shows one week (Monday to Sunday). Use arrows to switch weeks.</li>
+          <li>Each tick saves to the database for that store and day.</li>
+          <li>Tasks load from <code>deep_cleaning_tasks.dc_task</code>. If empty, the default client list is used.</li>
+        </ul>
+      </div>
     </div>
   );
 }

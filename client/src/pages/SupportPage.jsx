@@ -14,6 +14,17 @@ const inProgressPagination = usePagination(5);
 const completedPagination = usePagination(5);
 const filteredTickets = tickets.filter(t => (t.status || "").toLowerCase() === "todo");
 const hasNext = todoPagination.page * todoPagination.itemsPerPage < filteredTickets.length;
+// Pre-filter by status (case-insensitive)
+const todosAll = tickets.filter(
+  (t) => (t.status || "").toLowerCase() === "todo"
+);
+const inProgressAll = tickets.filter(
+  (t) => (t.status || "").toLowerCase() === "in progress"
+);
+const completedAll = tickets.filter(
+  (t) => (t.status || "").toLowerCase() === "completed"
+);
+
 
 
   // Fetch all tickets
@@ -90,138 +101,89 @@ const hasNext = todoPagination.page * todoPagination.itemsPerPage < filteredTick
 <KanbanColumn
   title="To Do"
   status="todo"
-  tickets={todoPagination.paginate(tickets.filter(t => (t.status || "").toLowerCase() === "todo"))}
+  tickets={todoPagination.paginate(todosAll)}
   refresh={fetchTickets}
   showRoleAndStore
 >
-<div className="flex flex-col h-full">
-  {/* Ticket list */}
-<div className="flex-1">
-  {tickets.map(ticket => (
-    <div key={ticket.id} className="p-2 bg-white shadow rounded mb-2">
-      <h4 className="font-semibold">{ticket.title}</h4>
-      <p className="text-sm text-gray-600">{ticket.description}</p>
-    </div>
-  ))}
-</div>
-
-  {/* Pagination buttons */}
-<div className="flex justify-between items-center p-2 border-t">
-  <button
-    onClick={() => todoPagination.prev()}
-    disabled={todoPagination.page === 1}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    ← Prev
-  </button>
-
-  <span className="text-sm text-gray-600">
-    Page {todoPagination.page} of {Math.max(1, Math.ceil(todosAll.length / todoPagination.itemsPerPage))}
-  </span>
-
-  <button
-    onClick={() => todoPagination.next(todosAll)}
-    disabled={todoPagination.page * todoPagination.itemsPerPage >= todosAll.length}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    Next →
-  </button>
-</div>
-
-</div>
-
-
+  <div className="flex justify-between items-center p-2 border-t">
+    <button
+      onClick={() => todoPagination.prev()}
+      disabled={todoPagination.page === 1}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      ← Prev
+    </button>
+    <span className="text-sm text-gray-600">
+      Page {todoPagination.page} of {Math.max(1, Math.ceil(todosAll.length / todoPagination.itemsPerPage))}
+    </span>
+    <button
+      onClick={() => todoPagination.next(todosAll)}
+      disabled={todoPagination.page * todoPagination.itemsPerPage >= todosAll.length}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      Next →
+    </button>
+  </div>
 </KanbanColumn>
+
 
 <KanbanColumn
   title="In Progress"
   status="in progress"
-  tickets={inProgressPagination.paginate(tickets.filter(t => (t.status || "").toLowerCase() === "in progress"))}
+  tickets={inProgressPagination.paginate(inProgressAll)}
   refresh={fetchTickets}
   showRoleAndStore
 >
-<div className="flex flex-col h-full">
-  {/* Ticket list */}
-<div className="flex-1">
-  {tickets.map(ticket => (
-    <div key={ticket.id} className="p-2 bg-white shadow rounded mb-2">
-      <h4 className="font-semibold">{ticket.title}</h4>
-      <p className="text-sm text-gray-600">{ticket.description}</p>
-    </div>
-  ))}
-</div>
-
-  {/* Pagination buttons */}
-<div className="flex justify-between items-center p-2 border-t">
-  <button
-    onClick={() => inProgressPagination.prev()}
-    disabled={inProgressPagination.page === 1}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    ← Prev
-  </button>
-
-  <span className="text-sm text-gray-600">
-    Page {inProgressPagination.page} of {Math.max(1, Math.ceil(inProgressAll.length / inProgressPagination.itemsPerPage))}
-  </span>
-
-  <button
-    onClick={() => inProgressPagination.next(inProgressAll)}
-    disabled={inProgressPagination.page * inProgressPagination.itemsPerPage >= inProgressAll.length}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    Next →
-  </button>
-</div>
-
-</div>
-
+  <div className="flex justify-between items-center p-2 border-t">
+    <button
+      onClick={() => inProgressPagination.prev()}
+      disabled={inProgressPagination.page === 1}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      ← Prev
+    </button>
+    <span className="text-sm text-gray-600">
+      Page {inProgressPagination.page} of {Math.max(1, Math.ceil(inProgressAll.length / inProgressPagination.itemsPerPage))}
+    </span>
+    <button
+      onClick={() => inProgressPagination.next(inProgressAll)}
+      disabled={inProgressPagination.page * inProgressPagination.itemsPerPage >= inProgressAll.length}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      Next →
+    </button>
+  </div>
 </KanbanColumn>
+
 
 <KanbanColumn
   title="Completed"
   status="completed"
-  tickets={completedPagination.paginate(tickets.filter(t => (t.status || "").toLowerCase() === "completed"))}
+  tickets={completedPagination.paginate(completedAll)}
   refresh={fetchTickets}
   showRoleAndStore
 >
-<div className="flex flex-col h-full">
-  {/* Ticket list */}
-<div className="flex-1">
-  {tickets.map(ticket => (
-    <div key={ticket.id} className="p-2 bg-white shadow rounded mb-2">
-      <h4 className="font-semibold">{ticket.title}</h4>
-      <p className="text-sm text-gray-600">{ticket.description}</p>
-    </div>
-  ))}
-</div>
-
-  {/* Pagination buttons */}
-<div className="flex justify-between items-center p-2 border-t">
-  <button
-    onClick={() => completedPagination.prev()}
-    disabled={completedPagination.page === 1}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    ← Prev
-  </button>
-
-  <span className="text-sm text-gray-600">
-    Page {completedPagination.page} of {Math.max(1, Math.ceil(completedAll.length / completedPagination.itemsPerPage))}
-  </span>
-
-  <button
-    onClick={() => completedPagination.next(completedAll)}
-    disabled={completedPagination.page * completedPagination.itemsPerPage >= completedAll.length}
-    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
-  >
-    Next →
-  </button>
-</div>
-
-</div>
-
+  <div className="flex justify-between items-center p-2 border-t">
+    <button
+      onClick={() => completedPagination.prev()}
+      disabled={completedPagination.page === 1}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      ← Prev
+    </button>
+    <span className="text-sm text-gray-600">
+      Page {completedPagination.page} of {Math.max(1, Math.ceil(completedAll.length / completedPagination.itemsPerPage))}
+    </span>
+    <button
+      onClick={() => completedPagination.next(completedAll)}
+      disabled={completedPagination.page * completedPagination.itemsPerPage >= completedAll.length}
+      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+    >
+      Next →
+    </button>
+  </div>
 </KanbanColumn>
+
           </div>
         )}
         {/* DEBUG: See all ticket objects in browser (for developers) */}

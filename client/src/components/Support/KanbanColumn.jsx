@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useAuth } from "../../hooks/UseAuth.jsx";
 import CommentSection from "./CommentSection.jsx";
+import SupportTicketCard from "./SupportTicketCard";
 
 // Modal for showing full ticket details, with delete button if allowed
 function TicketModal({ ticket, onClose, canDelete, onDelete }) {
@@ -139,9 +140,7 @@ export default function KanbanColumn({
 
       {/* Scrollable ticket list */}
       <div className="flex-1 overflow-y-auto">
-        {(tickets || [])
-          .filter((t) => t.status === status) // keep your original guard
-          .map((ticket) => (
+    {tickets.map((ticket) => (
             <div
               key={ticket.id}
               className="p-2 bg-white rounded border shadow mb-3 hover:bg-yellow-50 cursor-pointer transition"
