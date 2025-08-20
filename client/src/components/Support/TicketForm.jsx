@@ -8,60 +8,58 @@ export default function TicketForm({ onCreated }) {
   const [page, setPage] = useState("");
   const [description, setDescription] = useState("");
   const [repSteps, setRepSteps] = useState([""]);
-  const [screenshot, setScreenshot] = useState(null);
+  const [screenshots, setScreenshots] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [expandedImage, setExpandedImage] = useState(null);
+
+
+
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
 
-    let screenshot_url = "";
-    // Upload screenshot if present
-if (screenshot) {
-  const filePath = `${user.id}/${Date.now()}_${screenshot.name}`;
-  const { data, error } = await supabase.storage
-    .from("screenshots")
-    .upload(filePath, screenshot);
+    const uploadedUrls = [];
 
-  if (error) {
-    alert("Screenshot upload error: " + error.message);
-    setLoading(false);
-    return;
-  }
+    if (screenshots.length > 0) {
+     for (const { file } of screenshots) {
+        const filePath = `${user.id}/${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from("support-screenshots")
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-  // Log the data for debugging
-  console.log("Upload result:", data);
+        if (uploadError) {
+          alert("Screenshot upload error: " + uploadError.message);
+          continue;
+        }
 
-  // Always get the public URL after a successful upload
-  const { publicUrl } = supabase
-    .storage
-    .from("screenshots")
-    .getPublicUrl(filePath);
+      const publicUrl = `https://pjdycbnegzxzhauecrck.supabase.co/storage/v1/object/public/support-screenshots/${filePath}`;
+uploadedUrls.push(publicUrl);
 
-  // Log publicUrl for debug
-  console.log("Public URL to be saved:", publicUrl);
+      }
+    }
 
-  screenshot_url = publicUrl;
-}
-
-    // Use profile data for store location and permissions (role)
     const storeLocation = profile?.store_location || "";
     const userRole = profile?.permissions || "";
 
-    // Insert ticket into Supabase
-    await supabase.from("support_tickets").insert([{
-      user_id: user.id,
-      user_name: user.user_metadata?.name || user.email,
-      user_role: userRole,
-      store: storeLocation,
-      page,
-      error_message: description,
-      replication_steps: repSteps.filter(Boolean),
-      screenshot_url,
-      status: "todo",
-    }]);
+    await supabase.from("support_tickets").insert([
+      {
+        user_id: user.id,
+        user_name: user.user_metadata?.name || user.email,
+        user_role: userRole,
+        store: storeLocation,
+        page,
+        error_message: description,
+        replication_steps: repSteps.filter(Boolean),
+        screenshot_url: uploadedUrls, // stored as text[] in Supabase
+        status: "todo",
+      },
+    ]);
 
-    // Webhook (send all info, including store/role)
     const makeWebhookURL = "https://hook.eu2.make.com/8pdrel42bt65yzcncv7picyrxgdtnih2";
     await fetch(makeWebhookURL, {
       method: "POST",
@@ -73,17 +71,22 @@ if (screenshot) {
         repSteps,
         userName: user.user_metadata?.name || user.email,
         userRole,
-        screenshot_url
+        screenshot_url: uploadedUrls,
       }),
     });
 
     setPage("");
     setDescription("");
     setRepSteps([""]);
-    setScreenshot(null);
+    setScreenshots([]);
     setLoading(false);
     if (onCreated) onCreated();
   }
+
+  function removeScreenshot(index) {
+  setScreenshots(prev => prev.filter((_, i) => i !== index));
+}
+
 
   return (
     <form
@@ -91,6 +94,7 @@ if (screenshot) {
       className="max-w-lg mx-auto bg-white rounded-xl shadow p-6 space-y-4 mt-4"
     >
       <h2 className="text-xl font-semibold mb-2">Log a new Issue</h2>
+
       <div>
         <label className="block text-sm font-medium mb-1">Page / Screen</label>
         <input
@@ -98,9 +102,10 @@ if (screenshot) {
           placeholder="e.g. Dashboard, Stock Orders"
           className="block w-full rounded border px-3 py-2 text-base"
           value={page}
-          onChange={e => setPage(e.target.value)}
+          onChange={(e) => setPage(e.target.value)}
         />
       </div>
+
       <div>
         <label className="block text-sm font-medium mb-1">
           Describe the Error <span className="text-gray-400">(optional)</span>
@@ -110,9 +115,10 @@ if (screenshot) {
           placeholder="Explain what went wrong, or any message on screen"
           className="block w-full rounded border px-3 py-2 text-base"
           value={description}
-          onChange={e => setDescription(e.target.value)}
+          onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+
       <div>
         <label className="block text-sm font-medium mb-1">
           Steps to Reproduce <span className="text-red-500">*</span>
@@ -124,15 +130,23 @@ if (screenshot) {
               placeholder={`Step ${i + 1}`}
               className="flex-1 rounded border px-3 py-2 mr-2"
               value={s}
-              onChange={e => setRepSteps(reps => reps.map((r, j) => i === j ? e.target.value : r))}
+              onChange={(e) =>
+                setRepSteps((reps) =>
+                  reps.map((r, j) => (i === j ? e.target.value : r))
+                )
+              }
             />
             {i > 0 && (
               <button
                 type="button"
                 className="text-red-500 font-bold"
-                onClick={() => setRepSteps(reps => reps.filter((_, j) => j !== i))}
+                onClick={() =>
+                  setRepSteps((reps) => reps.filter((_, j) => j !== i))
+                }
                 title="Remove step"
-              >×</button>
+              >
+                ×
+              </button>
             )}
           </div>
         ))}
@@ -140,19 +154,61 @@ if (screenshot) {
           type="button"
           className="text-blue-600 underline text-sm"
           onClick={() => setRepSteps([...repSteps, ""])}
-        >+ Add Step</button>
+        >
+          + Add Step
+        </button>
       </div>
+
       <div>
         <label className="block text-sm font-medium mb-1">
-          Screenshot <span className="text-gray-400">(optional)</span>
+          Screenshots <span className="text-gray-400">(optional)</span>
         </label>
         <input
           type="file"
           accept="image/*"
+          multiple
           className="block"
-          onChange={e => setScreenshot(e.target.files[0])}
+          onChange={(e) => {
+  const files = Array.from(e.target.files);
+  const withPreviews = files.map(file => ({
+    file,
+    previewUrl: URL.createObjectURL(file),
+  }));
+  setScreenshots(prev => [...prev, ...withPreviews]);
+}}
+
         />
       </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+  {screenshots.map((s, i) => (
+    <div key={i} className="relative w-24 h-24 border rounded overflow-hidden">
+      <img
+        src={s.previewUrl}
+        alt={`Screenshot ${i + 1}`}
+        className="object-cover w-full h-full cursor-pointer"
+        onClick={() => setExpandedImage(s.previewUrl)}
+      />
+      <button
+        type="button"
+        className="absolute top-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1"
+        onClick={() => removeScreenshot(i)}
+      >
+        ×
+      </button>
+    </div>
+  ))}
+</div>
+{expandedImage && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+    onClick={() => setExpandedImage(null)}
+  >
+    <img src={expandedImage} alt="Expanded screenshot" className="max-w-full max-h-full" />
+  </div>
+)}
+
+
+
       <div className="flex justify-end">
         <button
           type="submit"

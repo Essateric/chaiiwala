@@ -2,10 +2,18 @@ import React, { useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useAuth } from "../../hooks/UseAuth.jsx";
 import CommentSection from "./CommentSection.jsx";
-import SupportTicketCard from "./SupportTicketCard";
 
 // Modal for showing full ticket details, with delete button if allowed
 function TicketModal({ ticket, onClose, canDelete, onDelete }) {
+  const parsedScreenshots = (() => {
+    try {
+      const parsed = JSON.parse(ticket.screenshot_url);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return ticket.screenshot_url ? [ticket.screenshot_url] : [];
+    }
+  })();
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 relative">
@@ -28,27 +36,30 @@ function TicketModal({ ticket, onClose, canDelete, onDelete }) {
         <div className="mb-2">
           <b>Steps:</b>
           <ol className="list-decimal ml-6">
-            {ticket.replication_steps &&
-              ticket.replication_steps.map((step, idx) => (
-                <li key={idx}>{step}</li>
-              ))}
+            {ticket.replication_steps?.map((step, idx) => (
+              <li key={idx}>{step}</li>
+            ))}
           </ol>
         </div>
         <div className="mb-2 text-sm text-gray-600">By: {ticket.user_name}</div>
 
-        {ticket.screenshot_url && (
-          <div className="my-2">
-            <a
-              href={ticket.screenshot_url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <img
-                src={ticket.screenshot_url}
-                alt="Screenshot"
-                style={{ maxWidth: "100%", maxHeight: "200px", borderRadius: "8px" }}
-              />
-            </a>
+        {parsedScreenshots.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-4">
+            {parsedScreenshots.map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Click to view full size"
+              >
+                <img
+                  src={url}
+                  alt={`Screenshot ${i + 1}`}
+                  className="w-full max-h-64 object-cover rounded hover:scale-105 transition-transform cursor-zoom-in"
+                />
+              </a>
+            ))}
           </div>
         )}
 
@@ -59,11 +70,7 @@ function TicketModal({ ticket, onClose, canDelete, onDelete }) {
             <button
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700"
               onClick={() => {
-                if (
-                  window.confirm(
-                    "Are you sure you want to delete this ticket? If you still have this issue you will need to create a new ticket again."
-                  )
-                ) {
+                if (window.confirm("Are you sure you want to delete this ticket?")) {
                   onDelete(ticket.id);
                   onClose();
                 }
@@ -84,21 +91,19 @@ export default function KanbanColumn({
   tickets,
   refresh,
   showRoleAndStore = false,
-  children, // <-- will render pagination controls passed from parent
+  children,
 }) {
   const supabase = useSupabaseClient();
   const { user, profile } = useAuth();
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
-  // Only allow valid status transitions
   function getNextStatuses(currentStatus) {
     if (currentStatus === "todo") return ["in progress", "completed"];
     if (currentStatus === "in progress") return ["completed"];
     return [];
   }
 
-  // Can current user delete this ticket?
   function canDelete(ticket) {
     return (
       profile?.permissions === "admin" ||
@@ -106,7 +111,6 @@ export default function KanbanColumn({
     );
   }
 
-  // Move ticket to a new status
   async function moveTicket(ticketId, newStatus) {
     setUpdatingId(ticketId);
     const { error } = await supabase
@@ -114,33 +118,34 @@ export default function KanbanColumn({
       .update({ status: newStatus })
       .eq("id", ticketId);
     setUpdatingId(null);
-    if (error) {
-      alert("Error updating ticket: " + error.message);
-      return;
-    }
+    if (error) alert("Error updating ticket: " + error.message);
     refresh();
   }
 
-  // Delete ticket (only if allowed)
   async function handleDelete(ticketId) {
     const { error } = await supabase
       .from("support_tickets")
       .delete()
       .eq("id", ticketId);
-    if (error) {
-      alert("Error deleting ticket: " + error.message);
-    }
+    if (error) alert("Error deleting ticket: " + error.message);
     refresh();
   }
 
-  // Container is flex column, list scrolls, footer (children) stays visible
   return (
     <div className="flex-1 min-w-[250px] bg-gray-50 p-2 rounded shadow flex flex-col">
       <h3 className="font-semibold mb-2">{title}</h3>
 
-      {/* Scrollable ticket list */}
       <div className="flex-1 overflow-y-auto">
-    {tickets.map((ticket) => (
+        {tickets.map((ticket) => {
+          let screenshotArray = [];
+          try {
+            screenshotArray = JSON.parse(ticket.screenshot_url);
+            if (!Array.isArray(screenshotArray)) screenshotArray = [];
+          } catch {
+            screenshotArray = ticket.screenshot_url ? [ticket.screenshot_url] : [];
+          }
+
+          return (
             <div
               key={ticket.id}
               className="p-2 bg-white rounded border shadow mb-3 hover:bg-yellow-50 cursor-pointer transition"
@@ -153,47 +158,36 @@ export default function KanbanColumn({
               <div className="mt-1 mb-1">
                 <b className="text-xs">Steps:</b>
                 <ol className="list-decimal ml-4 text-xs">
-                  {Array.isArray(ticket.replication_steps) &&
-                    ticket.replication_steps.map((step, idx) => (
-                      <li key={idx}>{step}</li>
-                    ))}
+                  {ticket.replication_steps?.map((step, idx) => (
+                    <li key={idx}>{step}</li>
+                  ))}
                 </ol>
               </div>
               <div className="text-xs text-gray-500">By: {ticket.user_name}</div>
               {showRoleAndStore && (
                 <div className="text-xs text-gray-500">
-                  <b>Role:</b> {ticket.user_role || "-"} | <b>Store:</b>{" "}
-                  {ticket.store || "-"}
+                  <b>Role:</b> {ticket.user_role || "-"} | <b>Store:</b> {ticket.store || "-"}
                 </div>
               )}
-
-              {ticket.screenshot_url && (
-                <div>
-                  <div style={{ fontSize: 10, color: "gray" }}>
-                    Image URL:{" "}
-                    <a href={ticket.screenshot_url} target="_blank" rel="noreferrer">
-                      {ticket.screenshot_url}
+              {screenshotArray.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {screenshotArray.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-20 h-20 overflow-hidden border rounded"
+                    >
+                      <img
+                        src={url}
+                        alt={`Screenshot ${i + 1}`}
+                        className="object-cover w-full h-full"
+                      />
                     </a>
-                  </div>
-                  <a
-                    href={ticket.screenshot_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <img
-                      src={ticket.screenshot_url}
-                      alt="Screenshot"
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "200px",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </a>
+                  ))}
                 </div>
               )}
-
-              {/* Status move links */}
               <div className="mt-1 text-xs">
                 {getNextStatuses(ticket.status).map((st) => (
                   <span
@@ -219,15 +213,12 @@ export default function KanbanColumn({
                 ))}
               </div>
             </div>
-          ))}
+          );
+        })}
       </div>
 
-      {/* Pagination footer passed in from parent */}
-      {children ? (
-        <div className="mt-2 pt-2 border-t border-gray-200">{children}</div>
-      ) : null}
+      {children && <div className="mt-2 pt-2 border-t border-gray-200">{children}</div>}
 
-      {/* Modal for ticket details */}
       {selectedTicket && (
         <TicketModal
           ticket={selectedTicket}

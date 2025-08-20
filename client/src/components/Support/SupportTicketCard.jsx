@@ -15,7 +15,10 @@ export default function SupportTicketCard({ ticket }) {
 
   if (!ticket) return null;
 
-  const hasImage = ticket.screenshot_url && ticket.screenshot_url.trim() !== "";
+  // Parse image upload array (like in JobLogCard)
+  const hasImage = Array.isArray(ticket.screenshot_url)
+    ? ticket.screenshot_url.length > 0
+    : typeof ticket.screenshot_url === "string" && ticket.screenshot_url.trim() !== "";
 
   let displayDate = "Unknown date";
   try {
@@ -29,7 +32,7 @@ export default function SupportTicketCard({ ticket }) {
         <div className="p-3 bg-white border rounded shadow cursor-pointer hover:shadow-md transition relative">
           {hasImage && (
             <img
-              src={ticket.screenshot_url}
+              src={Array.isArray(ticket.screenshot_url) ? ticket.screenshot_url[0] : ticket.screenshot_url}
               alt="Screenshot"
               className="h-28 w-full object-cover rounded mb-2"
             />
@@ -58,21 +61,24 @@ export default function SupportTicketCard({ ticket }) {
           Logged on {displayDate} by {ticket.user_name || "Unknown"} ({ticket.user_role || "N/A"})
         </DialogDescription>
 
-        {/* Screenshot */}
+        {/* Screenshot(s) */}
         {hasImage && (
-          <div className="my-4">
-            <a
-              href={ticket.screenshot_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Click to view full size"
-            >
-              <img
-                src={ticket.screenshot_url}
-                alt="Screenshot"
-                className="w-full max-h-72 object-cover rounded hover:scale-105 transition-transform cursor-zoom-in"
-              />
-            </a>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-4">
+            {(Array.isArray(ticket.screenshot_url) ? ticket.screenshot_url : [ticket.screenshot_url]).map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Click to view full size"
+              >
+                <img
+                  src={url}
+                  alt={`Screenshot ${i + 1}`}
+                  className="w-full max-h-72 object-cover rounded hover:scale-105 transition-transform cursor-zoom-in"
+                />
+              </a>
+            ))}
           </div>
         )}
 
