@@ -31,6 +31,8 @@ import {
   getOrderCutoffDate
 } from "../lib/getFreshwaysDeliveryDate.jsx";
 import MaintenanceRequestsPie from "../components/Maintenance/MaintenanceRequestsPie.jsx";
+import ChaiiwalaOrderStatusWidget from "../components/orders/ChaiiwalaOrderStatusWidget.jsx";
+
 
 
 
@@ -361,6 +363,8 @@ const mergedOrderLog = useMemo(() => {
   iconColor="text-blue-600"
   iconBgColor="bg-blue-100"
 />
+<ChaiiwalaOrderStatusWidget />
+
                 <Card className="relative bg-yellow-50">
                   {/* Clipboard icon at top-left */}
                   <div className="absolute left-5 top-5 z-10">
