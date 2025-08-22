@@ -20,7 +20,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast7DaysChart from "../components/dashboard/TasksLast7DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
-import StockCheckComplianceWidget from "../components/dashboard/StockCheckComplianceWidget.jsx";
 import { getFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
 import { formatDeliveryDateVerbose } from "../lib/formatters.js";
 import {
@@ -32,6 +31,7 @@ import {
 } from "../lib/getFreshwaysDeliveryDate.jsx";
 import MaintenanceRequestsPie from "../components/Maintenance/MaintenanceRequestsPie.jsx";
 import ChaiiwalaOrderStatusWidget from "../components/orders/ChaiiwalaOrderStatusWidget.jsx";
+import StockCheckCompliancePanel from "../components/dashboard/StockCheckCompliancePanel.jsx";
 
 
 
@@ -422,7 +422,7 @@ const mergedOrderLog = useMemo(() => {
                   iconBgColor="bg-red-100"
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
-                    <StockCheckComplianceWidget />
+                    <StockCheckCompliancePanel />
                      {/* Freshways Widget */}
     <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
       <div className="absolute left-4 top-4">
