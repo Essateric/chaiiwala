@@ -20,7 +20,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TasksLast7DaysChart from "../components/dashboard/TasksLast7DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
-import { getFreshwaysDeliveryDate } from "../lib/getFreshwaysDeliveryDate.jsx";
 import { formatDeliveryDateVerbose } from "../lib/formatters.js";
 import {
   getMostRecentFreshwaysDeliveryDate,
@@ -32,8 +31,7 @@ import {
 import MaintenanceRequestsPie from "../components/Maintenance/MaintenanceRequestsPie.jsx";
 import ChaiiwalaOrderStatusWidget from "../components/orders/ChaiiwalaOrderStatusWidget.jsx";
 import StockCheckCompliancePanel from "../components/dashboard/StockCheckCompliancePanel.jsx";
-
-
+import TaskProgressPanel from "../components/dashboard/TaskProgressPanel.jsx";
 
 
 // Get the most recent delivery date (today if valid, else yesterday, else last valid)
@@ -364,38 +362,16 @@ const mergedOrderLog = useMemo(() => {
   iconBgColor="bg-blue-100"
 />
 <ChaiiwalaOrderStatusWidget />
-
-                <Card className="relative bg-yellow-50">
-                  {/* Clipboard icon at top-left */}
-                  <div className="absolute left-5 top-5 z-10">
-                    <div className="rounded-full bg-yellow-100 p-2">
-                      <ClipboardList className="h-7 w-7 text-yellow-600" />
-                    </div>
-                  </div>
-                  {/* Big Value at top-right */}
-                  <div className="absolute right-8 top-7 z-10">
-                    {isLoadingTasks
-                      ? <Loader2 className="h-10 w-10 animate-spin" />
-                      : selectedTaskStoreId === "all"
-                        ? <span className="block text-5xl font-extrabold text-right">{percentComplete}%</span>
-                        : <span className="block text-5xl font-extrabold text-right">{completedTasks}/{totalTasks}</span>
-                    }
-                  </div>
-                  <div className="flex flex-col items-center pt-6 pb-2 relative z-0">
-                    <CardTitle className="text-base text-center font-bold mb-2">Daily Checklist Tasks Complete</CardTitle>
-                    <select
-                      className="border border-gray-300 rounded-lg px-4 text-base max-w-xs text-center font-semibold bg-white h-14 shadow-sm focus:outline-none focus:ring-2 focus:ring-chai-gold transition-all duration-200"
-                      value={selectedTaskStoreId}
-                      onChange={e => setSelectedTaskStoreId(e.target.value)}
-                    >
-                      <option value="all">All Stores</option>
-                      {stores.map(store => (
-                        <option key={store.id} value={store.id}>{store.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </Card>
-                <DailytaskListChart storeTaskData={storeTaskData} />
+<TaskProgressPanel
+   stores={stores}
+  selectedTaskStoreId={selectedTaskStoreId}
+   onChangeSelectedTaskStoreId={setSelectedTaskStoreId}
+   isLoadingTasks={isLoadingTasks}
+   percentComplete={percentComplete}
+  completedTasks={completedTasks}
+  totalTasks={totalTasks}
+/>
+                 <DailytaskListChart storeTaskData={storeTaskData} />
                 {/* Weekly Stock Check Compliance - Regional/Admin Only */}
 
                 <StatsCard
@@ -483,87 +459,12 @@ const mergedOrderLog = useMemo(() => {
         )}
       </CardContent>
     </Card>
-      <TasksLast7DaysChart
-      stores={stores}
-      selectedStoreId={selectedTaskStoreId}
-    />
-              </div>
+                  </div>
 
               </>
           )}
 
-          {/* Today's Tasks Card */}
-          <div className="grid grid-cols-1 gap-6">
-            <div className="space-y-6">
-              {["admin", "store"].includes(dashboardProfile?.permissions) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg">Today's Tasks</CardTitle>
-                      <Link to="/daily-checklist" className="text-chai-gold hover:underline text-sm font-medium">
-                        View All
-                      </Link>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {isLoadingTasks ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-chai-gold mx-auto my-3" />
-                      ) : todaysTasksForList.length === 0 ? (
-                        <p className="text-gray-500 text-sm">No tasks for today</p>
-                      ) : (
-                        todaysTasksForList.slice(0, 3).map(task => (
-                          <TaskItem
-                            key={task.id}
-                            id={task.id}
-                            title={task.title}
-                            location={task.location}
-                            dueDate={task.date}
-                            completed={task.status === "completed"}
-                            onComplete={(id, value) =>
-                              handleTaskComplete(id, value ? "completed" : "pending")
-                            }
-                            isUpdating={updatingTaskId === task.id}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {/* Recent Announcements */}
-              {["admin", "regional"].includes(dashboardProfile?.permissions) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg">Recent Announcements</CardTitle>
-                      <a href="/announcements" className="text-chai-gold hover:underline text-sm font-medium">
-                        View All
-                      </a>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {announcements.length === 0 ? (
-                        <p className="text-gray-500 text-sm">No recent announcements</p>
-                      ) : (
-                        announcements.slice(0, 2).map(announcement => (
-                          <AnnouncementItem
-                            key={announcement.id}
-                            title={announcement.title}
-                            description={announcement.content}
-                            date={announcement.created_at}
-                            isHighlighted={announcement.important}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-        </TabsContent>
+              </TabsContent>
         {/* ... all other tabs remain unchanged ... */}
         <TabsContent value="stock">
           {/* ... Stock Tab Content ... */}
