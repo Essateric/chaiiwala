@@ -11,15 +11,28 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../ui/card";
+import { formatDeliveryDateVerbose } from "../../lib/formatters.js";
 
-
-export default function DailytaskListChart({ storeTaskData = [] }) {
+export default function DailytaskListChart({ storeTaskData = [], dateISO }) {
+  // Make a friendly label. Falls back to today's local date if prop not provided.
+  const dateLabel =
+    dateISO
+      ? formatDeliveryDateVerbose(dateISO)
+      : new Date().toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
 
   return (
     <Card className="bg-white shadow rounded-xl p-4">
       <CardHeader>
-        <CardTitle>Store Task Completion Status</CardTitle>
+        <div className="flex items-baseline justify-between">
+          <CardTitle>Store Task Completion Status</CardTitle>
+          <CardDescription>{dateLabel}</CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>
@@ -39,7 +52,7 @@ export default function DailytaskListChart({ storeTaskData = [] }) {
             <YAxis domain={[0, 12]} tickCount={7} />
             <Tooltip
               formatter={(value) => [`${value} completed`, "Tasks"]}
-              labelFormatter={label => `Store: ${label}`}
+              labelFormatter={(label) => `Store: ${label} — ${dateLabel}`}
             />
             <ReferenceLine y={11} stroke="#888" strokeDasharray="4 4" />
             <Bar dataKey="tasksCompleted">
@@ -51,7 +64,7 @@ export default function DailytaskListChart({ storeTaskData = [] }) {
                       ? "#16a34a" // green
                       : entry.tasksCompleted >= 6
                       ? "#f97316" // orange
-                      : "#dc2626" // reds
+                      : "#dc2626" // red
                   }
                 />
               ))}
@@ -63,6 +76,7 @@ export default function DailytaskListChart({ storeTaskData = [] }) {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+
         <div className="mt-3 text-center text-sm text-gray-500">
           <span className="inline-block mr-2">
             <span className="inline-block w-3 h-3 bg-[#16a34a] rounded-full mr-1" />
