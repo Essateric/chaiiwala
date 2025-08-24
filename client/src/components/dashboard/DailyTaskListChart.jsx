@@ -31,8 +31,8 @@ export default function DailytaskListChart({ storeTaskData = [], dateISO }) {
       <CardHeader>
         <div className="flex items-baseline justify-between">
           <CardTitle>Store Task Completion Status</CardTitle>
-          <CardDescription>{dateLabel}</CardDescription>
         </div>
+        <div><CardDescription>{dateLabel}</CardDescription></div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>

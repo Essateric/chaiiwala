@@ -371,7 +371,7 @@ const mergedOrderLog = useMemo(() => {
   completedTasks={completedTasks}
   totalTasks={totalTasks}
 />
-                 <DailytaskListChart storeTaskData={storeTaskData} />
+<DailytaskListChart storeTaskData={storeTaskData} dateISO={today} />
                 {/* Weekly Stock Check Compliance - Regional/Admin Only */}
 
                 <StatsCard

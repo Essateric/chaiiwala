@@ -7,7 +7,7 @@ import {
   HomeIcon,
   ClipboardListIcon,
   MicVocalIcon,
-  // CalendarIcon,
+   CalendarIcon,
   // ArchiveIcon,
   BellIcon,
   UsersIcon,
@@ -65,6 +65,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const navItems = [
     { name: 'Dashboard', icon: HomeIcon, href: '/', active: currentPage === 'dashboard', roles: ['admin', 'regional', 'area','store', 'staff'] },
     { name: 'Maintenance', icon: HammerIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
+    { name: 'Staff Absence', icon: CalendarIcon, href: '/staff', active: currentPage === 'staff', roles: ['admin', 'regional', 'area','store', 'staff'] },
     { name: 'Event Orders', icon: MicVocalIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Management', icon: ShoppingCartIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
@@ -137,22 +138,6 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Navigation */}
       <nav className="p-4 space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
         {navItems.map((item, index) => {
-          // Safely check profile and permissions before rendering items
-          // // If profile is null, or permissions are not in the allowed roles, return null
-          // if (item.name === 'Stock Orders' && profile) { // Add profile check here
-          //   const allowedStoreIds = [1, 2, 3, 4, 5, 6, 7]; // Example IDs
-          //   const canAccessStockOrders = 
-          //     profile?.permissions === 'admin' || 
-          //     profile.permissions === 'regional' ||
-          //     profile.permissions === 'area' ||
-          //     // Check if profile.store_ids (array) has any common elements with allowedStoreIds
-          //     (profile.permissions === 'store' && 
-          //      profile.store_ids && 
-          //      profile.store_ids.some(id => allowedStoreIds.includes(id)));
-          //   if (!canAccessStockOrders) return null;
-          // } else if (!profile?.permissions || !item.roles.includes(profile.permissions)) {
-          //   return null;
-          // }
 
           return (
             <a
