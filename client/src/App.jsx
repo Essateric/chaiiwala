@@ -18,6 +18,7 @@ import SupportPage from "./pages/SupportPage.jsx";
 import  NotificationListener  from "./components/Support/NotificationListener.jsx";
 import { Toaster } from 'sonner';
 import CustomerFeedbackPage from "./pages/CustomerFeedbackPage.jsx";
+import StaffAbsencePage from "./pages/StaffAbsences.jsx";
 
 
 // List of allowed roles for certain pages
@@ -54,6 +55,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MaintenancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff-absence"
+          element={
+            <ProtectedRoute>
+<StaffAbsencePage />
             </ProtectedRoute>
           }
         />

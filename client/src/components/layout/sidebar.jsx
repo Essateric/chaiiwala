@@ -65,7 +65,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const navItems = [
     { name: 'Dashboard', icon: HomeIcon, href: '/', active: currentPage === 'dashboard', roles: ['admin', 'regional', 'area','store', 'staff'] },
     { name: 'Maintenance', icon: HammerIcon, href: '/maintenance', active: currentPage === 'maintenance', roles: ['admin', 'regional', 'store', 'area'] },
-    { name: 'Staff Absence', icon: CalendarIcon, href: '/staff', active: currentPage === 'staff', roles: ['admin', 'regional', 'area','store', 'staff'] },
+    { name: 'Staff Absence', icon: CalendarIcon, href: '/staff-absence', active: currentPage === 'staff', roles: ['admin', 'regional', 'area','store', 'staff'] },
     { name: 'Event Orders', icon: MicVocalIcon, href: '/event-orders', active: currentPage === 'event-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Management', icon: ShoppingCartIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
