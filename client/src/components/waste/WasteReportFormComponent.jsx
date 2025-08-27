@@ -1,5 +1,4 @@
-// /src/components/waste/WasteReportFormComponent.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '../ui/select.jsx';
@@ -31,12 +30,13 @@ const formSchema = z.object({
   { path: ['reasonOther'], message: 'Please type the reason' }
 );
 
-function WasteReportFormComponent({
+export default function WasteReportFormComponent({
   profile,
   stores,
   onSubmit,
   isLoading,
-  setIsModalOpen
+  setIsModalOpen,
+  shouldResetOnSuccess = true, // new optional prop
 }) {
   const defaultReporter =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -47,19 +47,22 @@ function WasteReportFormComponent({
       ? String(profile?.store_ids?.[0] ?? '')
       : '';
 
+  // compute default (stable) values we want to keep after reset
+  const defaults = useMemo(() => ({
+    reporterName: defaultReporter,
+    storeId: defaultStoreId,
+    reportDate: new Date().toISOString().slice(0, 10),
+    itemName: '',
+    category: '',
+    quantity: 1,
+    unit: '',
+    reason: '',
+    reasonOther: ''
+  }), [defaultReporter, defaultStoreId]);
+
   const form = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      reporterName: defaultReporter,
-      storeId: defaultStoreId,
-      reportDate: new Date().toISOString().slice(0, 10),
-      itemName: '',
-      category: '',
-      quantity: 1,
-      unit: '',
-      reason: '',
-      reasonOther: ''
-    }
+    defaultValues: defaults,
   });
 
   const canChooseStore = profile?.permissions === 'admin' || profile?.permissions === 'regional';
@@ -73,6 +76,28 @@ function WasteReportFormComponent({
     'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black/20';
   const selectTriggerClass = 'bg-white text-black border border-gray-300';
 
+  // wrap submit: call parent, then reset selected fields
+  const handleSubmitWrapped = async (values) => {
+    const res = await onSubmit(values); // success should resolve; throw on error
+    if (shouldResetOnSuccess !== false) {
+      // keep reporter, store, date; clear the rest
+      form.reset({
+        reporterName: form.getValues('reporterName') || defaults.reporterName,
+        storeId: form.getValues('storeId') || defaults.storeId,
+        reportDate: new Date().toISOString().slice(0, 10),
+        itemName: '',
+        category: '',
+        quantity: 1,
+        unit: '',
+        reason: '',
+        reasonOther: ''
+      });
+      // focus first field for faster entry
+      requestAnimationFrame(() => form.setFocus('itemName'));
+    }
+    return res;
+  };
+
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="rounded-2xl border border-gray-800 bg-[#171a23] shadow-lg">
@@ -85,7 +110,7 @@ function WasteReportFormComponent({
 
         <div className="p-5">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(handleSubmitWrapped)} className="space-y-6">
 
               {/* Row 1: Reporter + Date */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -283,5 +308,3 @@ function WasteReportFormComponent({
     </div>
   );
 }
-
-export default WasteReportFormComponent;
