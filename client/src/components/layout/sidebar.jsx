@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
+import { Trash2 as Trash2Icon } from "lucide-react";
 
 
 
@@ -73,6 +74,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Daily Checklist', icon: ClipboardCheckIcon, href: '/daily-checklist', active: currentPage === 'daily-checklist', roles: ['area','store', 'staff'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
+    { name: 'Waste Reporting', icon: Trash2Icon, href: '/waste-reporting', active: currentPage === 'waste-reporting', roles: ['admin','regional','area','store','staff'] },
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional'] },
     { name: 'Support', icon: WrenchIcon, href: '/support', active: currentPage === 'support', roles: ['admin', 'regional', 'area','store', 'staff'] }
   ];

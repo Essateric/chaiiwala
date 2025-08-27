@@ -19,7 +19,7 @@ import  NotificationListener  from "./components/Support/NotificationListener.js
 import { Toaster } from 'sonner';
 import CustomerFeedbackPage from "./pages/CustomerFeedbackPage.jsx";
 import StaffAbsencePage from "./pages/StaffAbsences.jsx";
-
+import WasteReportingPage from "./pages/WasteReportingPage.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -122,6 +122,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/waste-reporting" element={<WasteReportingPage />} />
         <Route path="/customerfeedback" element={<CustomerFeedbackPage />} />
 
 
