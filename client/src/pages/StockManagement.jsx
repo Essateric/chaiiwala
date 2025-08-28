@@ -58,6 +58,17 @@ export default function StockManagementView() {
     chaiiwalaStores,
   });
 
+  // format numbers to 2 decimals (with thousands separators)
+const nf2 = new Intl.NumberFormat('en-GB', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const format2 = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? nf2.format(n) : '0.00';
+};
+
+
   // Fetch stores (for filter + cards)
   useEffect(() => {
     async function fetchStores() {
@@ -251,7 +262,7 @@ const handleSaveChanges = async (updatedItem) => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-xl font-mono font-bold text-gray-800">
-                      {store.totalQuantity}
+                      {format2(store.totalQuantity)}
                     </div>
                     <div className="text-sm text-gray-500">Total Stock</div>
                   </CardContent>
