@@ -12,6 +12,17 @@ const format2 = (v, fallback = "0.00") => {
   return Number.isFinite(n) ? n.toFixed(2) : fallback;
 };
 
+/* Small arrow helper */
+const Arrow = ({ dir }) => {
+  if (dir === "up") {
+    return <span className="ml-1 align-middle text-emerald-600" aria-label="increased">▲</span>;
+  }
+  if (dir === "down") {
+    return <span className="ml-1 align-middle text-rose-600" aria-label="decreased">▼</span>;
+  }
+  return null;
+};
+
 /* ---------------- Product Table ---------------- */
 function ProductTable({
   products,
@@ -103,28 +114,36 @@ Close (New): stock left after the change
 Usage:      consumption only (decreases only)
 */
 function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
-  // Sum consumption only (decreases)
-  const totalUsage = useMemo(
-    () =>
-      historyRows.reduce((sum, r) => {
-        const oldQ = Number(r.old_quantity) || 0;
-        const newQ = Number(r.new_quantity) || 0;
-        const used = Math.max(0, oldQ - newQ);
-        return sum + used;
-      }, 0),
-    [historyRows]
-  );
+  // Per-row values + arrows
+  const rowsWithCalcs = useMemo(() => {
+    return (historyRows || []).map((row) => {
+      const oldQ = Number(row.old_quantity) || 0;
+      const newQ = Number(row.new_quantity) || 0;
+      const delivery = Math.max(0, newQ - oldQ); // increases only
+      const usage = Math.max(0, oldQ - newQ);    // decreases only
+      const closeDir = newQ > oldQ ? "up" : newQ < oldQ ? "down" : null;
+      const deliveryDir = delivery > 0 ? "up" : null;
+      const usageDir = usage > 0 ? "down" : null;
+      return { ...row, oldQ, newQ, delivery, usage, closeDir, deliveryDir, usageDir };
+    });
+  }, [historyRows]);
 
-  // Sum deliveries (increases)
+  // Totals across window
+  const sumOpen = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.oldQ || 0), 0),
+    [rowsWithCalcs]
+  );
   const totalDeliveries = useMemo(
-    () =>
-      historyRows.reduce((sum, r) => {
-        const oldQ = Number(r.old_quantity) || 0;
-        const newQ = Number(r.new_quantity) || 0;
-        const delivered = Math.max(0, newQ - oldQ);
-        return sum + delivered;
-      }, 0),
-    [historyRows]
+    () => rowsWithCalcs.reduce((s, r) => s + (r.delivery || 0), 0),
+    [rowsWithCalcs]
+  );
+  const sumClose = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.newQ || 0), 0),
+    [rowsWithCalcs]
+  );
+  const totalUsage = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.usage || 0), 0),
+    [rowsWithCalcs]
   );
 
   return (
@@ -160,22 +179,16 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
             </tr>
           </thead>
           <tbody>
-            {historyRows.length === 0 ? (
+            {rowsWithCalcs.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-4">
                   No changes recorded for this product
                 </td>
               </tr>
             ) : (
-              historyRows.map((row, i) => {
+              rowsWithCalcs.map((row, i) => {
                 const dt = row.changed_at ? new Date(row.changed_at) : null;
-                const isSunday = dt ? dt.getDay() === 0 : false;
-
-                const oldQ = Number(row.old_quantity) || 0;
-                const newQ = Number(row.new_quantity) || 0;
-                const delivery = Math.max(0, newQ - oldQ); // increases only
-                const usage = Math.max(0, oldQ - newQ);    // decreases only
-
+                const isSunday = dt ? dt.getDay() === 0 : false; // 0 = Sunday
                 return (
                   <tr
                     key={(row.changed_at || "") + (row.updated_by || "") + i}
@@ -185,44 +198,52 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
                       {dt ? dt.toLocaleString() : "—"}
                     </td>
                     <td className="p-2">{row.updated_by_name}</td>
-                    <td className="p-2">{format2(oldQ)}</td>
-                    <td className="p-2">{format2(delivery)}</td>
-                    <td className="p-2">{format2(newQ)}</td>
-                    <td className="p-2">{format2(usage)}</td>
+                    <td className="p-2">{format2(row.oldQ)}</td>
+                    <td className="p-2">
+                      {format2(row.delivery)}
+                      <Arrow dir={row.deliveryDir} />
+                    </td>
+                    <td className="p-2">
+                      {format2(row.newQ)}
+                      <Arrow dir={row.closeDir} />
+                    </td>
+                    <td className="p-2">
+                      {format2(row.usage)}
+                      <Arrow dir={row.usageDir} />
+                    </td>
                   </tr>
                 );
               })
             )}
           </tbody>
-          {historyRows.length > 0 && (
-            <tfoot>
-              <tr className="bg-gray-50 border-t">
-                <td className="p-2" colSpan={3}>
-                  <span className="font-medium">Totals (last {nDays}d)</span>
-                </td>
-                <td className="p-2 font-semibold">{format2(totalDeliveries)}</td>
-                <td className="p-2"></td>
-                <td className="p-2 font-semibold">{format2(totalUsage)}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
 
-      {/* Legend */}
-      <div className="mt-3 flex items-center gap-3 text-xs text-gray-600">
-        <div className="flex items-center gap-2">
-          <span
-            className="inline-block h-3 w-3 rounded-sm bg-blue-50 border border-blue-200"
-            aria-hidden="true"
-          />
-          <span>Sunday entries highlighted</span>
-        </div>
+          {/* Footer: totals + legend */}
+          <tfoot>
+            <tr className="bg-gray-50 border-t">
+              {/* label across Date + Changed By */}
+              <td className="p-2 font-medium" colSpan={2}>
+                Totals (last {nDays}d)
+              </td>
+              <td className="p-2 font-semibold">{format2(sumOpen)}</td>
+              <td className="p-2 font-semibold">{format2(totalDeliveries)}</td>
+              <td className="p-2 font-semibold">{format2(sumClose)}</td>
+              <td className="p-2 font-semibold">{format2(totalUsage)}</td>
+            </tr>
+            <tr>
+              <td className="p-2 text-xs text-gray-600" colSpan={6}>
+                <span
+                  className="inline-block h-3 w-3 rounded-sm bg-blue-50 border border-blue-200 align-middle mr-2"
+                  aria-hidden="true"
+                />
+                Sunday entries highlighted
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   );
 }
-
 
 /* ---------------- Content (keeps your editing logic) ---------------- */
 function HistoricStockDialogContent({
