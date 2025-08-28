@@ -15,10 +15,10 @@ const format2 = (v, fallback = "0.00") => {
 /* ---------------- Product Table ---------------- */
 function ProductTable({
   products,
-  usageByItem,           // { [stock_item_id]: number }
+  usageByItem,           // { [stock_item_id]: number } (consumption only)
   nDays,                 // window size (7 or 14)
   isRegional,
-  storeUsageTotal,       // number (only relevant for regional/admin)
+  storeUsageTotal,       // number (only relevant for regional/admin, consumption only)
   onViewHistory,
   rowsPerPage,
   currentPage,
@@ -29,9 +29,7 @@ function ProductTable({
   return (
     <>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold">
-          Products
-        </h4>
+        <h4 className="font-semibold">Products</h4>
         {isRegional && (
           <div className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1">
             Store total usage (last {nDays}d):{" "}
@@ -98,9 +96,34 @@ function ProductTable({
 }
 
 /* --------------- Product History Table --------------- */
+/*
+Open (Old): stock we have right now (e.g., on Sunday)
+Delivery:   stocks received (increases only) e.g., on Monday
+Close (New): stock left after the change
+Usage:      consumption only (decreases only)
+*/
 function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
+  // Sum consumption only (decreases)
   const totalUsage = useMemo(
-    () => historyRows.reduce((sum, r) => sum + ((Number(r.new_quantity) || 0) - (Number(r.old_quantity) || 0)), 0),
+    () =>
+      historyRows.reduce((sum, r) => {
+        const oldQ = Number(r.old_quantity) || 0;
+        const newQ = Number(r.new_quantity) || 0;
+        const used = Math.max(0, oldQ - newQ);
+        return sum + used;
+      }, 0),
+    [historyRows]
+  );
+
+  // Sum deliveries (increases)
+  const totalDeliveries = useMemo(
+    () =>
+      historyRows.reduce((sum, r) => {
+        const oldQ = Number(r.old_quantity) || 0;
+        const newQ = Number(r.new_quantity) || 0;
+        const delivered = Math.max(0, newQ - oldQ);
+        return sum + delivered;
+      }, 0),
     [historyRows]
   );
 
@@ -115,6 +138,9 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
           <div className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-1">
             {nDays}d usage: <span className="font-semibold">{format2(totalUsage)}</span>
           </div>
+          <div className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1">
+            {nDays}d deliveries: <span className="font-semibold">{format2(totalDeliveries)}</span>
+          </div>
           <Button variant="ghost" size="sm" onClick={onBack}>
             Back to Products
           </Button>
@@ -127,23 +153,29 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
             <tr className="bg-chai-gold text-chai-black">
               <th className="p-2 text-left">Date</th>
               <th className="p-2 text-left">Changed By</th>
-              <th className="p-2 text-left">Opened (Old)</th>
-              <th className="p-2 text-left">Closed (New)</th>
-              <th className="p-2 text-left">Usage (New − Old)</th>
+              <th className="p-2 text-left">Open (Old)</th>
+              <th className="p-2 text-left">Delivery</th>
+              <th className="p-2 text-left">Close (New)</th>
+              <th className="p-2 text-left">Usage</th>
             </tr>
           </thead>
           <tbody>
             {historyRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-4">
+                <td colSpan={6} className="text-center py-4">
                   No changes recorded for this product
                 </td>
               </tr>
             ) : (
               historyRows.map((row, i) => {
                 const dt = row.changed_at ? new Date(row.changed_at) : null;
-                const isSunday = dt ? dt.getDay() === 0 : false; // 0 = Sunday
-                const usage = (Number(row.new_quantity) || 0) - (Number(row.old_quantity) || 0);
+                const isSunday = dt ? dt.getDay() === 0 : false;
+
+                const oldQ = Number(row.old_quantity) || 0;
+                const newQ = Number(row.new_quantity) || 0;
+                const delivery = Math.max(0, newQ - oldQ); // increases only
+                const usage = Math.max(0, oldQ - newQ);    // decreases only
+
                 return (
                   <tr
                     key={(row.changed_at || "") + (row.updated_by || "") + i}
@@ -153,8 +185,9 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
                       {dt ? dt.toLocaleString() : "—"}
                     </td>
                     <td className="p-2">{row.updated_by_name}</td>
-                    <td className="p-2">{format2(row.old_quantity)}</td>
-                    <td className="p-2">{format2(row.new_quantity)}</td>
+                    <td className="p-2">{format2(oldQ)}</td>
+                    <td className="p-2">{format2(delivery)}</td>
+                    <td className="p-2">{format2(newQ)}</td>
                     <td className="p-2">{format2(usage)}</td>
                   </tr>
                 );
@@ -164,18 +197,32 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
           {historyRows.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50 border-t">
-                <td className="p-2" colSpan={4}>
-                  <span className="font-medium">Total usage (last {nDays}d)</span>
+                <td className="p-2" colSpan={3}>
+                  <span className="font-medium">Totals (last {nDays}d)</span>
                 </td>
+                <td className="p-2 font-semibold">{format2(totalDeliveries)}</td>
+                <td className="p-2"></td>
                 <td className="p-2 font-semibold">{format2(totalUsage)}</td>
               </tr>
             </tfoot>
           )}
         </table>
       </div>
+
+      {/* Legend */}
+      <div className="mt-3 flex items-center gap-3 text-xs text-gray-600">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-3 w-3 rounded-sm bg-blue-50 border border-blue-200"
+            aria-hidden="true"
+          />
+          <span>Sunday entries highlighted</span>
+        </div>
+      </div>
     </div>
   );
 }
+
 
 /* ---------------- Content (keeps your editing logic) ---------------- */
 function HistoricStockDialogContent({
@@ -195,7 +242,7 @@ function HistoricStockDialogContent({
   const isRegional = user?.permissions === "admin" || user?.permissions === "regional";
   const nDays = isRegional ? 14 : 7;
 
-  // usage per item & store total
+  // usage per item (consumption only) & store total consumption
   const [usageByItem, setUsageByItem] = useState({});
   const [storeUsageTotal, setStoreUsageTotal] = useState(0);
 
@@ -203,7 +250,7 @@ function HistoricStockDialogContent({
   useEffect(() => {
     if (!selectedStoreState) return;
     async function fetchProducts() {
-      let { data: stockData, error } = await supabase
+      const { data: stockData, error } = await supabase
         .from("store_stock_levels")
         .select(`
           stock_item_id,
@@ -215,7 +262,7 @@ function HistoricStockDialogContent({
         `)
         .eq("store_id", selectedStoreState.id);
 
-    if (!error) {
+      if (!error) {
         const unique = {};
         (stockData || []).forEach((row) => {
           if (!unique[row.stock_item_id]) unique[row.stock_item_id] = row;
@@ -230,7 +277,7 @@ function HistoricStockDialogContent({
     setSearch("");
   }, [selectedStoreState]);
 
-  // Fetch product history for selected product
+  // Fetch product history for selected product (detail table)
   useEffect(() => {
     if (!selectedStore || !selectedProduct) return;
 
@@ -281,7 +328,7 @@ function HistoricStockDialogContent({
     load();
   }, [selectedStore, selectedProduct, nDays]);
 
-  // Store-wide usage map for the last N days
+  // Store-wide usage map for the last N days (consumption only)
   useEffect(() => {
     if (!selectedStoreState?.id) return;
 
@@ -306,9 +353,11 @@ function HistoricStockDialogContent({
       const map = {};
       let total = 0;
       for (const r of data || []) {
-        const diff = (Number(r.new_quantity) || 0) - (Number(r.old_quantity) || 0);
-        map[r.stock_item_id] = (map[r.stock_item_id] ?? 0) + diff;
-        total += diff;
+        const oldQ = Number(r.old_quantity) || 0;
+        const newQ = Number(r.new_quantity) || 0;
+        const used = Math.max(0, oldQ - newQ); // consumption only
+        map[r.stock_item_id] = (map[r.stock_item_id] ?? 0) + used;
+        total += used;
       }
       setUsageByItem(map);
       setStoreUsageTotal(total);
@@ -345,7 +394,7 @@ function HistoricStockDialogContent({
   const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * rowsPerPage,
-    (currentPage) * rowsPerPage
+    currentPage * rowsPerPage
   );
 
   const handleNextPage = () => setCurrentPage((page) => Math.min(page + 1, totalPages));
