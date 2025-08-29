@@ -31,7 +31,7 @@ import {
 } from "../lib/getFreshwaysDeliveryDate.jsx";
 import MaintenanceRequestsPie from "../components/Maintenance/MaintenanceRequestsPie.jsx";
 import ChaiiwalaOrderStatusWidget from "../components/orders/ChaiiwalaOrderStatusWidget.jsx";
-import StockCheckCompliancePanel from "../components/dashboard/StockCheckCompliancePanel.jsx";
+import StockCheckCompliancePanel from "../components/dashboard/StockCheckComplianceWidget.jsx";
 import TaskProgressPanel from "../components/dashboard/TaskProgressPanel.jsx";
 
 /* ✅ Use the exact same components as the Daily Checklist page */
