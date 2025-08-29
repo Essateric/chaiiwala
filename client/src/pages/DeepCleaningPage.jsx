@@ -1,357 +1,284 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+// src/pages/DeepCleaningPage.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription
+  DialogDescription,
 } from "../components/ui/dialog.jsx";
-import { Button } from '../components/ui/button.jsx';
-import { useToast } from '../hooks/use-toast.jsx';
-import { useAuth } from '../hooks/UseAuth.jsx';
+import { Button } from "../components/ui/button.jsx";
+import { useToast } from "../hooks/use-toast.jsx";
+import { useAuth } from "../hooks/UseAuth.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { supabase } from "../lib/supabaseClient.js";
 import DeepCleaningFormComponent from "../components/DeepCleaningForm.jsx";
 import DeepCleaningChecklistView from "../components/DeepCleaningChecklistView.jsx";
-import DeepCleaningAdminDayView from "../components/DeepCleaningAdminDayView.jsx";
-
-// Calendar localizer setup
-const locales = { 'en-US': enUS };
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-});
-
-// Color logic for calendar cards
-function getTaskColor(task) {
-  if (task.completed_at) return 'green';
-  const created = new Date(task.created_at || task.start);
-  const now = new Date();
-  const ageInDays = (now - created) / (1000 * 60 * 60 * 24);
-  if (ageInDays >= 7) return 'orange';
-  return 'blue';
-}
+// ⛔ removed: DeepCleaningAdminDayView import
 
 export default function DeepCleaningPage() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const { toast } = useToast();
+
+  const isStoreManager = profile?.permissions === "store";
+  const isRegionalOrAdmin =
+    profile?.permissions === "admin" || profile?.permissions === "regional";
 
   const [stores, setStores] = useState([]);
   const [cleaningTasks, setCleaningTasks] = useState([]);
+
+  // “Add task” dialog
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('all');
+
+  // “View task” dialog (kept — used for store managers)
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [events, setEvents] = useState([]);
 
-  // Fetch stores
+  // Store selector for regional/admin
+  const [selectedStoreId, setSelectedStoreId] = useState("all");
+
+  // Load stores
   useEffect(() => {
-    async function fetchStores() {
-      const { data, error } = await supabase.from('stores').select('id, name');
+    (async () => {
+      const { data, error } = await supabase.from("stores").select("id, name");
       if (!error) setStores(data || []);
-    }
-    fetchStores();
+    })();
   }, []);
 
-  // Fetch cleaning task options
+  // 👉 Auto-pick first store for regional/admin so the table shows immediately
   useEffect(() => {
-    async function fetchTasks() {
-      const { data, error } = await supabase.from('deep_cleaning_tasks').select('id, dc_task');
+    if (isRegionalOrAdmin && selectedStoreId === "all" && stores.length > 0) {
+      setSelectedStoreId(String(stores[0].id));
+    }
+  }, [isRegionalOrAdmin, selectedStoreId, stores]);
+
+  // Load task options
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("deep_cleaning_tasks")
+        .select("id, dc_task");
       if (!error) setCleaningTasks(data || []);
-    }
-    fetchTasks();
+    })();
   }, []);
 
-  const visibleStores =
-    profile?.permissions === 'admin'
-      ? stores
-      : stores.filter(store => profile?.store_ids?.includes(store.id));
-
-  // Fetch existing deep cleaning events
-  useEffect(() => {
-    async function fetchEvents() {
-      const { data, error } = await supabase.from('deep_cleaning').select('*');
-      let filteredEvents = data || [];
-
-      if (profile?.permissions === 'store' && profile.store_ids?.[0]) {
-        filteredEvents = filteredEvents.filter(event => event.store_id === profile.store_ids[0]);
-      } else if (
-        (profile?.permissions === 'admin' || profile?.permissions === 'regional') &&
-        selectedStore !== 'all'
-      ) {
-        filteredEvents = filteredEvents.filter(event => event.store_id === Number(selectedStore));
-      }
-
-      setEvents(
-        filteredEvents.map(ev => ({
-          ...ev,
-          start: new Date(ev.start),
-          end: new Date(ev.end_time)
-        }))
-      );
-    }
-    fetchEvents();
-  }, [profile, selectedStore, isLoading, stores]);
-
-  // Open modal on calendar slot click
+  // Handlers (used by dialogs / store-manager flow)
   const handleSelectSlot = ({ start }) => {
     setSelectedDate(start);
     setIsModalOpen(true);
   };
-
   const handleEventSelect = (event) => {
     setSelectedTask(event);
     setViewDialogOpen(true);
   };
 
+  const onSubmit = async (data) => {
+    if (!selectedDate) return;
 
+    // Resolve store id for insert
+    const resolvedStoreId = isStoreManager
+      ? profile?.store_ids?.[0]
+      : data.storeId || "";
 
-
-const onSubmit = async (data) => {
-  if (!selectedDate) return;
-
-const resolvedStoreId =
-  profile?.permissions === 'store'
-    ? profile.store_ids?.[0]
-    : data.storeId || '';
-
-      console.log("🧠 raw form data:", data);
-console.log("🧠 resolved store id:", resolvedStoreId);
-
-if (!resolvedStoreId || resolvedStoreId === '') {
-  toast({
-    title: 'Missing Store',
-    description: 'Please select a store before submitting.',
-    variant: 'destructive',
-  });
-  return;
-}
-
-
-  if (!data.task || data.task.trim() === '') {
-    toast({
-      title: 'Missing Task',
-      description: 'Please select a task before submitting.',
-      variant: 'destructive'
-    });
-    return;
-  }
-
-  let startDate = new Date(selectedDate);
-  let endDate = new Date(selectedDate);
-
-  if (data.anytime) {
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-  } else {
-    if (!data.startTime || !data.endTime) {
+    if (!resolvedStoreId || resolvedStoreId === "") {
       toast({
-        title: 'Missing Time',
-        description: 'Please select start and end times.',
-        variant: 'destructive'
+        title: "Missing Store",
+        description: "Please select a store before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!data.task || data.task.trim() === "") {
+      toast({
+        title: "Missing Task",
+        description: "Please select a task before submitting.",
+        variant: "destructive",
       });
       return;
     }
 
-    const [startHours, startMinutes] = data.startTime.split(':').map(Number);
-    const [endHours, endMinutes] = data.endTime.split(':').map(Number);
-    startDate.setHours(startHours, startMinutes, 0, 0);
-    endDate.setHours(endHours, endMinutes, 0, 0);
-  }
+    let startDate = new Date(selectedDate);
+    let endDate = new Date(selectedDate);
 
-  const storeName = stores.find(s => s.id === Number(resolvedStoreId))?.name || '';
-
-  // Final validation before sending
-  const payload = {
-    task: data.task,
-    start: startDate.toISOString(),
-    end_time: endDate.toISOString(),
-    store_id: resolvedStoreId,
-    store_name: storeName,
-    created_by: profile?.id,
-    created_at: new Date().toISOString(),
-    anytime: data.anytime
-  };
-
-  // Check that no required fields are missing
-  const requiredFields = ['task', 'start', 'end_time', 'store_id', 'created_by'];
-  for (const key of requiredFields) {
-    if (!payload[key]) {
-      toast({
-        title: 'Missing Data',
-        description: `The field "${key}" is missing or invalid.`,
-        variant: 'destructive'
-      });
-      return;
-    }
-  }
-
-  console.log("✅ Final validated payload to Supabase:", payload);
-
-  setIsLoading(true);
-
-  const { data: insertData, error } = await supabase
-    .from('deep_cleaning')
-    .insert([payload])
-    .select()
-    .single();
-
-  if (!error) {
-    toast({
-      title: 'Deep cleaning task scheduled',
-      description: `${data.task} scheduled for ${storeName} on ${startDate.toDateString()}`
-    });
-    setIsLoading(false);
-    setIsModalOpen(false);
-    setEvents(prev => [
-      ...prev,
-      {
-        ...insertData,
-        start: new Date(insertData.start),
-        end: new Date(insertData.end_time)
+    if (data.anytime) {
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      if (!data.startTime || !data.endTime) {
+        toast({
+          title: "Missing Time",
+          description: "Please select start and end times.",
+          variant: "destructive",
+        });
+        return;
       }
-    ]);
-  } else {
-  let friendlyMessage = "Something went wrong while saving the task.";
+      const [sh, sm] = data.startTime.split(":").map(Number);
+      const [eh, em] = data.endTime.split(":").map(Number);
+      startDate.setHours(sh, sm, 0, 0);
+      endDate.setHours(eh, em, 0, 0);
+    }
 
-  if (error.message.includes('store_id')) {
-    friendlyMessage = "Please select a valid store before submitting.";
-  } else if (error.message.includes('task')) {
-    friendlyMessage = "Please select a valid task before submitting.";
-  }
+    const storeName =
+      stores.find((s) => String(s.id) === String(resolvedStoreId))?.name || "";
 
-  toast({
-    title: "Error",
-    description: friendlyMessage,
-    variant: "destructive"
-  });
+    const payload = {
+      task: data.task,
+      start: startDate.toISOString(),
+      end_time: endDate.toISOString(),
+      store_id: resolvedStoreId,
+      store_name: storeName,
+      created_by: profile?.id,
+      created_at: new Date().toISOString(),
+      anytime: data.anytime,
+    };
 
-  console.error("Supabase insert error:", error);
-  setIsLoading(false);
-}};
+    for (const key of ["task", "start", "end_time", "store_id", "created_by"]) {
+      if (!payload[key]) {
+        toast({
+          title: "Missing Data",
+          description: `The field "${key}" is missing or invalid.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    const { error } = await supabase.from("deep_cleaning").insert([payload]);
+
+    if (!error) {
+      toast({
+        title: "Deep cleaning task scheduled",
+        description: `${data.task} scheduled for ${storeName} on ${startDate.toDateString()}`,
+      });
+      setIsLoading(false);
+      setIsModalOpen(false);
+    } else {
+      let friendly = "Something went wrong while saving the task.";
+      if (error.message.includes("store_id")) friendly = "Please select a valid store.";
+      if (error.message.includes("task")) friendly = "Please select a valid task.";
+
+      toast({ title: "Error", description: friendly, variant: "destructive" });
+      setIsLoading(false);
+    }
+  };
 
   const markTaskComplete = async () => {
     if (!selectedTask) return;
     const now = new Date();
     const { error } = await supabase
-      .from('deep_cleaning')
+      .from("deep_cleaning")
       .update({ completed_at: now.toISOString() })
-      .eq('id', selectedTask.id);
+      .eq("id", selectedTask.id);
 
     if (!error) {
       toast({
-        title: 'Task marked as complete!',
+        title: "Task marked as complete!",
         description: `${selectedTask.task} is now completed.`,
       });
-      setEvents((prev) =>
-        prev.map((task) =>
-          task.id === selectedTask.id
-            ? { ...task, completed_at: now.toISOString() }
-            : task
-        )
-      );
       setViewDialogOpen(false);
       setSelectedTask(null);
     } else {
       toast({
-        title: 'Error',
-        description: 'Could not mark as complete.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Could not mark as complete.",
+        variant: "destructive",
       });
     }
   };
 
-  const eventPropGetter = (event) => {
-    const color = getTaskColor(event);
-    return {
-      style: {
-        backgroundColor: color,
-        borderColor: color,
-        color: 'white'
-      }
-    };
-  };
+  return (
+    <DashboardLayout title="Deep Cleaning">
+      {isStoreManager ? (
+        // Store manager: interactive checklist for their own store
+        <DeepCleaningChecklistView profile={profile} />
+      ) : (
+        <>
+          {/* Regional/Admin: store selector + read-only weekly checklist */}
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold">Regional / Admin View</h2>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Store:</label>
+              <select
+                className="border bg-white rounded px-2 py-1 text-sm"
+                value={selectedStoreId}
+                onChange={(e) => setSelectedStoreId(e.target.value)}
+              >
+                <option value="all">All Stores</option>
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-  const getEventTitle = (event) => {
-    let timeLabel = '';
-    if (event.anytime) {
-      timeLabel = '(Anytime)';
-    } else if (event.start && event.end) {
-      timeLabel =
-        ' (' +
-        format(event.start, 'HH:mm') +
-        '-' +
-        format(event.end, 'HH:mm') +
-        ')';
-    }
-    if ((profile?.permissions === 'admin' || profile?.permissions === 'regional') && event.store_name) {
-      return `${event.task}${timeLabel} - ${event.store_name}`;
-    }
-    return `${event.task}${timeLabel}`;
-  };
-
- return (
-  <DashboardLayout title="Deep Cleaning">
-    {/* Toggle at top of page */}
-{profile?.permissions === "store" ? (
-  <DeepCleaningChecklistView profile={profile} />
-) : (
-  <DeepCleaningAdminDayView profile={profile} />
-)}
-
-
-    {/* Modals below */}
-    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Deep Cleaning Task</DialogTitle>
-          <DialogDescription>
-            {selectedDate && `Schedule for ${format(selectedDate, 'MMMM dd, yyyy')}`}
-          </DialogDescription>
-        </DialogHeader>
-        <DeepCleaningFormComponent
-          profile={profile}
-          stores={stores}
-          cleaningTasks={cleaningTasks}
-          selectedDate={selectedDate}
-          onSubmit={onSubmit}
-          isLoading={isLoading}
-          setIsModalOpen={setIsModalOpen}
-        />
-      </DialogContent>
-    </Dialog>
-
-    <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Task Details</DialogTitle>
-          <DialogDescription>{selectedTask?.task}</DialogDescription>
-        </DialogHeader>
-        {/* Task details */}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-            Close
-          </Button>
-          {!selectedTask?.completed_at && (
-            <Button
-              onClick={markTaskComplete}
-              className="bg-green-600 text-white hover:bg-green-700"
-            >
-              Mark Complete
-            </Button>
+          {/* Read-only checklist table for the selected store */}
+          {selectedStoreId !== "all" ? (
+            <div className="mt-2">
+              <DeepCleaningChecklistView
+                profile={profile}
+                readOnly
+                storeIdOverride={Number(selectedStoreId)}
+                key={`ro-${selectedStoreId}`} // re-render on change
+              />
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              Select a store to view its checklist (read-only).
+            </div>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </DashboardLayout>
-);}
+        </>
+      )}
+
+      {/* Dialogs (kept; used by store managers) */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Deep Cleaning Task</DialogTitle>
+            <DialogDescription>
+              {selectedDate && `Schedule for ${format(selectedDate, "MMMM dd, yyyy")}`}
+            </DialogDescription>
+          </DialogHeader>
+          <DeepCleaningFormComponent
+            profile={profile}
+            stores={stores}
+            cleaningTasks={cleaningTasks}
+            selectedDate={selectedDate}
+            onSubmit={onSubmit}
+            isLoading={isLoading}
+            setIsModalOpen={setIsModalOpen}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Task Details</DialogTitle>
+            <DialogDescription>{selectedTask?.task}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+              Close
+            </Button>
+            {/* Only store managers can mark complete from this dialog */}
+            {!selectedTask?.completed_at && isStoreManager && (
+              <Button
+                onClick={markTaskComplete}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                Mark Complete
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}

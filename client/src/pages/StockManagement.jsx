@@ -85,10 +85,11 @@ export default function StockManagementView() {
           <div className="p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
             <div className="flex items-center gap-2">
               <Store className="h-5 w-5 text-chai-gold" />
-              <span className="font-medium text-gray-800">
-                Viewing historic stock for:{" "}
-                <span className="text-chai-gold font-semibold">{myStoreName}</span>
-              </span>
+           <span className="font-medium text-gray-800">
+  Viewing historic stock for:{" "}
+  <span className="text-black font-semibold">{myStoreName}</span>
+</span>
+
             </div>
           </div>
 
