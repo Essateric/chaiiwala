@@ -1,12 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient.js";
 import { useAuth } from "../hooks/UseAuth.jsx";
 import { useToast } from "../hooks/use-toast.jsx";
 import { useInventoryData } from "../hooks/useInventoryData.jsx";
 import { Search, Filter, Store } from "lucide-react";
-import {
-  Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow
-} from "../components/ui/table.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Button } from "../components/ui/button.jsx";
 import {
@@ -21,8 +18,6 @@ import {
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import { getStatusFromQty } from "../lib/utils.js";
 import StockTable from "../components/stock/StockTable.jsx";
-
-// 🔹 Import the EXTERNAL modal (the one with the search field + fixed copy)
 import HistoricStockDialog from "../components/stock/HistoricStockDialog.jsx";
 
 export default function StockManagementView() {
@@ -30,11 +25,11 @@ export default function StockManagementView() {
   const currentUser = profile;
   const { toast } = useToast();
 
-  // Stores and modal state
+  // Stores + modal state
   const [chaiiwalaStores, setChaiiwalaStores] = useState([]);
   const [selectedHistoricStore, setSelectedHistoricStore] = useState(null);
 
-  // Filters / sorting / pagination
+  // Filters / sorting / pagination (hidden for store managers)
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -42,34 +37,31 @@ export default function StockManagementView() {
   const [sort, setSort] = useState({ field: "", direction: "" });
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Edit item dialog
+  // Edit dialog (regional/admin)
   const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Permissions
   const isStoreManager = currentUser?.permissions === "store";
   const isArea = currentUser?.permissions === "area";
-  const isAdminOrRegional = currentUser?.permissions === "admin" || currentUser?.permissions === "regional";
+  const isAdminOrRegional =
+    currentUser?.permissions === "admin" || currentUser?.permissions === "regional";
 
-  // Inventory data + store cards
+  // Manager's primary store id
+  const myStoreId = useMemo(() => {
+    if (Array.isArray(currentUser?.store_ids) && currentUser.store_ids.length)
+      return currentUser.store_ids[0];
+    return currentUser?.store_id ?? null;
+  }, [currentUser]);
+
+  // Data used for cards/table
   const { inventoryData, loading, storeCards } = useInventoryData({
     currentUser,
     storeFilter,
     chaiiwalaStores,
   });
 
-  // format numbers to 2 decimals (with thousands separators)
-const nf2 = new Intl.NumberFormat('en-GB', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-const format2 = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? nf2.format(n) : '0.00';
-};
-
-
-  // Fetch stores (for filter + cards)
+  // Fetch stores for labels
   useEffect(() => {
     async function fetchStores() {
       const { data, error } = await supabase.from("stores").select("id, name");
@@ -78,7 +70,41 @@ const format2 = (v) => {
     fetchStores();
   }, []);
 
-  // Filtering / sorting
+  // Resolve the manager's store name
+  const myStoreName = useMemo(() => {
+    if (!myStoreId) return "";
+    const found = chaiiwalaStores.find((s) => String(s.id) === String(myStoreId));
+    return found?.name || "My Store";
+  }, [chaiiwalaStores, myStoreId]);
+
+  // ---- Store Manager: render page-style historic view (no table/filters) ----
+  if (isStoreManager) {
+    return (
+      <DashboardLayout title="Stock Management">
+        <div className="container mx-auto p-4 space-y-4">
+          <div className="p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Store className="h-5 w-5 text-chai-gold" />
+              <span className="font-medium text-gray-800">
+                Viewing historic stock for:{" "}
+                <span className="text-chai-gold font-semibold">{myStoreName}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Page mode – no modal, no click needed */}
+          <HistoricStockDialog
+            asPage
+            user={currentUser}
+            selectedStore={{ id: myStoreId, name: myStoreName }}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ---------- Regional/Admin flow (unchanged) ----------
+  // Filtering/sorting
   let filteredData = inventoryData;
   if (search) {
     const s = search.toLowerCase();
@@ -88,8 +114,10 @@ const format2 = (v) => {
         (item.sku || "").toLowerCase().includes(s)
     );
   }
-  if (categoryFilter !== "all") filteredData = filteredData.filter((i) => i.category === categoryFilter);
-  if (statusFilter !== "all") filteredData = filteredData.filter((i) => i.status === statusFilter);
+  if (categoryFilter !== "all")
+    filteredData = filteredData.filter((i) => i.category === categoryFilter);
+  if (statusFilter !== "all")
+    filteredData = filteredData.filter((i) => i.status === statusFilter);
 
   if (sort.field) {
     filteredData = [...filteredData].sort((a, b) => {
@@ -104,8 +132,11 @@ const format2 = (v) => {
   }
 
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedRows = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const paginatedRows = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleSort = (field) => {
     setSort({
@@ -114,115 +145,109 @@ const format2 = (v) => {
     });
   };
 
-  // Editing
+  // Editing (regional/admin only)
   const handleEditItem = (item) => {
     setEditItem(item);
     setDialogOpen(true);
   };
 
-const handleSaveChanges = async (updatedItem) => {
-  const { data: { user } } = await supabase.auth.getUser();
+  const handleSaveChanges = async (updatedItem) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  // 1) Get the current/old quantity for this store+item
-  const { data: existing, error: getErr } = await supabase
-    .from('store_stock_levels')
-    .select('quantity')
-    .eq('store_id', updatedItem.storeId)
-    .eq('stock_item_id', updatedItem.sku) // or real stock_item_id if different
-    .maybeSingle();
+    const { data: existing, error: getErr } = await supabase
+      .from("store_stock_levels")
+      .select("quantity")
+      .eq("store_id", updatedItem.storeId)
+      .eq("stock_item_id", updatedItem.sku)
+      .maybeSingle();
 
-  if (getErr) {
-    toast({ title: "Error", description: getErr.message, variant: "destructive" });
-    return;
-  }
+    if (getErr) {
+      toast({ title: "Error", description: getErr.message, variant: "destructive" });
+      return;
+    }
 
-  const oldQty = existing?.quantity ?? 0;
-  const newQty = updatedItem.stock;
+    const oldQty = existing?.quantity ?? 0;
+    const newQty = updatedItem.stock;
 
-  // 2) Upsert new quantity
-  const { error: upsertErr } = await supabase
-    .from('store_stock_levels')
-    .upsert({
-      stock_item_id: updatedItem.sku,    // use real ID if you have it
+    const { error: upsertErr } = await supabase
+      .from("store_stock_levels")
+      .upsert({
+        stock_item_id: updatedItem.sku,
+        store_id: updatedItem.storeId,
+        quantity: newQty,
+        last_updated: new Date().toISOString(),
+        updated_by: user?.id,
+      });
+
+    if (upsertErr) {
+      toast({
+        title: "Error",
+        description: `Failed to update stock: ${upsertErr.message}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await supabase.from("stock_history").insert({
       store_id: updatedItem.storeId,
-      quantity: newQty,
-      last_updated: new Date().toISOString(),
-      updated_by: user.id,
+      stock_item_id: updatedItem.sku,
+      old_quantity: oldQty,
+      new_quantity: newQty,
+      updated_by: user?.id,
+      changed_at: new Date().toISOString(),
     });
 
-  if (upsertErr) {
-    toast({ title: "Error", description: `Failed to update stock: ${upsertErr.message}`, variant: "destructive" });
-    return;
-  }
+    toast({
+      title: "Stock Updated",
+      description: `${updatedItem.product} stock has been updated successfully.`,
+    });
 
-  // 3) Insert history entry (use your real columns)
-  await supabase.from('stock_history').insert({
-    store_id: updatedItem.storeId,
-    stock_item_id: updatedItem.sku,   // use real ID if different
-    old_quantity: oldQty,
-    new_quantity: newQty,
-    updated_by: user.id,
-    changed_at: new Date().toISOString(), // add this column if you don’t have one
-  });
+    setDialogOpen(false);
+    setEditItem(null);
+  };
 
-  toast({
-    title: "Stock Updated",
-    description: `${updatedItem.product} stock has been updated successfully.`,
-  });
-
-  setDialogOpen(false);
-  setEditItem(null);
-};
-
-
-  // UI helpers
   const getStatusBadgeClass = (status) => {
     switch (status) {
-      case "in_stock": return "bg-green-100 text-green-800";
-      case "low_stock": return "bg-yellow-100 text-yellow-800";
-      case "out_of_stock": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "in_stock":
+        return "bg-green-100 text-green-800";
+      case "low_stock":
+        return "bg-yellow-100 text-yellow-800";
+      case "out_of_stock":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case "in_stock": return "In Stock";
-      case "low_stock": return "Low Stock";
-      case "out_of_stock": return "Out of Stock";
-      default: return status;
+      case "in_stock":
+        return "In Stock";
+      case "low_stock":
+        return "Low Stock";
+      case "out_of_stock":
+        return "Out of Stock";
+      default:
+        return status;
     }
   };
-
-  const currentStoreName =
-    isStoreManager && currentUser?.store_id
-      ? chaiiwalaStores.find((s) => s.id === currentUser.store_id)?.name
-      : (isStoreManager && currentUser?.storeId)
-        ? chaiiwalaStores.find((s) => s.id === currentUser.storeId)?.name
-        : "";
-
-  const showStoreFilter = isAdminOrRegional;
-  const showStoreColumn = isAdminOrRegional || isArea;
 
   if (loading) return <div>Loading...</div>;
 
   return (
     <DashboardLayout title="Stock Management">
       <div className="container mx-auto p-4">
-        {/* Header */}
+        {/* Header + modal host */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Stock Management</h1>
-            <p className="mt-1 text-sm text-gray-500">Manage your Chaiiwala product stock</p>
-          </div>
-          <div className="mt-4 md:mt-0 flex flex-col items-end">
-            <div className="bg-gray-100 px-3 py-1 rounded-md flex items-center">
-              <span className="text-sm font-medium mr-2">Logged in as:</span>
-              <span className="text-sm text-chai-gold font-semibold">{currentUser?.name}</span>
-            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your Chaiiwala product stock
+            </p>
           </div>
 
-          {/* 🔹 External Historic modal (no inline component anymore) */}
           {selectedHistoricStore && (
             <HistoricStockDialog
               open={!!selectedHistoricStore}
@@ -233,44 +258,37 @@ const handleSaveChanges = async (updatedItem) => {
           )}
         </div>
 
-        {/* Store manager banner */}
-        {isStoreManager && currentStoreName && (
-          <div className="mb-4 p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
-            <div className="flex items-center">
-              <Store className="h-5 w-5 text-chai-gold mr-2" />
-              <span className="font-medium text-gray-800">
-                Viewing stock for: <span className="text-chai-gold font-semibold">{currentStoreName}</span>
-              </span>
-            </div>
+        {/* Regional/Admin: cards -> modal */}
+        <div className="mb-10">
+          <h2 className="text-lg font-bold mb-4">Historic Stock by Store</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 max-w-5xl">
+            {storeCards.map((store) => (
+              <Card
+                key={store.id}
+                className="cursor-pointer transition hover:shadow-xl border border-gray-200 bg-white"
+                onClick={() =>
+                  setSelectedHistoricStore({ id: store.id, name: store.name })
+                }
+              >
+                <CardHeader className="flex items-center gap-2 pb-0">
+                  <Store className="text-chai-gold" />
+                  <span className="font-bold text-base">{store.name}</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-mono font-bold text-gray-800">
+                    {
+                      new Intl.NumberFormat("en-GB", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(store.totalQuantity ?? 0)
+                    }
+                  </div>
+                  <div className="text-sm text-gray-500">Total Stock</div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        )}
-
-        {/* Store cards -> open historic modal */}
-        {isAdminOrRegional && (
-          <div className="mb-10">
-            <h2 className="text-lg font-bold mb-4">Historic Stock by Store</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 max-w-5xl">
-              {storeCards.map((store) => (
-                <Card
-                  key={store.id}
-                  className="cursor-pointer transition hover:shadow-xl border border-gray-200 bg-white"
-                  onClick={() => setSelectedHistoricStore(store)}
-                >
-                  <CardHeader className="flex items-center gap-2 pb-0">
-                    <Store className="text-chai-gold" />
-                    <span className="font-bold text-base">{store.name}</span>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-mono font-bold text-gray-800">
-                      {format2(store.totalQuantity)}
-                    </div>
-                    <div className="text-sm text-gray-500">Total Stock</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -309,50 +327,72 @@ const handleSaveChanges = async (updatedItem) => {
               </SelectContent>
             </Select>
 
-            {showStoreFilter && (
-              <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger className="w-[170px]">
-                  <Store className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Store" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stores</SelectItem>
-                  {chaiiwalaStores.map((store) => (
-                    <SelectItem key={store.id} value={String(store.id)}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={storeFilter} onValueChange={setStoreFilter}>
+              <SelectTrigger className="w-[170px]">
+                <Store className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Store" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stores</SelectItem>
+                {chaiiwalaStores.map((store) => (
+                  <SelectItem key={store.id} value={String(store.id)}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Stock table */}
+        {/* Table */}
         <StockTable
           rows={paginatedRows}
           currentPage={currentPage}
           totalPages={totalPages}
-          showStoreColumn={showStoreColumn}
+          showStoreColumn={isAdminOrRegional || isArea}
           handleSort={handleSort}
           getStatusBadgeClass={getStatusBadgeClass}
           getStatusText={getStatusText}
           handleEditItem={handleEditItem}
-          currentStoreName={currentStoreName}
-          isStoreManager={isStoreManager}
+          currentStoreName={""}
+          isStoreManager={false}
         />
 
         {/* Table pagination footer */}
         <div className="flex justify-between items-center p-4 bg-white border-t">
           <div>Page {currentPage} of {totalPages || 1}</div>
           <div className="space-x-2">
-            <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>Start</Button>
-            <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>Previous</Button>
-            <Button type="button" variant="outline" size="sm" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(1)}
+            >
+              Start
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Next
+            </Button>
           </div>
         </div>
 
-        {/* Edit Inventory Item Dialog (unchanged) */}
+        {/* Edit dialog (regional/admin) */}
         {dialogOpen && editItem && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogContent className="sm:max-w-md">
@@ -376,11 +416,13 @@ const handleSaveChanges = async (updatedItem) => {
 
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Price:</div>
-                  <div className="col-span-3">£{editItem.price?.toFixed(2)}</div>
+                  <div className="col-span-3">£{Number(editItem.price ?? 0).toFixed(2)}</div>
                 </div>
 
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">Quantity:</label>
+                  <label htmlFor="stock" className="text-right text-sm font-medium col-span-1">
+                    Quantity:
+                  </label>
                   <div className="col-span-3">
                     <Input
                       id="stock"
@@ -406,21 +448,30 @@ const handleSaveChanges = async (updatedItem) => {
                     <input
                       type="checkbox"
                       checked={!!editItem.daily_check}
-                      onChange={(e) => setEditItem({ ...editItem, daily_check: e.target.checked })}
+                      onChange={(e) =>
+                        setEditItem({ ...editItem, daily_check: e.target.checked })
+                      }
                       className="mr-2"
                     />
-                    <span className="text-xs text-gray-600">Show on daily stock check list</span>
+                    <span className="text-xs text-gray-600">
+                      Show on daily stock check list
+                    </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-4 items-center gap-4">
                   <div className="text-right text-sm font-medium col-span-1">Status:</div>
                   <div className="col-span-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(editItem.status)}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(
+                        editItem.status
+                      )}`}
+                    >
                       {getStatusText(editItem.status)}
                     </span>
                     <div className="mt-1 text-xs text-gray-500">
-                      Status is automatically updated based on stock quantity and configured thresholds
+                      Status is automatically updated based on stock quantity and configured
+                      thresholds
                     </div>
                   </div>
                 </div>
