@@ -1,3 +1,4 @@
+// client/src/pages/DashboardPage.jsx
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import StatsCard from "../components/dashboard/stats-card.jsx";
 import TaskItem from "../components/dashboard/task-item.jsx";
@@ -33,6 +34,9 @@ import ChaiiwalaOrderStatusWidget from "../components/orders/ChaiiwalaOrderStatu
 import StockCheckCompliancePanel from "../components/dashboard/StockCheckCompliancePanel.jsx";
 import TaskProgressPanel from "../components/dashboard/TaskProgressPanel.jsx";
 
+/* ✅ Use the exact same components as the Daily Checklist page */
+import DailyStoreChecklistCard from "../components/checklists/DailyStoreChecklistCard.jsx";
+import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
 
 // Get the most recent delivery date (today if valid, else yesterday, else last valid)
 const deliveryDateISO = getMostRecentFreshwaysDeliveryDate();
@@ -49,47 +53,44 @@ if (isTodayDeliveryDay(today)) {
   orderDeadlineDate = null;
 }
 
-
 export default function DashboardPage() {
   const { toast } = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   const queryClient = useQueryClient();
 
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
-const deliveryDate = getMostRecentFreshwaysDeliveryDate();
+  const deliveryDate = getMostRecentFreshwaysDeliveryDate();
 
+  const now = new Date();
+  const todayIsOrderDay = isOrderDay(now);
+  const cutoff11 = getOrderCutoffDate(now);
 
+  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday   = new Date(now); endOfToday.setHours(23, 59, 59, 999);
 
-const now = new Date();
-const todayIsOrderDay = isOrderDay(now);
-const cutoff11 = getOrderCutoffDate(now);
-
-const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-const endOfToday   = new Date(now); endOfToday.setHours(23, 59, 59, 999);
-
-
-const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
-  queryKey: ["freshways_order_log_today", startOfToday.toISOString()],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("freshways_orders")
-      .select("id, store_id, created_at, stores(name)")
-      .gte("created_at", startOfToday.toISOString())
-      .lte("created_at", endOfToday.toISOString())
-      .order("created_at", { ascending: true });
-    if (error) throw error;
-    return data || [];
-  }
-});
+  const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
+    queryKey: ["freshways_order_log_today", startOfToday.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("freshways_orders")
+        .select("id, store_id, created_at, stores(name)")
+        .gte("created_at", startOfToday.toISOString())
+        .lte("created_at", endOfToday.toISOString())
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    }
+  });
 
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
-  queryKey: ["stores"],
-  queryFn: async () => {
-    const { data, error } = await supabase.from("stores").select("*");
-    if (error) throw error;
-    return data;
-  }
-});
+    queryKey: ["stores"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("stores").select("*");
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // 2 dropdowns (one for tasks, one for stock), default "all"
   const [selectedTaskStoreId, setSelectedTaskStoreId] = useState("all");
   const [selectedStockStoreId, setSelectedStockStoreId] = useState("all");
@@ -147,7 +148,7 @@ const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
         const { count, error } = await supabase
           .from("stock_items")
           .lt("quantity", 10)
-          .select('id', { count: "exact" });
+          .select("id", { count: "exact" });
         if (error) throw error;
         return count || 0;
       } else {
@@ -155,7 +156,7 @@ const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
           .from("stock_items")
           .eq("store_id", selectedStockStoreId)
           .lt("quantity", 10)
-          .select('id', { count: "exact" });
+          .select("id", { count: "exact" });
         if (error) throw error;
         return count || 0;
       }
@@ -164,14 +165,14 @@ const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
   });
 
   // Fetch all checklist rows for today (all stores)
-  const today = new Date().toISOString().split("T")[0];
+  const todayISO = new Date().toISOString().split("T")[0];
   const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
-    queryKey: ["v_daily_checklist_with_status", today, selectedTaskStoreId],
+    queryKey: ["v_daily_checklist_with_status", todayISO, selectedTaskStoreId],
     queryFn: async () => {
       let query = supabase
         .from("v_daily_checklist_with_status")
         .select("*")
-        .eq("date", today);
+        .eq("date", todayISO);
 
       if (selectedTaskStoreId !== "all") {
         query = query.eq("store_id", selectedTaskStoreId);
@@ -181,15 +182,11 @@ const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
       if (error) throw error;
       return data || [];
     },
-    enabled: !!today
+    enabled: !!todayISO
   });
-
-
-
 
   const storeTaskData = useMemo(() => {
     if (!stores.length) return [];
-    // For each store, count number of completed tasks today
     return stores.map(store => {
       const completed = checklistRows.filter(
         row => String(row.store_id) === String(store.id) && row.status === "completed"
@@ -201,33 +198,31 @@ const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
     });
   }, [stores, checklistRows]);
 
-const mergedOrderLog = useMemo(() => {
-  return stores.map(store => {
-    const todays = orderLogsToday.filter(o => o.store_id === store.id);
-    const earliest = todays[0] ? new Date(todays[0].created_at) : null;
+  const mergedOrderLog = useMemo(() => {
+    return stores.map(store => {
+      const todays = orderLogsToday.filter(o => o.store_id === store.id);
+      const earliest = todays[0] ? new Date(todays[0].created_at) : null;
 
-    if (!todayIsOrderDay) {
-      return { storeName: store.name, status: "no_order_day", createdAt: null };
-    }
+      if (!todayIsOrderDay) {
+        return { storeName: store.name, status: "no_order_day", createdAt: null };
+      }
 
-    if (now < cutoff11) {
+      if (now < cutoff11) {
+        if (earliest && earliest <= cutoff11) {
+          return { storeName: store.name, status: "placed", createdAt: earliest };
+        }
+        return { storeName: store.name, status: "pending", createdAt: null };
+      }
+
       if (earliest && earliest <= cutoff11) {
         return { storeName: store.name, status: "placed", createdAt: earliest };
       }
-      return { storeName: store.name, status: "pending", createdAt: null };
-    }
-
-    if (earliest && earliest <= cutoff11) {
-      return { storeName: store.name, status: "placed", createdAt: earliest };
-    }
-    if (todays.length > 0) {
-      return { storeName: store.name, status: "missed_late", createdAt: new Date(todays[0].created_at) };
-    }
-    return { storeName: store.name, status: "missed", createdAt: null };
-  });
-}, [stores, orderLogsToday, todayIsOrderDay, now, cutoff11]);
-
-
+      if (todays.length > 0) {
+        return { storeName: store.name, status: "missed_late", createdAt: new Date(todays[0].created_at) };
+      }
+      return { storeName: store.name, status: "missed", createdAt: null };
+    });
+  }, [stores, orderLogsToday, todayIsOrderDay, now, cutoff11]);
 
   // For stats card: SUM all rows across all stores if "all"
   let filteredChecklistRows = checklistRows;
@@ -258,7 +253,7 @@ const mergedOrderLog = useMemo(() => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!today
+    enabled: !!todayISO
   });
 
   // Map tasks for "Today's Tasks" list
@@ -274,7 +269,7 @@ const mergedOrderLog = useMemo(() => {
     }));
   }, [checklistRows, allDailyTasks, stores, selectedTaskStoreId]);
 
-  // Task complete handler
+  // Task complete handler (kept for backwards compatibility)
   const handleTaskComplete = async (id, newStatus) => {
     setUpdatingTaskId(id);
     const { error } = await supabase
@@ -295,7 +290,6 @@ const mergedOrderLog = useMemo(() => {
     }
     queryClient.invalidateQueries(["freshways_order_log", deliveryDate]);
     setUpdatingTaskId(null);
-
   };
 
   // Loading and error handling
@@ -341,6 +335,12 @@ const mergedOrderLog = useMemo(() => {
     dashboardProfile?.permissions === "admin" ||
     dashboardProfile?.permissions === "regional";
 
+  /* Store manager's primary store (first id in array) or 'all' for others */
+  const myStoreId =
+    dashboardProfile?.permissions === "store"
+      ? (dashboardProfile?.store_ids?.[0] ?? "all")
+      : "all";
+
   // ========== MAIN DASHBOARD RENDER ===========
   return (
     <DashboardLayout title="Dashboard" profile={dashboardProfile} announcements={announcements || []}>
@@ -349,31 +349,54 @@ const mergedOrderLog = useMemo(() => {
           Welcome back, {dashboardProfile?.first_name || dashboardProfile?.name || "there"}.
         </h2>
       </div>
+
       <Tabs defaultValue="overview" className="mb-6">
         <TabsContent value="overview">
+          {/* Store Manager view: two cards – checklist + stock check */}
+{/* Store Manager view: stacked cards – checklist then stock check */}
+{!canViewStatsAndChart && (
+  <div className="flex flex-col gap-6 mb-6">
+    <DailyStoreChecklistCard
+      title="Daily Store Checklist"
+      collapsible
+      defaultExpanded={true}
+    />
+
+    <DailyStockCheck
+      title="Daily Stock Check"
+      // storeId={myStoreId} // optional; it auto-uses the manager’s first store
+      itemsPerPageProp={10}
+      collapsible
+      defaultExpanded={true}
+    />
+  </div>
+)}
+
+
+          {/* Admin/Regional widgets remain unchanged */}
           {canViewStatsAndChart && (
             <>
               {/* Stats cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-<MaintenanceRequestsPie
-  daysBack={14}
-  icon={Building}
-  iconColor="text-blue-600"
-  iconBgColor="bg-blue-100"
-/>
-<ChaiiwalaOrderStatusWidget />
-<TaskProgressPanel
-   stores={stores}
-  selectedTaskStoreId={selectedTaskStoreId}
-   onChangeSelectedTaskStoreId={setSelectedTaskStoreId}
-   isLoadingTasks={isLoadingTasks}
-   percentComplete={percentComplete}
-  completedTasks={completedTasks}
-  totalTasks={totalTasks}
-/>
-<DailytaskListChart storeTaskData={storeTaskData} dateISO={today} />
-                {/* Weekly Stock Check Compliance - Regional/Admin Only */}
+                <MaintenanceRequestsPie
+                  daysBack={14}
+                  icon={Building}
+                  iconColor="text-blue-600"
+                  iconBgColor="bg-blue-100"
+                />
+                <ChaiiwalaOrderStatusWidget />
+                <TaskProgressPanel
+                  stores={stores}
+                  selectedTaskStoreId={selectedTaskStoreId}
+                  onChangeSelectedTaskStoreId={setSelectedTaskStoreId}
+                  isLoadingTasks={isLoadingTasks}
+                  percentComplete={percentComplete}
+                  completedTasks={completedTasks}
+                  totalTasks={totalTasks}
+                />
+                <DailytaskListChart storeTaskData={storeTaskData} dateISO={todayISO} />
 
+                {/* Weekly Stock Check Compliance - Regional/Admin Only */}
                 <StatsCard
                   title={
                     <span className="flex flex-col">
@@ -398,95 +421,82 @@ const mergedOrderLog = useMemo(() => {
                   iconBgColor="bg-red-100"
                   change={{ value: "Immediate attention", isPositive: false, text: "" }}
                 />
-                    <StockCheckCompliancePanel />
-                     {/* Freshways Widget */}
-    <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
-      <div className="absolute left-4 top-4">
-        <div className="rounded-full bg-blue-100 p-2">
-          <ShoppingCart className="h-6 w-6 text-blue-600" />
-        </div>
-      </div>
-      <CardHeader className="pl-20 pt-4 pb-2">
-        <CardTitle className="text-base font-bold text-gray-800">
-          Freshways Order Status
-        </CardTitle>
-        <CardDescription>
-          for delivery on {formatDeliveryDateVerbose(deliveryDate)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-5 pb-5">
-        {isLoadingOrders ? (
-          <p className="text-gray-500 text-sm">Loading...</p>
-        ) : mergedOrderLog.length === 0 ? (
-          <p className="text-gray-500 text-sm">No stores available</p>
-        ) : (
-          <table className="w-full text-sm text-gray-700">
-            <thead>
-              <tr className="text-left border-b text-xs text-gray-400">
-                <th className="py-1">Store</th>
-                <th className="py-1">Status</th>
-                <th className="py-1">Placed At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mergedOrderLog.map((log, idx) => (
-                <tr key={idx} className="border-b">
-                  <td className="py-2">{log.storeName}</td>
-                  <td className="py-2">
-                    {log.status === "placed" ? (
-                      <span className="text-green-600 font-semibold">Placed</span>
-                    ) : log.status === "missed" ? (
-                      <span className="text-red-600 font-semibold">Missed</span>
-                    ) : (
-                      <span className="text-yellow-600 font-semibold">No Entry</span>
-                    )}
-                  </td>
-                  <td className="py-2">
-                    {log.status === "placed" && log.createdAt
-                      ? new Date(log.createdAt).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </CardContent>
-    </Card>
+
+                <StockCheckCompliancePanel />
+
+                {/* Freshways Widget */}
+                <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
+                  <div className="absolute left-4 top-4">
+                    <div className="rounded-full bg-blue-100 p-2">
+                      <ShoppingCart className="h-6 w-6 text-blue-600" />
+                    </div>
                   </div>
-
-              </>
+                  <CardHeader className="pl-20 pt-4 pb-2">
+                    <CardTitle className="text-base font-bold text-gray-800">
+                      Freshways Order Status
+                    </CardTitle>
+                    <CardDescription>
+                      for delivery on {formatDeliveryDateVerbose(deliveryDate)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5">
+                    {isLoadingOrders ? (
+                      <p className="text-gray-500 text-sm">Loading...</p>
+                    ) : mergedOrderLog.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No stores available</p>
+                    ) : (
+                      <table className="w-full text-sm text-gray-700">
+                        <thead>
+                          <tr className="text-left border-b text-xs text-gray-400">
+                            <th className="py-1">Store</th>
+                            <th className="py-1">Status</th>
+                            <th className="py-1">Placed At</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mergedOrderLog.map((log, idx) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-2">{log.storeName}</td>
+                              <td className="py-2">
+                                {log.status === "placed" ? (
+                                  <span className="text-green-600 font-semibold">Placed</span>
+                                ) : log.status === "missed" ? (
+                                  <span className="text-red-600 font-semibold">Missed</span>
+                                ) : (
+                                  <span className="text-yellow-600 font-semibold">No Entry</span>
+                                )}
+                              </td>
+                              <td className="py-2">
+                                {log.status === "placed" && log.createdAt
+                                  ? new Date(log.createdAt).toLocaleString("en-GB", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "2-digit",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
           )}
+        </TabsContent>
 
-              </TabsContent>
-        {/* ... all other tabs remain unchanged ... */}
-        <TabsContent value="stock">
-          {/* ... Stock Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="cleaning">
-          {/* ... Cleaning Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="orders">
-          {/* ... Orders Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="maintenance">
-          {/* ... Maintenance Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="staff">
-          {/* ... Staff Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="bookings">
-          {/* ... Bookings Tab Content ... */}
-        </TabsContent>
-        <TabsContent value="audit">
-          {/* ... Audit Tab Content ... */}
-        </TabsContent>
+        {/* other tabs unchanged */}
+        <TabsContent value="stock">{/* ... */}</TabsContent>
+        <TabsContent value="cleaning">{/* ... */}</TabsContent>
+        <TabsContent value="orders">{/* ... */}</TabsContent>
+        <TabsContent value="maintenance">{/* ... */}</TabsContent>
+        <TabsContent value="staff">{/* ... */}</TabsContent>
+        <TabsContent value="bookings">{/* ... */}</TabsContent>
+        <TabsContent value="audit">{/* ... */}</TabsContent>
       </Tabs>
     </DashboardLayout>
   );

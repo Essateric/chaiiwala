@@ -1,26 +1,44 @@
+// components/stock/DailyStockCheck.jsx
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supabaseClient.js";
-import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card.jsx";
-import { Button } from "../../components/ui/button.jsx";
-import { Input } from "../../components/ui/input.jsx";
-import { useAuth } from "../../hooks/UseAuth.jsx";
+import { supabase } from "@/lib/supabaseClient.js";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { useAuth } from "@/hooks/UseAuth.jsx";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
-export default function DailyStockCheck() {
+export default function DailyStockCheck({
+  /** Optional: force a specific store id. If omitted, uses the user's first store. */
+  storeId: storeIdProp = null,
+  /** Optional: page size (defaults to 10) */
+  itemsPerPageProp = 10,
+  /** Optional: custom title (defaults to "Daily Stock Check") */
+  title = "Daily Stock Check",
+  /** NEW: collapsible header + default state */
+  collapsible = true,
+  defaultExpanded = true,
+}) {
   const { profile } = useAuth();
-  const storeId = Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null;
+  const resolvedStoreId =
+    storeIdProp ?? (Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null);
 
   const isSunday = new Date().getDay() === 0; // Sunday = 0
 
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
   const [search, setSearch] = useState("");
-  const itemsPerPage = 10;
+  const itemsPerPage = itemsPerPageProp;
 
   const fetchStock = async () => {
-    if (!storeId) return;
+    if (!resolvedStoreId) {
+      setStockItems([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -29,6 +47,7 @@ export default function DailyStockCheck() {
       .select("*")
       .order("name", { ascending: true });
 
+    // Match your existing logic: hide non-daily items except on Sundays
     if (!itemError && !isSunday) {
       items = items.filter((item) => item.daily_check === true);
     }
@@ -47,7 +66,7 @@ export default function DailyStockCheck() {
         .from("store_stock_levels")
         .select("*")
         .in("stock_item_id", itemIds)
-        .eq("store_id", storeId);
+        .eq("store_id", resolvedStoreId);
 
       if (!levelsError && levelData) levels = levelData;
     }
@@ -70,7 +89,7 @@ export default function DailyStockCheck() {
   useEffect(() => {
     fetchStock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+  }, [resolvedStoreId]);
 
   const handleEditChange = (id, value) => {
     // Allow empty for “clear”, but guard negative values
@@ -104,7 +123,7 @@ export default function DailyStockCheck() {
     const start = (currentPage - 1) * itemsPerPage;
     const end = currentPage * itemsPerPage;
     return filteredStockItems.slice(start, end);
-  }, [filteredStockItems, currentPage]);
+  }, [filteredStockItems, currentPage, itemsPerPage]);
 
   // Determine which edits on this page are valid and changed
   const pageChanges = useMemo(() => {
@@ -123,7 +142,7 @@ export default function DailyStockCheck() {
   const hasPageChanges = pageChanges.length > 0;
 
   const handleSavePage = async () => {
-    if (!storeId || !hasPageChanges) return;
+    if (!resolvedStoreId || !hasPageChanges) return;
     setSaving(true);
 
     try {
@@ -145,7 +164,7 @@ export default function DailyStockCheck() {
       const rows = pageChanges.map(({ item, qty }) => ({
         id: item.store_stock_level_id ?? undefined,
         stock_item_id: item.id,
-        store_id: storeId,
+        store_id: resolvedStoreId,
         quantity: qty,
         last_updated: now,
         updated_by: user.id,
@@ -170,7 +189,6 @@ export default function DailyStockCheck() {
         const next = { ...prev };
         pageItems.forEach((item) => {
           if (typeof next[item.id] !== "undefined") {
-            // Clear only values that were actually changed/saved
             const wasChanged = pageChanges.some((c) => c.item.id === item.id);
             if (wasChanged) delete next[item.id];
           }
@@ -187,111 +205,135 @@ export default function DailyStockCheck() {
 
   return (
     <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>Daily Stock Check</CardTitle>
-        <p className="text-sm text-gray-500">
-          {isSunday
-            ? "Sunday Weekly Stock Check — update quantities for all stock items."
-            : "Update today’s stock levels for all daily-check items."}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <Input
-            placeholder="Search by name or SKU..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64"
-          />
-
-          {/* Save current page button (top-right for convenience) */}
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleSavePage}
-            disabled={!hasPageChanges || saving || loading}
-          >
-            {saving ? "Saving..." : "Save This Page"}
-          </Button>
+      <CardHeader className="flex items-center justify-between relative">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <p className="text-sm text-gray-500">
+            {isSunday
+              ? "Sunday Weekly Stock Check — update quantities for all stock items."
+              : "Update today’s stock levels for all daily-check items."}
+          </p>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading stock items...</div>
-        ) : (
-          <>
-            {pageItems.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No stock items found.</div>
+        {collapsible && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExpanded((s) => !s)}
+            className="absolute top-3 right-4"
+          >
+            {expanded ? (
+              <>
+                <ChevronUp className="h-4 w-4 mr-1" /> Collapse
+              </>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Category</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Current Qty</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">New Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageItems.map((item) => (
-                      <tr key={item.id} className="border-t">
-                        <td className="px-4 py-2">{item.sku}</td>
-                        <td className="px-4 py-2">{item.name}</td>
-                        <td className="px-4 py-2">{item.category}</td>
-                        <td className="px-4 py-2 text-right">{item.current_qty}</td>
-                        <td className="px-4 py-2 text-right">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={editing[item.id] ?? ""}
-                            onChange={(e) => handleEditChange(item.id, e.target.value)}
-                            placeholder="Qty"
-                            className="w-24"
-                          />
-                        </td>
+              <>
+                <ChevronDown className="h-4 w-4 mr-1" /> Expand
+              </>
+            )}
+          </Button>
+        )}
+      </CardHeader>
+
+      {expanded && (
+        <CardContent>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <Input
+              placeholder="Search by name or SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64"
+            />
+
+            {/* Save current page button (top-right for convenience) */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSavePage}
+              disabled={!hasPageChanges || saving || loading}
+            >
+              {saving ? "Saving..." : "Save This Page"}
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">Loading stock items...</div>
+          ) : (
+            <>
+              {pageItems.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">No stock items found.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Category</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Current Qty</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">New Qty</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {pageItems.map((item) => (
+                        <tr key={item.id} className="border-t">
+                          <td className="px-4 py-2">{item.sku}</td>
+                          <td className="px-4 py-2">{item.name}</td>
+                          <td className="px-4 py-2">{item.category}</td>
+                          <td className="px-4 py-2 text-right">{item.current_qty}</td>
+                          <td className="px-4 py-2 text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={editing[item.id] ?? ""}
+                              onChange={(e) => handleEditChange(item.id, e.target.value)}
+                              placeholder="Qty"
+                              className="w-24"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-                  <span>Page {currentPage} of {totalPages}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                    <span>Page {currentPage} of {totalPages}</span>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === totalPages || totalPages === 0}
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    >
-                      Next
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      >
+                        Prev
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === totalPages || totalPages === 0}
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      >
+                        Next
+                      </Button>
 
-                    {/* Duplicate Save at bottom for easy access */}
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleSavePage}
-                      disabled={!hasPageChanges || saving || loading}
-                    >
-                      {saving ? "Saving..." : "Save This Page"}
-                    </Button>
+                      {/* Duplicate Save at bottom for easy access */}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleSavePage}
+                        disabled={!hasPageChanges || saving || loading}
+                      >
+                        {saving ? "Saving..." : "Save This Page"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
+              )}
+            </>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }

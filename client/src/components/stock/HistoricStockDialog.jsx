@@ -6,30 +6,44 @@ import {
 } from "../../components/ui/dialog.jsx";
 import { Input } from "../../components/ui/input.jsx";
 
-/* Format any number to 2dp safely */
+/* Format to 2dp safely */
 const format2 = (v, fallback = "0.00") => {
   const n = Number(v);
   return Number.isFinite(n) ? n.toFixed(2) : fallback;
 };
 
-/* Small arrow helper */
+/* Arrow helper */
 const Arrow = ({ dir }) => {
-  if (dir === "up") {
-    return <span className="ml-1 align-middle text-emerald-600" aria-label="increased">▲</span>;
-  }
-  if (dir === "down") {
-    return <span className="ml-1 align-middle text-rose-600" aria-label="decreased">▼</span>;
-  }
+  if (dir === "up") return <span className="ml-1 align-middle text-emerald-600">▲</span>;
+  if (dir === "down") return <span className="ml-1 align-middle text-rose-600">▼</span>;
   return null;
+};
+
+/* Date helpers (LOCAL day keys) */
+const pad2 = (x) => String(x).padStart(2, "0");
+const localDayKey = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const lastNDatesLocal = (n) => {
+  const dates = [];
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  for (let i = 0; i < n; i++) {
+    const d = new Date(end);
+    d.setDate(end.getDate() - i);
+    dates.push(d);
+  }
+  return dates; // today, yesterday, ...
 };
 
 /* ---------------- Product Table ---------------- */
 function ProductTable({
   products,
-  usageByItem,           // { [stock_item_id]: number } (consumption only)
-  nDays,                 // window size (7 or 14)
+  usageByItem,
+  updatedInWindow,       // {stock_item_id: true} if any change within range
+  rangeShortLabel,       // "5d" | "14d" | "4w"
+  rangeLongLabel,
   isRegional,
-  storeUsageTotal,       // number (only relevant for regional/admin, consumption only)
+  storeUsageTotal,
   onViewHistory,
   rowsPerPage,
   currentPage,
@@ -43,7 +57,7 @@ function ProductTable({
         <h4 className="font-semibold">Products</h4>
         {isRegional && (
           <div className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1">
-            Store total usage (last {nDays}d):{" "}
+            Store total usage ({rangeLongLabel}):{" "}
             <span className="font-semibold">{format2(storeUsageTotal)}</span>
           </div>
         )}
@@ -56,7 +70,7 @@ function ProductTable({
               <th className="p-2 text-left">Product Name</th>
               <th className="p-2 text-left">SKU</th>
               <th className="p-2 text-left">Last Stock Qty</th>
-              <th className="p-2 text-left">Usage (last {nDays}d)</th>
+              <th className="p-2 text-left">Usage ({rangeShortLabel})</th>
               <th className="p-2"></th>
             </tr>
           </thead>
@@ -70,15 +84,22 @@ function ProductTable({
             ) : (
               products.map((row) => {
                 const usage = usageByItem?.[row.stock_item_id] ?? 0;
+                const wasUpdated = !!updatedInWindow?.[row.stock_item_id];
                 return (
                   <tr key={row.stock_item_id} className="bg-white border-b last:border-b-0">
                     <td className="p-2">{row.stock_items?.name}</td>
                     <td className="p-2">{row.stock_items?.sku}</td>
-                    <td className="p-2">{format2(row.quantity)}</td>
+                    <td className="p-2">
+                      {wasUpdated ? (
+                        format2(row.quantity)
+                      ) : (
+                        <span className="italic text-gray-500">quantity was not updated</span>
+                      )}
+                    </td>
                     <td className="p-2">{format2(usage)}</td>
                     <td className="p-2">
                       <Button variant="gold" size="sm" onClick={() => onViewHistory(row)}>
-                        View {nDays}d History
+                        View {rangeShortLabel} History
                       </Button>
                     </td>
                   </tr>
@@ -94,9 +115,7 @@ function ProductTable({
           <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={handlePrevPage}>
             Prev
           </Button>
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
+          <span>Page {currentPage} of {totalPages}</span>
           <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={handleNextPage}>
             Next
           </Button>
@@ -108,29 +127,110 @@ function ProductTable({
 
 /* --------------- Product History Table --------------- */
 /*
-Open (Old): stock we have right now (e.g., on Sunday)
-Delivery:   stocks received (increases only) e.g., on Monday
-Close (New): stock left after the change
-Usage:      consumption only (decreases only)
+Open (Old)  : stock at the start of the change
+Delivery    : increases only
+Close (New) : stock after the change
+Usage       : decreases only
 */
-function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
-  // Per-row values + arrows
-  const rowsWithCalcs = useMemo(() => {
-    return (historyRows || []).map((row) => {
-      const oldQ = Number(row.old_quantity) || 0;
-      const newQ = Number(row.new_quantity) || 0;
-      const delivery = Math.max(0, newQ - oldQ); // increases only
-      const usage = Math.max(0, oldQ - newQ);    // decreases only
-      const closeDir = newQ > oldQ ? "up" : newQ < oldQ ? "down" : null;
-      const deliveryDir = delivery > 0 ? "up" : null;
-      const usageDir = usage > 0 ? "down" : null;
-      return { ...row, oldQ, newQ, delivery, usage, closeDir, deliveryDir, usageDir };
-    });
-  }, [historyRows]);
+function ProductHistoryTable({ historyRows, product, onBack, rangeShortLabel, rangeLongLabel }) {
+  const is5d = rangeShortLabel === "5d";
 
-  // Totals across window
+  // Build rows:
+  // - For 14d/4w: one row per change (as before)
+  // - For 5d: one row per DAY (today + previous 4). If no changes that day,
+  //           insert a placeholder row with "quantity was not updated".
+  const rowsWithCalcs = useMemo(() => {
+    if (!is5d) {
+      // Event-by-event rows (existing behaviour)
+      return (historyRows || []).map((row) => {
+        const oldQ = Number(row.old_quantity) || 0;
+        const newQ = Number(row.new_quantity) || 0;
+        const delivery = Math.max(0, newQ - oldQ);
+        const usage = Math.max(0, oldQ - newQ);
+        const closeDir = newQ > oldQ ? "up" : newQ < oldQ ? "down" : null;
+        const deliveryDir = delivery > 0 ? "up" : null;
+        const usageDir = usage > 0 ? "down" : null;
+        return { ...row, oldQ, newQ, delivery, usage, closeDir, deliveryDir, usageDir };
+      });
+    }
+
+    // ---- 5d daily aggregation ----
+    const days = lastNDatesLocal(5); // today..prev4
+    const byDay = new Map(days.map(d => [localDayKey(d), []]));
+    for (const r of historyRows || []) {
+      if (!r.changed_at) continue;
+      const dt = new Date(r.changed_at);
+      const key = localDayKey(dt);
+      if (byDay.has(key)) byDay.get(key).push(r);
+    }
+
+    // For each day (desc by date: today first), aggregate or placeholder
+    const result = [];
+    for (const d of days) {
+      const key = localDayKey(d);
+      const rows = byDay.get(key) || [];
+
+      if (!rows.length) {
+        result.push({
+          __placeholder: true,
+          changed_at: d.toISOString(),
+          updated_by_name: "—",
+          dayDate: d,
+          oldQ: null,
+          newQ: null,
+          delivery: 0,
+          usage: 0,
+          closeDir: null,
+          deliveryDir: null,
+          usageDir: null,
+        });
+        continue;
+      }
+
+      // sort rows ASC to get first/last of the day
+      const asc = [...rows].sort(
+        (a, b) => new Date(a.changed_at) - new Date(b.changed_at)
+      );
+      const first = asc[0];
+      const last = asc[asc.length - 1];
+
+      // aggregate delivery/usage across day
+      let deliverySum = 0;
+      let usageSum = 0;
+      let open = Number(first.old_quantity) || 0;
+      let close = Number(last.new_quantity) || 0;
+
+      for (const r of asc) {
+        const oldQ = Number(r.old_quantity) || 0;
+        const newQ = Number(r.new_quantity) || 0;
+        deliverySum += Math.max(0, newQ - oldQ);
+        usageSum += Math.max(0, oldQ - newQ);
+      }
+
+      // changed_by: multiple -> "Multiple"
+      const names = new Set(asc.map(r => r.updated_by_name || "-"));
+      const changedBy =
+        names.size === 1 ? Array.from(names)[0] : "Multiple";
+
+      result.push({
+        changed_at: d.toISOString(), // use day's date for row
+        updated_by_name: changedBy,
+        dayDate: d,
+        oldQ: open,
+        newQ: close,
+        delivery: deliverySum,
+        usage: usageSum,
+        closeDir: close > open ? "up" : close < open ? "down" : null,
+        deliveryDir: deliverySum > 0 ? "up" : null,
+        usageDir: usageSum > 0 ? "down" : null,
+      });
+    }
+    return result; // already newest -> oldest
+  }, [historyRows, is5d]);
+
+  // Totals across window (skip placeholders for Open/Close sums)
   const sumOpen = useMemo(
-    () => rowsWithCalcs.reduce((s, r) => s + (r.oldQ || 0), 0),
+    () => rowsWithCalcs.reduce((s, r) => s + (r.oldQ ?? 0), 0),
     [rowsWithCalcs]
   );
   const totalDeliveries = useMemo(
@@ -138,7 +238,7 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
     [rowsWithCalcs]
   );
   const sumClose = useMemo(
-    () => rowsWithCalcs.reduce((s, r) => s + (r.newQ || 0), 0),
+    () => rowsWithCalcs.reduce((s, r) => s + (r.newQ ?? 0), 0),
     [rowsWithCalcs]
   );
   const totalUsage = useMemo(
@@ -155,10 +255,10 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-1">
-            {nDays}d usage: <span className="font-semibold">{format2(totalUsage)}</span>
+            {rangeShortLabel} usage: <span className="font-semibold">{format2(totalUsage)}</span>
           </div>
           <div className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1">
-            {nDays}d deliveries: <span className="font-semibold">{format2(totalDeliveries)}</span>
+            {rangeShortLabel} deliveries: <span className="font-semibold">{format2(totalDeliveries)}</span>
           </div>
           <Button variant="ghost" size="sm" onClick={onBack}>
             Back to Products
@@ -187,26 +287,42 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
               </tr>
             ) : (
               rowsWithCalcs.map((row, i) => {
-                const dt = row.changed_at ? new Date(row.changed_at) : null;
-                const isSunday = dt ? dt.getDay() === 0 : false; // 0 = Sunday
+                const dt = row.dayDate ? row.dayDate : (row.changed_at ? new Date(row.changed_at) : null);
+                const isSunday = dt ? dt.getDay() === 0 : false;
                 return (
                   <tr
-                    key={(row.changed_at || "") + (row.updated_by || "") + i}
+                    key={(row.changed_at || "") + (row.updated_by_name || "") + i}
                     className={isSunday ? "bg-blue-50" : ""}
                   >
                     <td className={`p-2 ${isSunday ? "text-blue-700 font-medium" : ""}`}>
-                      {dt ? dt.toLocaleString() : "—"}
+                      {dt ? dt.toLocaleDateString() + (is5d ? "" : ` ${dt.toLocaleTimeString()}`) : "—"}
                     </td>
-                    <td className="p-2">{row.updated_by_name}</td>
-                    <td className="p-2">{format2(row.oldQ)}</td>
+                    <td className="p-2">{row.updated_by_name || "—"}</td>
+
+                    {/* Open */}
+                    <td className="p-2">
+                      {row.oldQ == null ? "—" : format2(row.oldQ)}
+                    </td>
+
+                    {/* Delivery */}
                     <td className="p-2">
                       {format2(row.delivery)}
                       <Arrow dir={row.deliveryDir} />
                     </td>
+
+                    {/* Close */}
                     <td className="p-2">
-                      {format2(row.newQ)}
-                      <Arrow dir={row.closeDir} />
+                      {row.newQ == null ? (
+                        <span className="italic text-gray-500">quantity was not updated</span>
+                      ) : (
+                        <>
+                          {format2(row.newQ)}
+                          <Arrow dir={row.closeDir} />
+                        </>
+                      )}
                     </td>
+
+                    {/* Usage */}
                     <td className="p-2">
                       {format2(row.usage)}
                       <Arrow dir={row.usageDir} />
@@ -220,9 +336,8 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
           {/* Footer: totals + legend */}
           <tfoot>
             <tr className="bg-gray-50 border-t">
-              {/* label across Date + Changed By */}
               <td className="p-2 font-medium" colSpan={2}>
-                Totals (last {nDays}d)
+                Totals ({rangeLongLabel})
               </td>
               <td className="p-2 font-semibold">{format2(sumOpen)}</td>
               <td className="p-2 font-semibold">{format2(totalDeliveries)}</td>
@@ -233,7 +348,6 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
               <td className="p-2 text-xs text-gray-600" colSpan={6}>
                 <span
                   className="inline-block h-3 w-3 rounded-sm bg-blue-50 border border-blue-200 align-middle mr-2"
-                  aria-hidden="true"
                 />
                 Sunday entries highlighted
               </td>
@@ -245,13 +359,8 @@ function ProductHistoryTable({ historyRows, product, onBack, nDays }) {
   );
 }
 
-/* ---------------- Content (keeps your editing logic) ---------------- */
-function HistoricStockDialogContent({
-  open,
-  onClose,
-  user,
-  selectedStore,
-}) {
+/* ---------------- Content (modal body) ---------------- */
+function HistoricStockDialogContent({ open, onClose, user, selectedStore }) {
   const [selectedStoreState, setSelectedStoreState] = useState(selectedStore || null);
   const [storeProducts, setStoreProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -260,33 +369,35 @@ function HistoricStockDialogContent({
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  const isRegional = user?.permissions === "admin" || user?.permissions === "regional";
-  const nDays = isRegional ? 14 : 7;
+  // Range toggle
+  const [range, setRange] = useState("14d");
+  const windowDays = useMemo(() => (range === "5d" ? 5 : range === "4w" ? 28 : 14), [range]);
+  const rangeShortLabel = range === "4w" ? "4w" : `${windowDays}d`;
+  const rangeLongLabel = range === "4w" ? "last 4 weeks" : `last ${windowDays} days`;
 
-  // usage per item (consumption only) & store total consumption
+  const isRegional = user?.permissions === "admin" || user?.permissions === "regional";
+
   const [usageByItem, setUsageByItem] = useState({});
   const [storeUsageTotal, setStoreUsageTotal] = useState(0);
+  const [updatedInWindow, setUpdatedInWindow] = useState({});
 
-  // Fetch products for selected store
+  // Fetch products
   useEffect(() => {
     if (!selectedStoreState) return;
     async function fetchProducts() {
-      const { data: stockData, error } = await supabase
+      const { data, error } = await supabase
         .from("store_stock_levels")
         .select(`
           stock_item_id,
           quantity,
-          stock_items (
-            name,
-            sku
-          )
+          stock_items ( name, sku )
         `)
         .eq("store_id", selectedStoreState.id);
 
       if (!error) {
         const unique = {};
-        (stockData || []).forEach((row) => {
-          if (!unique[row.stock_item_id]) unique[row.stock_item_id] = row;
+        (data || []).forEach((r) => {
+          if (!unique[r.stock_item_id]) unique[r.stock_item_id] = r;
         });
         setStoreProducts(Object.values(unique));
       } else {
@@ -298,17 +409,16 @@ function HistoricStockDialogContent({
     setSearch("");
   }, [selectedStoreState]);
 
-  // Fetch product history for selected product (detail table)
+  // Fetch history for selected product
   useEffect(() => {
     if (!selectedStore || !selectedProduct) return;
 
     const load = async () => {
       const end = new Date();
       const start = new Date();
-      start.setDate(end.getDate() - (nDays - 1));
+      start.setDate(end.getDate() - (windowDays - 1));
 
-      // 1) Fetch history rows
-      const { data: changes, error: changesError } = await supabase
+      const { data: changes, error } = await supabase
         .from("stock_history_changes")
         .select("changed_at, updated_by, old_quantity, new_quantity")
         .eq("store_id", selectedStore.id)
@@ -317,12 +427,12 @@ function HistoricStockDialogContent({
         .lte("changed_at", end.toISOString())
         .order("changed_at", { ascending: false });
 
-      if (changesError) {
+      if (error) {
         setHistoryRows([]);
         return;
       }
 
-      // 2) Map updater ids to names
+      // Map updater IDs to display names
       const ids = Array.from(new Set((changes ?? []).map(r => r.updated_by).filter(Boolean)));
       let nameMap = {};
       if (ids.length) {
@@ -347,16 +457,16 @@ function HistoricStockDialogContent({
     };
 
     load();
-  }, [selectedStore, selectedProduct, nDays]);
+  }, [selectedStore, selectedProduct, windowDays]);
 
-  // Store-wide usage map for the last N days (consumption only)
+  // Store-wide usage map + "updated in window" flags
   useEffect(() => {
     if (!selectedStoreState?.id) return;
 
     const run = async () => {
       const end = new Date();
       const start = new Date();
-      start.setDate(end.getDate() - (nDays - 1));
+      start.setDate(end.getDate() - (windowDays - 1));
 
       const { data, error } = await supabase
         .from("stock_history_changes")
@@ -368,24 +478,28 @@ function HistoricStockDialogContent({
       if (error) {
         setUsageByItem({});
         setStoreUsageTotal(0);
+        setUpdatedInWindow({});
         return;
       }
 
       const map = {};
+      const updatedMap = {};
       let total = 0;
       for (const r of data || []) {
         const oldQ = Number(r.old_quantity) || 0;
         const newQ = Number(r.new_quantity) || 0;
-        const used = Math.max(0, oldQ - newQ); // consumption only
+        const used = Math.max(0, oldQ - newQ);
         map[r.stock_item_id] = (map[r.stock_item_id] ?? 0) + used;
+        updatedMap[r.stock_item_id] = true;
         total += used;
       }
       setUsageByItem(map);
       setStoreUsageTotal(total);
+      setUpdatedInWindow(updatedMap);
     };
 
     run();
-  }, [selectedStoreState, nDays]);
+  }, [selectedStoreState, windowDays]);
 
   // Reset when closed
   useEffect(() => {
@@ -398,17 +512,19 @@ function HistoricStockDialogContent({
       setSearch("");
       setUsageByItem({});
       setStoreUsageTotal(0);
+      setUpdatedInWindow({});
+      setRange("14d");
     }
   }, [open, selectedStore]);
 
   // Filtering + pagination
   let filteredProducts = storeProducts;
   if (search) {
-    const searchLower = search.toLowerCase();
+    const s = search.toLowerCase();
     filteredProducts = filteredProducts.filter(
       (row) =>
-        (row.stock_items?.name || "").toLowerCase().includes(searchLower) ||
-        (row.stock_items?.sku || "").toLowerCase().includes(searchLower)
+        (row.stock_items?.name || "").toLowerCase().includes(s) ||
+        (row.stock_items?.sku || "").toLowerCase().includes(s)
     );
   }
 
@@ -418,19 +534,25 @@ function HistoricStockDialogContent({
     currentPage * rowsPerPage
   );
 
-  const handleNextPage = () => setCurrentPage((page) => Math.min(page + 1, totalPages));
-  const handlePrevPage = () => setCurrentPage((page) => Math.max(page - 1, 1));
+  const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
+  const handlePrevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
 
   if (!open) return null;
 
   return (
     <div className="p-4" style={{ minWidth: 400 }}>
       {/* Header */}
-      <div>
+      <div className="flex items-center justify-between mb-2">
         <h4 className="font-semibold">Products in {selectedStoreState?.name}</h4>
+        {/* Range toggle */}
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant={range === "5d" ? "default" : "outline"} onClick={() => setRange("5d")}>5d</Button>
+          <Button size="sm" variant={range === "14d" ? "default" : "outline"} onClick={() => setRange("14d")}>14d</Button>
+          <Button size="sm" variant={range === "4w" ? "default" : "outline"} onClick={() => setRange("4w")}>4w</Button>
+        </div>
       </div>
 
-      {/* Product list (with sticky search) or history table */}
+      {/* Products or per-product history */}
       {!selectedProduct ? (
         <>
           <div
@@ -458,7 +580,9 @@ function HistoricStockDialogContent({
           <ProductTable
             products={paginatedProducts}
             usageByItem={usageByItem}
-            nDays={nDays}
+            updatedInWindow={updatedInWindow}
+            rangeShortLabel={rangeShortLabel}
+            rangeLongLabel={rangeLongLabel}
             isRegional={isRegional}
             storeUsageTotal={storeUsageTotal}
             onViewHistory={setSelectedProduct}
@@ -474,33 +598,28 @@ function HistoricStockDialogContent({
           historyRows={historyRows}
           product={selectedProduct}
           onBack={() => setSelectedProduct(null)}
-          nDays={nDays}
+          rangeShortLabel={rangeShortLabel}
+          rangeLongLabel={rangeLongLabel}
         />
       )}
 
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
-          Close
-        </Button>
+        <Button variant="outline" onClick={onClose}>Close</Button>
       </DialogFooter>
     </div>
   );
 }
 
-/* ---------------- Wrapper (the actual external modal) ---------------- */
+/* ---------------- Wrapper ---------------- */
 export default function HistoricStockDialog({ open, onClose, user, selectedStore }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="w-[900px] max-w-full rounded-lg p-0">
-        {/* Accessible, static header to satisfy Radix requirements */}
         <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle>Historic Stock</DialogTitle>
-          <DialogDescription>
-            Search or pick a product to view its quantity history.
-          </DialogDescription>
+          <DialogDescription>Search or pick a product to view its quantity history.</DialogDescription>
         </DialogHeader>
 
-        {/* All dynamic UI (including its own headers) lives inside here */}
         <HistoricStockDialogContent
           open={open}
           onClose={onClose}

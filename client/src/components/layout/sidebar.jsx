@@ -71,7 +71,6 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Management', icon: ShoppingCartIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'Deep Cleaning', icon: ClipboardListIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
-    { name: 'Daily Checklist', icon: ClipboardCheckIcon, href: '/daily-checklist', active: currentPage === 'daily-checklist', roles: ['area','store', 'staff'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Waste Reporting', icon: Trash2Icon, href: '/waste-reporting', active: currentPage === 'waste-reporting', roles: ['admin','regional','area','store','staff'] },

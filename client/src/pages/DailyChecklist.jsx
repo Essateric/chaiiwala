@@ -4,6 +4,10 @@ import ChecklistItem from "../components/checklists/checklist-item.jsx";
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
 import { useAuth } from "../hooks/UseAuth.jsx";
+import DailyStoreChecklistCard from "../components/checklists/DailyStoreChecklistCard.jsx";
+
+
+
 
 export default function DailyChecklist() {
   const { profile } = useAuth();

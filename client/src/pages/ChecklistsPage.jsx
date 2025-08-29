@@ -1,46 +1,35 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ChecklistItem from "@/components/checklists/checklist-item";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-// Types for checklist data
-interface ChecklistTask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface Checklist {
-  id: string;
-  title: string;
-  description: string;
-  dueDate?: string;
-  category: string;
-  assignedTo: string;
-  tasks: ChecklistTask[];
-}
+/* ⬇️ NEW: auth + reusable daily checklist panel */
+import { useAuth } from "@/hooks/UseAuth.jsx";
+import DailyChecklistPanel from "@/components/checklists/DailyChecklistPanel.jsx";
+import DailyStockCheck from "../components/stock/DailyStockCheck.jsx";
+import DailyStoreChecklistCard from "../components/checklists/DailyStoreChecklistCard.jsx";
 
 export default function ChecklistsPage() {
   const [showAddChecklistDialog, setShowAddChecklistDialog] = useState(false);
@@ -52,6 +41,14 @@ export default function ChecklistsPage() {
     dueDate: ""
   });
   const { toast } = useToast();
+
+  /* ⬇️ NEW: compute manager’s primary store for the panel */
+  const { profile } = useAuth();
+  const myStoreId =
+    profile?.permissions === "store" ? (profile?.store_ids?.[0] ?? "all") : "all";
+
+  /* ⬇️ NEW: local toggle for expand/collapse */
+  const [dailyOpen, setDailyOpen] = useState(true);
 
   // Fetch checklists data
   const { data: checklists = [] } = useQuery<Checklist[]>({
@@ -129,12 +126,40 @@ export default function ChecklistsPage() {
       });
       return;
     }
-    
+
     addChecklistMutation.mutate(newChecklist);
   };
 
   return (
     <DashboardLayout title="Checklists">
+      {/* ⬇️ NEW: Collapsible Daily Store Checklist (same as daily page) */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setDailyOpen(v => !v)}
+          className="w-full flex items-center justify-between rounded-lg bg-white px-4 py-3 shadow hover:bg-gray-50 transition"
+          aria-expanded={dailyOpen}
+        >
+          <span className="font-montserrat font-bold">Daily Store Checklist</span>
+          <ChevronDown
+            className={`h-5 w-5 transition-transform ${dailyOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {dailyOpen && (
+          <div className="mt-3">
+            {/* Re-uses the exact panel & data as your Daily Checklist page */}
+            <DailyChecklistPanel
+              title="Daily Store Checklist"
+              storeId={myStoreId}
+              showManageLink={true}
+              limit={999}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Existing Weekly Checklists UI (unchanged) */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-montserrat font-bold mb-1">Weekly Checklists</h2>
@@ -147,7 +172,7 @@ export default function ChecklistsPage() {
           </Button>
         </div>
       </div>
-      
+
       {/* Checklist Filters */}
       <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <Select>
@@ -185,7 +210,7 @@ export default function ChecklistsPage() {
           </SelectContent>
         </Select>
       </div>
-      
+
       {/* Checklists */}
       <div className="space-y-4">
         {checklists.length === 0 ? (
@@ -198,7 +223,7 @@ export default function ChecklistsPage() {
           </div>
         ) : (
           checklists.map(checklist => (
-            <ChecklistItem 
+            <ChecklistItem
               key={checklist.id}
               id={checklist.id}
               title={checklist.title}
@@ -212,7 +237,7 @@ export default function ChecklistsPage() {
           ))
         )}
       </div>
-      
+
       {/* Add Checklist Dialog */}
       <Dialog open={showAddChecklistDialog} onOpenChange={setShowAddChecklistDialog}>
         <DialogContent className="sm:max-w-[500px]">
@@ -228,7 +253,7 @@ export default function ChecklistsPage() {
               <Input
                 id="title"
                 value={newChecklist.title}
-                onChange={(e) => setNewChecklist({...newChecklist, title: e.target.value})}
+                onChange={(e) => setNewChecklist({ ...newChecklist, title: e.target.value })}
                 placeholder="Enter checklist title"
               />
             </div>
@@ -237,7 +262,7 @@ export default function ChecklistsPage() {
               <Textarea
                 id="description"
                 value={newChecklist.description}
-                onChange={(e) => setNewChecklist({...newChecklist, description: e.target.value})}
+                onChange={(e) => setNewChecklist({ ...newChecklist, description: e.target.value })}
                 placeholder="Enter checklist description"
                 rows={2}
               />
@@ -245,9 +270,9 @@ export default function ChecklistsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={newChecklist.category} 
-                  onValueChange={(value) => setNewChecklist({...newChecklist, category: value})}
+                <Select
+                  value={newChecklist.category}
+                  onValueChange={(value) => setNewChecklist({ ...newChecklist, category: value })}
                 >
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
@@ -262,9 +287,9 @@ export default function ChecklistsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="assigned-to">Assign To</Label>
-                <Select 
-                  value={newChecklist.assignedTo} 
-                  onValueChange={(value) => setNewChecklist({...newChecklist, assignedTo: value})}
+                <Select
+                  value={newChecklist.assignedTo}
+                  onValueChange={(value) => setNewChecklist({ ...newChecklist, assignedTo: value })}
                 >
                   <SelectTrigger id="assigned-to">
                     <SelectValue placeholder="Select role/person" />
@@ -284,7 +309,7 @@ export default function ChecklistsPage() {
                 id="due-date"
                 type="date"
                 value={newChecklist.dueDate}
-                onChange={(e) => setNewChecklist({...newChecklist, dueDate: e.target.value})}
+                onChange={(e) => setNewChecklist({ ...newChecklist, dueDate: e.target.value })}
               />
             </div>
             {/* Tasks would be added after creation in a real implementation */}
@@ -293,8 +318,8 @@ export default function ChecklistsPage() {
             <Button variant="outline" onClick={() => setShowAddChecklistDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              className="bg-chai-gold hover:bg-yellow-600" 
+            <Button
+              className="bg-chai-gold hover:bg-yellow-600"
               onClick={submitNewChecklist}
               disabled={addChecklistMutation.isPending}
             >
