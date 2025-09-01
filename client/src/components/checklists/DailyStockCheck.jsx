@@ -31,6 +31,10 @@ export default function DailyStockCheck({
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
   const [search, setSearch] = useState("");
+
+  // NEW: Category filter state
+  const [selectedCategory, setSelectedCategory] = useState("all");
+
   const itemsPerPage = itemsPerPageProp;
 
   const fetchStock = async () => {
@@ -100,16 +104,39 @@ export default function DailyStockCheck({
     }));
   };
 
-  // Filtering
-  const filteredStockItems = useMemo(() => {
-    if (!search) return stockItems;
-    const q = search.toLowerCase();
-    return stockItems.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(q) ||
-        item.sku?.toLowerCase().includes(q)
+  // NEW: Build unique, sorted category list from data
+  const categoryOptions = useMemo(() => {
+    const set = new Set(
+      (stockItems || []).map((i) => {
+        const c = (i.category ?? "").trim();
+        return c.length ? c : "Uncategorized";
+      })
     );
-  }, [stockItems, search]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [stockItems]);
+
+  // Filtering (category + search)
+  const filteredStockItems = useMemo(() => {
+    let list = stockItems;
+
+    if (selectedCategory !== "all") {
+      list = list.filter((i) => {
+        const cat = (i.category ?? "").trim() || "Uncategorized";
+        return cat === selectedCategory;
+      });
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.name?.toLowerCase().includes(q) ||
+          item.sku?.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [stockItems, selectedCategory, search]);
 
   // Pagination
   const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage) || 1;
@@ -118,6 +145,11 @@ export default function DailyStockCheck({
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
+  // NEW: Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, search]);
 
   const pageItems = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -237,13 +269,29 @@ export default function DailyStockCheck({
 
       {expanded && (
         <CardContent>
+          {/* Toolbar: search + category + save */}
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Input
-              placeholder="Search by name or SKU..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-64"
-            />
+            <div className="flex items-center gap-3">
+              <Input
+                placeholder="Search by name or SKU..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-64"
+              />
+
+              <select
+                className="border rounded px-3 py-2 text-sm"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="all">All categories</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Save current page button (top-right for convenience) */}
             <Button
@@ -279,7 +327,9 @@ export default function DailyStockCheck({
                         <tr key={item.id} className="border-t">
                           <td className="px-4 py-2">{item.sku}</td>
                           <td className="px-4 py-2">{item.name}</td>
-                          <td className="px-4 py-2">{item.category}</td>
+                          <td className="px-4 py-2">
+                            {(item.category ?? "").trim() || "Uncategorized"}
+                          </td>
                           <td className="px-4 py-2 text-right">{item.current_qty}</td>
                           <td className="px-4 py-2 text-right">
                             <Input
@@ -297,7 +347,9 @@ export default function DailyStockCheck({
                   </table>
 
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-                    <span>Page {currentPage} of {totalPages}</span>
+                    <span>
+                      Page {currentPage} of {totalPages}
+                    </span>
 
                     <div className="flex items-center gap-2">
                       <Button
