@@ -18,7 +18,6 @@ import { supabase } from "../lib/supabaseClient.js";
 import { useState, useEffect, useMemo } from "react";
 import JobLogsGrid from "../components/Maintenance/JobLogsGrid.jsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import TasksLast7DaysChart from "../components/dashboard/TasksLast7DaysChart.jsx";
 import { Link } from "react-router-dom";
 import DailytaskListChart from "../components/dashboard/DailyTaskListChart.jsx";
 import { formatDeliveryDateVerbose } from "../lib/formatters.js";
@@ -37,6 +36,7 @@ import TaskProgressPanel from "../components/dashboard/TaskProgressPanel.jsx";
 /* ✅ Use the exact same components as the Daily Checklist page */
 import DailyStoreChecklistCard from "../components/checklists/DailyStoreChecklistCard.jsx";
 import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
+import TasksLast7DaysTable from "../components/dashboard/TasksLast7DaysTable.jsx";
 
 // Get the most recent delivery date (today if valid, else yesterday, else last valid)
 const deliveryDateISO = getMostRecentFreshwaysDeliveryDate();
