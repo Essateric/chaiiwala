@@ -60,7 +60,7 @@ export default function DailytaskListChart({ storeTaskData = [], dateISO }) {
                 <Cell
                   key={`cell-${index}`}
                   fill={
-                    entry.tasksCompleted === 11
+                    entry.tasksCompleted >= 11
                       ? "#16a34a" // green
                       : entry.tasksCompleted >= 6
                       ? "#f97316" // orange
@@ -80,7 +80,7 @@ export default function DailytaskListChart({ storeTaskData = [], dateISO }) {
         <div className="mt-3 text-center text-sm text-gray-500">
           <span className="inline-block mr-2">
             <span className="inline-block w-3 h-3 bg-[#16a34a] rounded-full mr-1" />
-            11/11 completed
+            11-12 completed
           </span>
           <span className="inline-block mr-2">
             <span className="inline-block w-3 h-3 bg-[#f97316] rounded-full mr-1" />
