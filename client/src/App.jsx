@@ -20,6 +20,7 @@ import { Toaster } from 'sonner';
 import CustomerFeedbackPage from "./pages/CustomerFeedbackPage.jsx";
 import StaffAbsencePage from "./pages/StaffAbsences.jsx";
 import WasteReportingPage from "./pages/WasteReportingPage.jsx";
+import HolidayRequestPage from "./pages/HolidayRequests.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -63,6 +64,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
 <StaffAbsencePage />
+            </ProtectedRoute>
+          }
+        />
+                <Route
+          path="/holiday-requests"
+          element={
+            <ProtectedRoute>
+<HolidayRequestPage />
             </ProtectedRoute>
           }
         />
