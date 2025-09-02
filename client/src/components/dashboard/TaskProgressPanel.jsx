@@ -324,13 +324,12 @@ export default function TaskProgressPanel({
                   <div className="rounded-md border border-gray-100 overflow-x-hidden">
                     <table className="w-full table-fixed text-[13px] text-gray-700">
                       {/* Lock widths so the table always fits the card */}
-                      <colgroup>
-                        <col style={{ width: "120px" }} /> {/* Date */}
-                        <col />                            {/* Store (flex) */}
-                        <col style={{ width: "96px" }} />  {/* Status */}
-                        <col style={{ width: "90px" }} />  {/* Completed */}
-                      </colgroup>
-
+                     <colgroup>
+    <col style={{ width: "36%" }} />
+    <col style={{ width: "28%" }} />
+    <col style={{ width: "20%" }} />
+    <col style={{ width: "16%" }} />
+  </colgroup>
                       <thead className="bg-white">
                         <tr className="text-left border-b text-xs text-gray-400">
                           <th className="py-2 px-2">Date</th>
