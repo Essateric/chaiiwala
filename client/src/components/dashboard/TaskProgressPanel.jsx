@@ -17,6 +17,17 @@ function formatNiceDate(isoDate) {
   });
 }
 
+// Shorter date for compact table cells
+function formatNiceDateShort(isoDate) {
+  if (!isoDate) return "N/A";
+  const d = new Date(isoDate);
+  return d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  });
+}
+
 function formatTimeHM(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -63,7 +74,7 @@ export default function TaskProgressPanel({
   /* ----------------------- TODAY (Completed list) ----------------------- */
   const todayISO = new Date().toISOString().split("T")[0];
 
-  // ✅ FIX: select("*") so we don't 400 if the view doesn't expose completed_at
+  // ✅ select("*") so we don't 400 if the view doesn’t expose completed_at
   const {
     data: todayRows = [],
     isLoading: isLoadingTodayRows,
@@ -73,7 +84,7 @@ export default function TaskProgressPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("v_daily_checklist_with_status")
-        .select("*") // <- don't enumerate completed_at here
+        .select("*")
         .eq("date", todayISO)
         .eq("store_id", selectedTaskStoreId);
       if (error) throw error;
@@ -82,13 +93,10 @@ export default function TaskProgressPanel({
     enabled: !isAllSelected, // only fetch when a single store is selected
   });
 
-  // Titles for nicer display
   const { data: allDailyTasks = [] } = useQuery({
     queryKey: ["all_daily_tasks_titles"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("daily_tasks")
-        .select("id,title");
+      const { data, error } = await supabase.from("daily_tasks").select("id,title");
       if (error) throw error;
       return data || [];
     },
@@ -108,12 +116,11 @@ export default function TaskProgressPanel({
       .map((r) => ({
         task_id: r.task_id,
         title: titleById.get(r.task_id) || `Task #${r.task_id}`,
-        completed_at: r.completed_at ?? null, // will be null if not in view
+        completed_at: r.completed_at ?? null,
       }))
       .sort(
         (a, b) =>
-          new Date(b.completed_at || 0).getTime() -
-          new Date(a.completed_at || 0).getTime()
+          new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime()
       );
   }, [todayRows, titleById]);
 
@@ -123,19 +130,14 @@ export default function TaskProgressPanel({
     isLoading: isLoading7,
     error: error7,
   } = useQuery({
-    queryKey: [
-      "v_daily_checklist_with_status_last7",
-      startISO,
-      endISO,
-      selectedTaskStoreId,
-    ],
+    queryKey: ["v_daily_checklist_with_status_last7", startISO, endISO, selectedTaskStoreId],
     queryFn: async () => {
       let query = supabase
         .from("v_daily_checklist_with_status")
         .select("date, store_id, status")
         .gte("date", startISO)
         .lte("date", endISO)
-        .eq("store_id", selectedTaskStoreId); // force single store
+        .eq("store_id", selectedTaskStoreId);
       const { data, error } = await query;
       if (error) throw error;
       return Array.isArray(data) ? data : [];
@@ -162,8 +164,7 @@ export default function TaskProgressPanel({
 
     const arr = [];
     for (const b of buckets.values()) {
-      const storeName =
-        storeById.get(String(b.store_id)) || `Store #${b.store_id}`;
+      const storeName = storeById.get(String(b.store_id)) || `Store #${b.store_id}`;
       let status = "Incomplete";
       if (b.total === 0) status = "No Entry";
       else if (b.completed === b.total) status = "All Done";
@@ -192,9 +193,7 @@ export default function TaskProgressPanel({
         <div className="flex items-center justify-between gap-3">
           <div>
             <CardTitle className="text-base">Checklist Progress</CardTitle>
-            <CardDescription className="mt-1">
-              Track completion across stores
-            </CardDescription>
+            <CardDescription className="mt-1">Track completion across stores</CardDescription>
           </div>
 
           {/* Store Filter */}
@@ -250,16 +249,12 @@ export default function TaskProgressPanel({
                 <div className="w-full bg-gray-100 h-3 rounded overflow-hidden">
                   <div
                     className="bg-emerald-500 h-3"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, percentComplete))}%`,
-                    }}
+                    style={{ width: `${Math.min(100, Math.max(0, percentComplete))}%` }}
                   />
                 </div>
               )}
               {!isLoadingTasks && (
-                <p className="mt-2 text-xs text-gray-500">
-                  {percentComplete}% complete
-                </p>
+                <p className="mt-2 text-xs text-gray-500">{percentComplete}% complete</p>
               )}
             </div>
 
@@ -308,7 +303,7 @@ export default function TaskProgressPanel({
             )}
           </TabsContent>
 
-          {/* ===== LAST 7 DAYS (TABLE) ===== */}
+          {/* ===== LAST 7 DAYS (TABLE) – compact, no-scroll ===== */}
           <TabsContent value="last7">
             {isAllSelected ? null : (
               <>
@@ -317,9 +312,7 @@ export default function TaskProgressPanel({
                 </div>
 
                 {error7 ? (
-                  <p className="text-sm text-red-600">
-                    Error: {error7.message || "Failed to load."}
-                  </p>
+                  <p className="text-sm text-red-600">Error: {error7.message || "Failed to load."}</p>
                 ) : isLoading7 ? (
                   <div className="flex items-center text-gray-500 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -328,39 +321,43 @@ export default function TaskProgressPanel({
                 ) : rows.length === 0 ? (
                   <p className="text-gray-500 text-sm">No data for this store.</p>
                 ) : (
-                  <div className="rounded-md border border-gray-100">
-                    <table className="w-full text-sm text-gray-700">
+                  <div className="rounded-md border border-gray-100 overflow-x-hidden">
+                    <table className="w-full table-fixed text-[13px] text-gray-700">
+                      {/* Lock widths so the table always fits the card */}
+                      <colgroup>
+                        <col style={{ width: "120px" }} /> {/* Date */}
+                        <col />                            {/* Store (flex) */}
+                        <col style={{ width: "96px" }} />  {/* Status */}
+                        <col style={{ width: "90px" }} />  {/* Completed */}
+                      </colgroup>
+
                       <thead className="bg-white">
                         <tr className="text-left border-b text-xs text-gray-400">
-                          <th className="py-2 px-3">Date</th>
-                          <th className="py-2 px-3">Store</th>
-                          <th className="py-2 px-3">Status</th>
-                          <th className="py-2 px-3 text-right">Completed</th>
+                          <th className="py-2 px-2">Date</th>
+                          <th className="py-2 px-2">Store</th>
+                          <th className="py-2 px-2">Status</th>
+                          <th className="py-2 px-2 text-right">Completed</th>
                         </tr>
                       </thead>
                       <tbody>
                         {rows.map((r, idx) => (
                           <tr key={idx} className="border-b">
-                            <td className="py-2 px-3 whitespace-nowrap">
-                              {formatNiceDate(r.date)}
+                            <td className="py-1.5 px-2 whitespace-normal break-words leading-tight">
+                              {formatNiceDateShort(r.date)}
                             </td>
-                            <td className="py-2 px-3">{r.storeName}</td>
-                            <td className="py-2 px-3">
+                            <td className="py-1.5 px-2 truncate" title={r.storeName}>
+                              {r.storeName}
+                            </td>
+                            <td className="py-1.5 px-2">
                               {r.total === 0 ? (
-                                <span className="text-yellow-600 font-semibold">
-                                  No Entry
-                                </span>
+                                <span className="text-yellow-700 font-semibold text-xs">No Entry</span>
                               ) : r.completed === r.total ? (
-                                <span className="text-green-600 font-semibold">
-                                  All Done
-                                </span>
+                                <span className="text-green-700 font-semibold text-xs">All Done</span>
                               ) : (
-                                <span className="text-red-600 font-semibold">
-                                  Incomplete
-                                </span>
+                                <span className="text-red-700 font-semibold text-xs">Incomplete</span>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-right">
+                            <td className="py-1.5 px-2 text-right">
                               {r.total > 0 ? (
                                 <span className="font-medium">
                                   {r.completed}/{r.total}
