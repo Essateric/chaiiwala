@@ -1,12 +1,11 @@
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient.js";
-import {
-  Card, CardHeader, CardTitle, CardDescription, CardContent
-} from "../ui/card.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.jsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs.jsx";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
+/* Helpers */
 function formatNiceDate(isoDate) {
   if (!isoDate) return "N/A";
   const d = new Date(isoDate);
@@ -17,10 +16,22 @@ function formatNiceDate(isoDate) {
     year: "numeric",
   });
 }
+
+function formatTimeHM(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 function formatRangeLabel(startISO, endISO) {
   return `${formatNiceDate(startISO)} → ${formatNiceDate(endISO)}`;
 }
 
+/**
+ * Checklist progress widget with Today + Last 7 Days tabs.
+ * - “Today” shows progress bar + (if a store is selected) a table of tasks completed today.
+ * - “Last 7 Days” only shows when a single store is selected.
+ */
 export default function TaskProgressPanel({
   stores = [],
   selectedTaskStoreId = "all",
@@ -32,53 +43,146 @@ export default function TaskProgressPanel({
 }) {
   const isAllSelected = !selectedTaskStoreId || selectedTaskStoreId === "all";
 
-  const end = new Date(); end.setHours(0,0,0,0);
-  const start = new Date(end); start.setDate(start.getDate() - 6);
+  /* ----- Date range for last 7 days (including today) ----- */
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 6);
+
   const startISO = start.toISOString().split("T")[0];
-  const endISO   = end.toISOString().split("T")[0];
+  const endISO = end.toISOString().split("T")[0];
   const rangeLabel = formatRangeLabel(startISO, endISO);
 
-  const { data: checklistRows = [], isLoading: isLoading7, error: error7 } = useQuery({
-    queryKey: ["v_daily_checklist_with_status_last7", startISO, endISO, selectedTaskStoreId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_daily_checklist_with_status")
-        .select("date, store_id, status")
-        .gte("date", startISO)
-        .lte("date", endISO)
-        .eq("store_id", selectedTaskStoreId);
-      if (error) throw error;
-      return Array.isArray(data) ? data : [];
-    },
-    enabled: !isAllSelected, // unchanged
-  });
-
+  /* ----- Store name lookup ----- */
   const storeById = useMemo(() => {
     const map = new Map();
     (stores || []).forEach((s) => map.set(String(s.id), s.name));
     return map;
   }, [stores]);
 
+  /* ----------------------- TODAY (Completed list) ----------------------- */
+  const todayISO = new Date().toISOString().split("T")[0];
+
+  // ✅ FIX: select("*") so we don't 400 if the view doesn't expose completed_at
+  const {
+    data: todayRows = [],
+    isLoading: isLoadingTodayRows,
+    error: errorTodayRows,
+  } = useQuery({
+    queryKey: ["today_tasks_for_store", todayISO, selectedTaskStoreId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_daily_checklist_with_status")
+        .select("*") // <- don't enumerate completed_at here
+        .eq("date", todayISO)
+        .eq("store_id", selectedTaskStoreId);
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !isAllSelected, // only fetch when a single store is selected
+  });
+
+  // Titles for nicer display
+  const { data: allDailyTasks = [] } = useQuery({
+    queryKey: ["all_daily_tasks_titles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_tasks")
+        .select("id,title");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const titleById = useMemo(() => {
+    const m = new Map();
+    for (const t of allDailyTasks) m.set(t.id, t.title);
+    return m;
+  }, [allDailyTasks]);
+
+  const completedTodayForStore = useMemo(() => {
+    if (!todayRows.length) return [];
+    return todayRows
+      .filter((r) => r.status === "completed")
+      .map((r) => ({
+        task_id: r.task_id,
+        title: titleById.get(r.task_id) || `Task #${r.task_id}`,
+        completed_at: r.completed_at ?? null, // will be null if not in view
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.completed_at || 0).getTime() -
+          new Date(a.completed_at || 0).getTime()
+      );
+  }, [todayRows, titleById]);
+
+  /* ----------------------- LAST 7 DAYS (Table) ----------------------- */
+  const {
+    data: checklistRows = [],
+    isLoading: isLoading7,
+    error: error7,
+  } = useQuery({
+    queryKey: [
+      "v_daily_checklist_with_status_last7",
+      startISO,
+      endISO,
+      selectedTaskStoreId,
+    ],
+    queryFn: async () => {
+      let query = supabase
+        .from("v_daily_checklist_with_status")
+        .select("date, store_id, status")
+        .gte("date", startISO)
+        .lte("date", endISO)
+        .eq("store_id", selectedTaskStoreId); // force single store
+      const { data, error } = await query;
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !isAllSelected, // don’t run for "All Stores"
+  });
+
   const rows = useMemo(() => {
-    const buckets = new Map();
+    const buckets = new Map(); // key: `${date}|${store_id}`
     for (const r of checklistRows) {
       const key = `${r.date}|${r.store_id}`;
       if (!buckets.has(key)) {
-        buckets.set(key, { date: r.date, store_id: r.store_id, total: 0, completed: 0 });
+        buckets.set(key, {
+          date: r.date,
+          store_id: r.store_id,
+          total: 0,
+          completed: 0,
+        });
       }
       const b = buckets.get(key);
       b.total += 1;
       if (r.status === "completed") b.completed += 1;
     }
+
     const arr = [];
     for (const b of buckets.values()) {
-      const storeName = storeById.get(String(b.store_id)) || `Store #${b.store_id}`;
+      const storeName =
+        storeById.get(String(b.store_id)) || `Store #${b.store_id}`;
       let status = "Incomplete";
       if (b.total === 0) status = "No Entry";
       else if (b.completed === b.total) status = "All Done";
-      arr.push({ date: b.date, storeName, completed: b.completed, total: b.total, status });
+      arr.push({
+        date: b.date,
+        storeName,
+        completed: b.completed,
+        total: b.total,
+        status,
+      });
     }
-    arr.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.storeName.localeCompare(b.storeName)));
+
+    // Sort by date DESC, then store ASC
+    arr.sort((a, b) => {
+      if (a.date < b.date) return 1;
+      if (a.date > b.date) return -1;
+      return a.storeName.localeCompare(b.storeName);
+    });
+
     return arr;
   }, [checklistRows, storeById]);
 
@@ -93,9 +197,8 @@ export default function TaskProgressPanel({
             </CardDescription>
           </div>
 
-          {/* 🔹 Give this select an id so other components/buttons can focus it */}
+          {/* Store Filter */}
           <select
-            id="taskStoreSelect"
             className="border border-gray-200 rounded px-2 py-1 text-xs bg-white"
             value={selectedTaskStoreId}
             onChange={(e) => onChangeSelectedTaskStoreId(e.target.value)}
@@ -109,13 +212,10 @@ export default function TaskProgressPanel({
           </select>
         </div>
 
-        {/* 🔸 Gentle nudge when “All Stores” is selected */}
+        {/* Helpful hint when "All Stores" is selected */}
         {isAllSelected && (
-          <div className="mt-3 flex items-start gap-2 rounded-md bg-yellow-50 border border-yellow-100 p-2">
-            <AlertCircle className="h-4 w-4 text-yellow-700 mt-0.5" />
-            <p className="text-xs text-yellow-800">
-              Select a store to enable the <strong>Last 7 Days</strong> view for that store.
-            </p>
+          <div className="mt-2 text-[11px] text-gray-500">
+            Select a store to see the Last 7 Days and the list of tasks completed today.
           </div>
         )}
       </CardHeader>
@@ -129,7 +229,7 @@ export default function TaskProgressPanel({
             </TabsTrigger>
           </TabsList>
 
-          {/* ===== TODAY (unchanged) ===== */}
+          {/* ===== TODAY ===== */}
           <TabsContent value="today">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
@@ -150,7 +250,9 @@ export default function TaskProgressPanel({
                 <div className="w-full bg-gray-100 h-3 rounded overflow-hidden">
                   <div
                     className="bg-emerald-500 h-3"
-                    style={{ width: `${Math.min(100, Math.max(0, percentComplete))}%` }}
+                    style={{
+                      width: `${Math.min(100, Math.max(0, percentComplete))}%`,
+                    }}
                   />
                 </div>
               )}
@@ -160,16 +262,55 @@ export default function TaskProgressPanel({
                 </p>
               )}
             </div>
+
+            {/* Completed Today (per selected store) */}
+            {!isAllSelected && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-gray-700">
+                    Completed Today — {storeById.get(String(selectedTaskStoreId)) || "Store"}
+                  </h4>
+                  {isLoadingTodayRows && (
+                    <div className="flex items-center text-gray-500 text-xs">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading…
+                    </div>
+                  )}
+                </div>
+
+                {errorTodayRows ? (
+                  <p className="text-sm text-red-600">
+                    Error: {errorTodayRows.message || "Failed to load."}
+                  </p>
+                ) : completedTodayForStore.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No tasks completed yet today.</p>
+                ) : (
+                  <div className="rounded-md border border-gray-100">
+                    <table className="w-full text-sm text-gray-700">
+                      <thead className="bg-white">
+                        <tr className="text-left border-b text-xs text-gray-400">
+                          <th className="py-2 px-3">Task</th>
+                          <th className="py-2 px-3">Completed At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {completedTodayForStore.map((t) => (
+                          <tr key={t.task_id} className="border-b">
+                            <td className="py-2 px-3">{t.title}</td>
+                            <td className="py-2 px-3">{formatTimeHM(t.completed_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
 
-          {/* ===== LAST 7 DAYS ===== */}
+          {/* ===== LAST 7 DAYS (TABLE) ===== */}
           <TabsContent value="last7">
-            {/* If somehow navigated here with “all” selected, show the nudge inline too */}
-            {isAllSelected ? (
-              <div className="rounded-md bg-yellow-50 border border-yellow-100 p-3 text-sm text-yellow-800">
-                Please select a store from the dropdown above to view the last 7 days.
-              </div>
-            ) : (
+            {isAllSelected ? null : (
               <>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-500">{rangeLabel}</span>
@@ -200,15 +341,23 @@ export default function TaskProgressPanel({
                       <tbody>
                         {rows.map((r, idx) => (
                           <tr key={idx} className="border-b">
-                            <td className="py-2 px-3 whitespace-nowrap">{formatNiceDate(r.date)}</td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              {formatNiceDate(r.date)}
+                            </td>
                             <td className="py-2 px-3">{r.storeName}</td>
                             <td className="py-2 px-3">
                               {r.total === 0 ? (
-                                <span className="text-yellow-600 font-semibold">No Entry</span>
+                                <span className="text-yellow-600 font-semibold">
+                                  No Entry
+                                </span>
                               ) : r.completed === r.total ? (
-                                <span className="text-green-600 font-semibold">All Done</span>
+                                <span className="text-green-600 font-semibold">
+                                  All Done
+                                </span>
                               ) : (
-                                <span className="text-red-600 font-semibold">Incomplete</span>
+                                <span className="text-red-600 font-semibold">
+                                  Incomplete
+                                </span>
                               )}
                             </td>
                             <td className="py-2 px-3 text-right">
