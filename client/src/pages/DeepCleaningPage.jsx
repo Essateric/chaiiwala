@@ -1,6 +1,6 @@
 // src/pages/DeepCleaningPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns"; // ⬅️ added startOfWeek
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,11 @@ export default function DeepCleaningPage() {
   // Store selector for regional/admin
   const [selectedStoreId, setSelectedStoreId] = useState("all");
 
+  // ✅ NEW: compute the “week commencing” date (Monday start)
+  const weekCommencingDate = useMemo(
+    () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+    []
+  );
   // Load stores
   useEffect(() => {
     (async () => {
@@ -193,6 +198,7 @@ export default function DeepCleaningPage() {
 
   return (
     <DashboardLayout title="Deep Cleaning">
+
       {isStoreManager ? (
         // Store manager: interactive checklist for their own store
         <DeepCleaningChecklistView profile={profile} />

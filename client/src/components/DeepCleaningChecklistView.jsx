@@ -26,6 +26,28 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
+/* Helpers for “WC …” button text (Mon → Sun) */
+const ordinal = (n) => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+};
+const monthAbbrUK = (date) => {
+  const m = format(date, "MMM"); // "Sep"
+  return m === "Sep" ? "Sept" : m; // UK style "Sept"
+};
+const wcRangeText = (start, end) => {
+  const d1 = ordinal(parseInt(format(start, "d"), 10));
+  const d2 = ordinal(parseInt(format(end, "d"), 10));
+  const m1 = monthAbbrUK(start);
+  const m2 = monthAbbrUK(end);
+  const y1 = format(start, "yyyy");
+  const y2 = format(end, "yyyy");
+  return y1 === y2
+    ? `WC ${d1} ${m1} - ${d2} ${m2} ${y1}`
+    : `WC ${d1} ${m1} ${y1} - ${d2} ${m2} ${y2}`;
+};
+
 /**
  * Props:
  *  - profile: user profile (used to infer store for store managers)
@@ -45,65 +67,57 @@ export default function DeepCleaningChecklistView({
   const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState("auto");
   const [weekAnchor, setWeekAnchor] = useState(new Date());
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // rows loading
   const [rows, setRows] = useState([]);
+
+  // ✅ Tasks from DB only (no hard-coded fallback)
   const [taskTypes, setTaskTypes] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
 
   const isAdminOrRegional =
     profile?.permissions === "admin" || profile?.permissions === "regional";
   const isStoreManager = profile?.permissions === "store";
   const isReadOnly = readOnly || isAdminOrRegional; // enforce read-only for regional/admin
 
-  // Fallback task list (client's list)
-  const DEFAULT_TASKS = [
-    "Bins area(inside/out)",
-    "Door Mats",
-    "Skirting board",
-    "Remove gums from under tables/chairs",
-    "Table legs & Backs",
-    "Chair legs and backs",
-    "Booth Seating /padded seats",
-    "Mirrors",
-    "Outside Signage",
-    "Shop front and window",
-    "Outside barriers and poles",
-    "Outside point of sale(A frame etc)",
-    "Shutters",
-    "Fly zappers",
-    "Drinks Fridge",
-    "Cake fridge",
-    "Ice Machine",
-    "Behind counters and shelving",
-    "Fryer(change oil)",
-    "Canopy",
-    "Air vents",
-    "Stockroom",
-    "Behind sink and cookers",
-    "All kitchen fridge in/out and seals",
-    "Grill (change sheet)",
-    "Fire extingushers(all)",
-    "Urn taps and seals",
-    "Mop bucket and change mop heads",
-    "Stairs (brush and mop)",
-    "Gray tiles and white walls",
-    "Pasty oven and trays",
-  ];
-
-  // Load stores + task types once
+  // Load stores + task types (DB-only)
   useEffect(() => {
     (async () => {
-      const { data: storeRows } = await supabase.from("stores").select("id,name");
-      setStores(storeRows || []);
+      const [{ data: storeRows, error: storeErr }, { data: types, error: taskErr }] =
+        await Promise.all([
+          supabase.from("stores").select("id,name"),
+          supabase
+            .from("deep_cleaning_tasks")
+            .select("id,dc_task")
+            .order("id", { ascending: true }),
+        ]);
 
-      const { data: types } = await supabase
-        .from("deep_cleaning_tasks")
-        .select("id,dc_task")
-        .order("id", { ascending: true });
+      if (storeErr) {
+        toast({
+          title: "Error loading stores",
+          description: storeErr.message,
+          variant: "destructive",
+        });
+      } else {
+        setStores(storeRows || []);
+      }
 
-      const list = (types || []).map((t) => t.dc_task).filter(Boolean);
-      setTaskTypes(list.length ? list : DEFAULT_TASKS);
+      if (taskErr) {
+        toast({
+          title: "Error loading tasks",
+          description: taskErr.message,
+          variant: "destructive",
+        });
+        setTaskTypes([]);
+      } else {
+        // DB only: trim, dedupe, drop empties
+        const list = (types || [])
+          .map((t) => (t.dc_task || "").trim())
+          .filter(Boolean);
+        setTaskTypes([...new Set(list)]);
+      }
+      setTasksLoading(false);
     })();
-  }, []);
+  }, [toast]);
 
   // Week boundaries (Mon–Sun)
   const weekStart = useMemo(
@@ -117,6 +131,12 @@ export default function DeepCleaningChecklistView({
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart]
+  );
+
+  // Button label: “WC 1st Sept - 7th Sept 2025” (Mon → Sun)
+  const wcButtonLabel = useMemo(
+    () => wcRangeText(weekStart, weekEnd),
+    [weekStart, weekEnd]
   );
 
   // Visible stores: admin/regional see all; others see their assigned
@@ -166,15 +186,7 @@ export default function DeepCleaningChecklistView({
       return;
     }
 
-    let filtered = data || [];
-
-    // If no resolved store (e.g., regional/admin hasn't selected one), show nothing in the matrix
-    // (prevents showing mixed data for all stores).
-    if (!resolvedStoreId) {
-      filtered = [];
-    }
-
-    setRows(filtered);
+    setRows(resolvedStoreId ? data || [] : []);
     setIsLoading(false);
   };
 
@@ -187,9 +199,7 @@ export default function DeepCleaningChecklistView({
   const cellMap = useMemo(() => {
     const m = new Map();
     for (const r of rows) {
-      const key = `${r.task}|${format(new Date(r.start), "yyyy-MM-dd")}|${
-        r.store_id
-      }`;
+      const key = `${r.task}|${format(new Date(r.start), "yyyy-MM-dd")}|${r.store_id}`;
       m.set(key, r);
     }
     return m;
@@ -217,6 +227,8 @@ export default function DeepCleaningChecklistView({
     }
 
     const dateKey = format(date, "yyyy-MM-dd");
+    theKey: {
+    }
     const key = `${task}|${dateKey}|${resolvedStoreId}`;
     const existing = cellMap.get(key);
 
@@ -227,7 +239,11 @@ export default function DeepCleaningChecklistView({
         .update({ completed_at: newCompletedAt })
         .eq("id", existing.id);
       if (error) {
-        toast({ title: "Error", description: "Could not update.", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "Could not update.",
+          variant: "destructive",
+        });
         return;
       }
       setRows((prev) =>
@@ -311,16 +327,7 @@ export default function DeepCleaningChecklistView({
                 </span>
               )}
             </h2>
-            <p className="text-sm text-gray-300">
-              Week of {format(weekStart, "EEE, d MMM yyyy")} –{" "}
-              {format(weekEnd, "EEE, d MMM yyyy")}
-            </p>
-            {resolvedStoreId ? (
-              <p className="text-sm text-gray-300">
-                <span className="font-medium">{doneCells}</span> / {totalCells} cells
-                ticked
-              </p>
-            ) : null}
+          
           </div>
 
           <div className="flex flex-col gap-2 items-stretch md:flex-row md:items-center">
@@ -345,9 +352,18 @@ export default function DeepCleaningChecklistView({
               <Button variant="outline" size="sm" onClick={goPrevWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={goThisWeek}>
-                <CalIcon className="h-4 w-4 mr-1" /> This week
+
+              {/* Button shows Mon → Sun range */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goThisWeek}
+                title="Jump to the current week"
+              >
+                <CalIcon className="h-4 w-4 mr-1" />
+                {wcButtonLabel}
               </Button>
+
               <Button variant="outline" size="sm" onClick={goNextWeek}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -375,7 +391,21 @@ export default function DeepCleaningChecklistView({
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
+            {tasksLoading ? (
+              <tr>
+                <td colSpan={8} className="p-4 text-sm text-gray-600">
+                  Loading tasks…
+                </td>
+              </tr>
+            ) : taskTypes.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-4 text-sm text-gray-600">
+                  No deep cleaning tasks found in{" "}
+                  <code>public.deep_cleaning_tasks</code>. Please add tasks in
+                  that table.
+                </td>
+              </tr>
+            ) : isLoading ? (
               <tr>
                 <td colSpan={8} className="p-4 text-sm text-gray-600">
                   Loading…
@@ -448,20 +478,6 @@ export default function DeepCleaningChecklistView({
             Select a store to {isReadOnly ? "view" : "enable ticking"}.
           </p>
         ) : null}
-      </div>
-
-      <div className="text-xs text-gray-500 px-1">
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Matrix shows one week (Monday to Sunday). Use arrows to switch weeks.</li>
-          <li>Each tick saves to the database for that store and day.</li>
-          <li>
-            Tasks load from <code>deep_cleaning_tasks.dc_task</code>. If empty, the
-            default client list is used.
-          </li>
-          {isReadOnly && (
-            <li>This is a read-only view for regional/admin users.</li>
-          )}
-        </ul>
       </div>
     </div>
   );
