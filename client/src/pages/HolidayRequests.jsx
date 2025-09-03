@@ -9,21 +9,38 @@ import { useToast } from "../hooks/use-toast.jsx";
 import { supabase } from "../lib/supabaseClient.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const REASONS = [
-  "Annual Leave",
-  "Sick",
-  "Personal",
-  "Family",
-  "Training",
-  "Other",
-];
+const REASONS = ["Annual Leave", "Sick", "Personal", "Family", "Training", "Other"];
 
 export default function HolidayRequestsPage() {
   const { user, isLoading: isAuthLoading, profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Stores (for admins to choose; managers default to their first store)
+  const isRegionalOrAdmin = profile?.permissions === "admin" || profile?.permissions === "regional";
+  const isStoreManager = profile?.permissions === "store";
+  const storeIds = Array.isArray(profile?.store_ids) ? profile.store_ids : [];
+
+  const [updatingId, setUpdatingId] = useState(null);
+
+  const canModerateRow = (r) =>
+    r.status === "pending" &&
+    (isRegionalOrAdmin || (isStoreManager && storeIds.includes(r.store_id)));
+
+  const updateStatus = async (row, next) => {
+    try {
+      setUpdatingId(row.id);
+      const { error } = await supabase.from("holiday_requests").update({ status: next }).eq("id", row.id);
+      if (error) throw error;
+      toast({ title: "Status updated", description: `Request ${next}.` });
+      queryClient.invalidateQueries({ queryKey: ["holiday_requests"] });
+    } catch (e) {
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Stores list
   const { data: stores = [] } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
@@ -33,11 +50,10 @@ export default function HolidayRequestsPage() {
     },
   });
 
-  const isAdminOrRegional = profile?.permissions === "admin" || profile?.permissions === "regional";
   const defaultStoreId = useMemo(() => {
-    if (isAdminOrRegional) return stores?.[0]?.id ?? null;
+    if (isRegionalOrAdmin) return stores?.[0]?.id ?? null;
     return Array.isArray(profile?.store_ids) ? profile.store_ids[0] ?? null : null;
-  }, [isAdminOrRegional, profile?.store_ids, stores]);
+  }, [isRegionalOrAdmin, profile?.store_ids, stores]);
 
   // Form state
   const [managerName, setManagerName] = useState(profile?.name || profile?.first_name || "");
@@ -52,7 +68,7 @@ export default function HolidayRequestsPage() {
     setStoreId((prev) => prev ?? defaultStoreId);
   }, [defaultStoreId]);
 
-  // Existing requests list (RLS will scope)
+  // Requests list (RLS handles scoping)
   const {
     data: requests = [],
     isLoading: isLoadingRequests,
@@ -62,14 +78,21 @@ export default function HolidayRequestsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("holiday_requests")
-        .select("id, created_at, store_id, manager_name, employee_name, days, reason_category, reason_other, reason_notes, status, stores(name)")
+        .select(
+          "id, created_at, store_id, manager_name, employee_name, days, reason_category, reason_other, reason_notes, status, stores(name)"
+        )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
     },
   });
 
-  const canSubmit = !!user && !!employeeName && Number(days) >= 0 && !!reasonCategory && (!!storeId || isAdminOrRegional);
+  const canSubmit =
+    !!user &&
+    !!employeeName &&
+    Number(days) >= 0 &&
+    !!reasonCategory &&
+    (!!storeId || isRegionalOrAdmin);
 
   const clearForm = () => {
     setEmployeeName("");
@@ -83,9 +106,12 @@ export default function HolidayRequestsPage() {
     e.preventDefault();
     if (!canSubmit) return;
 
-    // require "Other" text when "Other" chosen
     if (reasonCategory === "Other" && !reasonOther.trim()) {
-      toast({ title: "Add the other reason", description: "Please type the reason in the box.", variant: "destructive" });
+      toast({
+        title: "Add the other reason",
+        description: "Please type the reason in the box.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -119,7 +145,6 @@ export default function HolidayRequestsPage() {
   return (
     <DashboardLayout title="Holiday Requests" profile={profile} announcements={[]}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-4">
-
         {/* Form */}
         <Card>
           <CardHeader>
@@ -132,7 +157,7 @@ export default function HolidayRequestsPage() {
               <div className="grid grid-cols-4 items-center gap-3">
                 <label className="text-sm text-gray-600">Store</label>
                 <div className="col-span-3">
-                  {isAdminOrRegional ? (
+                  {isRegionalOrAdmin ? (
                     <select
                       className="w-full border rounded p-2"
                       value={storeId ?? ""}
@@ -140,14 +165,16 @@ export default function HolidayRequestsPage() {
                       required
                     >
                       {stores.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
                       ))}
                     </select>
                   ) : (
                     <>
                       <input
                         className="w-full border rounded p-2 bg-gray-100"
-                        value={stores.find(s => s.id === storeId)?.name || "Assigned store"}
+                        value={stores.find((s) => s.id === storeId)?.name || "Assigned store"}
                         readOnly
                       />
                       <input type="hidden" name="store_id" value={storeId ?? ""} />
@@ -156,25 +183,44 @@ export default function HolidayRequestsPage() {
                 </div>
               </div>
 
-              {/* Store Manager (text) */}
+              {/* Store Manager */}
               <div className="grid grid-cols-4 items-center gap-3">
                 <label className="text-sm text-gray-600">Store manager</label>
-                <Input className="col-span-3" value={managerName} onChange={(e) => setManagerName(e.target.value)} placeholder="e.g. A. Khan" />
+                <Input
+                  className="col-span-3"
+                  value={managerName}
+                  onChange={(e) => setManagerName(e.target.value)}
+                  placeholder="e.g. A. Khan"
+                />
               </div>
 
               {/* Requester Name */}
               <div className="grid grid-cols-4 items-center gap-3">
                 <label className="text-sm text-gray-600">Name</label>
-                <Input className="col-span-3" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} required placeholder="Your name" />
+                <Input
+                  className="col-span-3"
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
+                  required
+                  placeholder="Your name"
+                />
               </div>
 
               {/* Days */}
               <div className="grid grid-cols-4 items-center gap-3">
                 <label className="text-sm text-gray-600">Days</label>
-                <Input className="col-span-3" type="number" min={0} value={days} onChange={(e) => setDays(e.target.value)} required placeholder="0" />
+                <Input
+                  className="col-span-3"
+                  type="number"
+                  min={0}
+                  value={days}
+                  onChange={(e) => setDays(e.target.value)}
+                  required
+                  placeholder="0"
+                />
               </div>
 
-              {/* Reason (dropdown) */}
+              {/* Reason */}
               <div className="grid grid-cols-4 items-center gap-3">
                 <label className="text-sm text-gray-600">Reason</label>
                 <select
@@ -184,12 +230,14 @@ export default function HolidayRequestsPage() {
                   required
                 >
                   {REASONS.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* Other (only when "Other") */}
+              {/* Other reason */}
               {reasonCategory === "Other" && (
                 <div className="grid grid-cols-4 items-center gap-3">
                   <label className="text-sm text-gray-600">Other reason</label>
@@ -203,7 +251,7 @@ export default function HolidayRequestsPage() {
                 </div>
               )}
 
-              {/* Extra notes (optional) */}
+              {/* Notes */}
               <div className="grid grid-cols-4 items-start gap-3">
                 <label className="text-sm text-gray-600 mt-2">Notes</label>
                 <Textarea
@@ -216,7 +264,9 @@ export default function HolidayRequestsPage() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" disabled={!canSubmit}>Submit Request</Button>
+                <Button type="submit" disabled={!canSubmit}>
+                  Submit Request
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -236,8 +286,9 @@ export default function HolidayRequestsPage() {
             ) : requests.length === 0 ? (
               <p className="text-sm text-gray-500">No requests yet.</p>
             ) : (
-              <div className="rounded-md border border-gray-100">
-                <table className="w-full text-sm text-gray-700">
+           <div className="rounded-md border border-gray-100 overflow-x-auto">
+  {/* change table-fixed -> table-auto */}
+  <table className="w-full text-sm text-gray-700 table-auto">
                   <thead className="bg-gray-50">
                     <tr className="text-left border-b text-xs text-gray-400">
                       <th className="py-2 px-3">Date</th>
@@ -246,22 +297,28 @@ export default function HolidayRequestsPage() {
                       <th className="py-2 px-3">Days</th>
                       <th className="py-2 px-3">Reason</th>
                       <th className="py-2 px-3">Status</th>
+                      <th className="py-2 px-3 w-64">Notes</th>
+                      <th className="py-2 px-3 w-32 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {requests.map((r) => {
                       const dateStr = new Date(r.created_at).toLocaleString("en-GB", {
-                        day: "2-digit", month: "short", year: "2-digit",
-                        hour: "2-digit", minute: "2-digit",
+                        day: "2-digit",
+                        month: "short",
+                        year: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
                       });
-                      const reason = r.reason_category === "Other"
-                        ? (r.reason_other || "Other")
-                        : r.reason_category;
+                      const reason =
+                        r.reason_category === "Other"
+                          ? r.reason_other || "Other"
+                          : r.reason_category;
 
                       return (
                         <tr key={r.id} className="border-b">
                           <td className="py-2 px-3 whitespace-nowrap">{dateStr}</td>
-                          <td className="py-2 px-3">{r.stores?.name || "—"}</td>
+                          <td className="py-2 px--5">{r.stores?.name || "—"}</td>
                           <td className="py-2 px-3">{r.employee_name}</td>
                           <td className="py-2 px-3">{r.days}</td>
                           <td className="py-2 px-3">{reason}</td>
@@ -272,6 +329,36 @@ export default function HolidayRequestsPage() {
                               <span className="text-red-600 font-semibold">Rejected</span>
                             ) : (
                               <span className="text-yellow-600 font-semibold">Pending</span>
+                            )}
+                          </td>
+
+                          {/* Notes */}
+                          <td className="py-2 px-3 align-top">
+                            <div className="whitespace-pre-wrap break-words text-gray-700 max-w-prose">
+                              {r.reason_notes?.trim() ? r.reason_notes : "—"}
+                            </div>
+                          </td>
+
+                          {/* Action (bounded) */}
+                          <td className="py-2 px-3 w-32 text-right">
+                            {canModerateRow(r) ? (
+                              <select
+                                className="border rounded p-1 text-xs w-full max-w-[128px]"
+                                disabled={updatingId === r.id}
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v) updateStatus(r, v);
+                                }}
+                              >
+                                <option value="" disabled>
+                                  Set status…
+                                </option>
+                                <option value="approved">Approve</option>
+                                <option value="rejected">Reject</option>
+                              </select>
+                            ) : (
+                              <span className="text-gray-400">—</span>
                             )}
                           </td>
                         </tr>
