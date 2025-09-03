@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Select,
   SelectContent,
@@ -30,7 +30,6 @@ const formSchema = z
     daysAbsent: z.coerce.number().int().min(1, 'Days absent must be at least 1'),
     reason: z.string().min(1, 'Please select a reason'),
     reasonOther: z.string().optional(),
-    // NEW: Notes (optional)
     notes: z.string().max(2000, 'Notes are too long').optional()
   })
   .refine(
@@ -45,7 +44,11 @@ export default function StaffAbsenceFormComponent({
   stores,
   onSubmit,
   isLoading,
-  setIsModalOpen
+  setIsModalOpen,
+  // NEW: optional edit-mode props (backward compatible)
+  initialValues,
+  submitLabel = 'Record Absence',
+  onCancelEdit
 }) {
   const defaultReporter =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -69,10 +72,32 @@ export default function StaffAbsenceFormComponent({
       daysAbsent: 1,
       reason: '',
       reasonOther: '',
-      // NEW
       notes: ''
     }
   });
+
+  // When entering edit mode, hydrate the form with provided values
+  useEffect(() => {
+    if (initialValues) {
+      form.reset({
+        staffName: initialValues.staffName ?? '',
+        reporterName: initialValues.reporterName ?? defaultReporter,
+        storeId:
+          initialValues.storeId != null
+            ? String(initialValues.storeId)
+            : defaultStoreId,
+        startDate: initialValues.startDate ?? todayStr,
+        daysAbsent:
+          typeof initialValues.daysAbsent === 'number'
+            ? initialValues.daysAbsent
+            : 1,
+        reason: initialValues.reason ?? '',
+        reasonOther: initialValues.reasonOther ?? '',
+        notes: initialValues.notes ?? ''
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues]);
 
   const visibleStores =
     profile?.permissions === 'admin' || profile?.permissions === 'regional'
@@ -81,7 +106,14 @@ export default function StaffAbsenceFormComponent({
 
   const reasonValue = form.watch('reason');
 
-  // shared input styles: white field + black text
+  // If user switches away from "Other", clear the free-text field
+  useEffect(() => {
+    if (reasonValue !== 'Other' && form.getValues('reasonOther')) {
+      form.setValue('reasonOther', '');
+    }
+  }, [reasonValue, form]);
+
+  // shared input styles
   const inputClass =
     'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black/20';
 
@@ -90,11 +122,10 @@ export default function StaffAbsenceFormComponent({
 
   const selectTriggerClass = 'bg-white text-black border border-gray-300';
 
-  // Wrap submit to reset on success
+  // Wrap submit to reset on success (works for create & edit)
   const handleSubmit = form.handleSubmit(async (values) => {
-    // Pass everything up, including notes
-    await onSubmit?.(values);
-    // Reset form to fresh defaults after a successful submit
+    await onSubmit?.(values); // includes notes
+    // Reset to fresh defaults after successful submit (exits edit mode upstream)
     form.reset({
       staffName: '',
       reporterName: defaultReporter,
@@ -111,16 +142,18 @@ export default function StaffAbsenceFormComponent({
     <div className="mx-auto w-full max-w-2xl">
       <div className="rounded-2xl border border-gray-800 bg-[#171a23] shadow-lg">
         <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-lg font-semibold text-white">Record Staff Absence</h2>
+          <h2 className="text-lg font-semibold text-white">
+            {initialValues ? 'Edit Staff Absence' : 'Record Staff Absence'}
+          </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Fill in the details below and press <span className="text-white">Record Absence</span>.
+            Fill in the details below and press{' '}
+            <span className="text-white">{submitLabel}</span>.
           </p>
         </div>
 
         <div className="p-5">
           <Form {...form}>
             <form onSubmit={handleSubmit} className="space-y-6">
-
               {/* Row 1: Staff + Reporter */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
@@ -138,7 +171,9 @@ export default function StaffAbsenceFormComponent({
                         />
                       </FormControl>
                       {fieldState.error && (
-                        <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                        <p className="text-sm text-red-500">
+                          {fieldState.error.message}
+                        </p>
                       )}
                     </FormItem>
                   )}
@@ -159,7 +194,9 @@ export default function StaffAbsenceFormComponent({
                         />
                       </FormControl>
                       {fieldState.error && (
-                        <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                        <p className="text-sm text-red-500">
+                          {fieldState.error.message}
+                        </p>
                       )}
                     </FormItem>
                   )}
@@ -167,7 +204,8 @@ export default function StaffAbsenceFormComponent({
               </div>
 
               {/* Row 2: Store (only admin/regional) */}
-              {(profile?.permissions === 'admin' || profile?.permissions === 'regional') && (
+              {(profile?.permissions === 'admin' ||
+                profile?.permissions === 'regional') && (
                 <div className="grid grid-cols-1">
                   <FormField
                     control={form.control}
@@ -190,7 +228,9 @@ export default function StaffAbsenceFormComponent({
                           </SelectContent>
                         </Select>
                         {fieldState.error && (
-                          <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                          <p className="text-sm text-red-500">
+                            {fieldState.error.message}
+                          </p>
                         )}
                       </FormItem>
                     )}
@@ -210,7 +250,9 @@ export default function StaffAbsenceFormComponent({
                         <input type="date" className={inputClass} {...field} />
                       </FormControl>
                       {fieldState.error && (
-                        <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                        <p className="text-sm text-red-500">
+                          {fieldState.error.message}
+                        </p>
                       )}
                     </FormItem>
                   )}
@@ -233,7 +275,9 @@ export default function StaffAbsenceFormComponent({
                         />
                       </FormControl>
                       {fieldState.error && (
-                        <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                        <p className="text-sm text-red-500">
+                          {fieldState.error.message}
+                        </p>
                       )}
                     </FormItem>
                   )}
@@ -263,7 +307,9 @@ export default function StaffAbsenceFormComponent({
                         </SelectContent>
                       </Select>
                       {fieldState.error && (
-                        <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                        <p className="text-sm text-red-500">
+                          {fieldState.error.message}
+                        </p>
                       )}
                     </FormItem>
                   )}
@@ -285,7 +331,9 @@ export default function StaffAbsenceFormComponent({
                           />
                         </FormControl>
                         {fieldState.error && (
-                          <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                          <p className="text-sm text-red-500">
+                            {fieldState.error.message}
+                          </p>
                         )}
                       </FormItem>
                     )}
@@ -293,7 +341,7 @@ export default function StaffAbsenceFormComponent({
                 )}
               </div>
 
-              {/* Row 5: Notes (NEW) */}
+              {/* Row 5: Notes */}
               <FormField
                 control={form.control}
                 name="notes"
@@ -308,7 +356,9 @@ export default function StaffAbsenceFormComponent({
                       />
                     </FormControl>
                     {fieldState.error && (
-                      <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                      <p className="text-sm text-red-500">
+                        {fieldState.error.message}
+                      </p>
                     )}
                   </FormItem>
                 )}
@@ -326,6 +376,16 @@ export default function StaffAbsenceFormComponent({
                     Cancel
                   </Button>
                 )}
+                {initialValues && typeof onCancelEdit === 'function' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancelEdit}
+                    disabled={isLoading}
+                  >
+                    Cancel Edit
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={isLoading}
@@ -336,7 +396,7 @@ export default function StaffAbsenceFormComponent({
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
                     </>
                   ) : (
-                    'Record Absence'
+                    submitLabel
                   )}
                 </Button>
               </div>
