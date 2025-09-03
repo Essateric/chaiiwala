@@ -29,7 +29,9 @@ const formSchema = z
     startDate: z.string().min(1, 'Please choose a start date'),
     daysAbsent: z.coerce.number().int().min(1, 'Days absent must be at least 1'),
     reason: z.string().min(1, 'Please select a reason'),
-    reasonOther: z.string().optional()
+    reasonOther: z.string().optional(),
+    // NEW: Notes (optional)
+    notes: z.string().max(2000, 'Notes are too long').optional()
   })
   .refine(
     (data) =>
@@ -55,16 +57,20 @@ export default function StaffAbsenceFormComponent({
       ? String(profile?.store_ids?.[0] ?? '')
       : '';
 
+  const todayStr = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
+
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       staffName: '',
       reporterName: defaultReporter,
       storeId: defaultStoreId,
-      startDate: new Date().toISOString().slice(0, 10), // yyyy-mm-dd
+      startDate: todayStr,
       daysAbsent: 1,
       reason: '',
-      reasonOther: ''
+      reasonOther: '',
+      // NEW
+      notes: ''
     }
   });
 
@@ -79,8 +85,27 @@ export default function StaffAbsenceFormComponent({
   const inputClass =
     'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black/20';
 
-  const selectTriggerClass =
-    'bg-white text-black border border-gray-300';
+  const textareaClass =
+    'w-full min-h-[88px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black/20';
+
+  const selectTriggerClass = 'bg-white text-black border border-gray-300';
+
+  // Wrap submit to reset on success
+  const handleSubmit = form.handleSubmit(async (values) => {
+    // Pass everything up, including notes
+    await onSubmit?.(values);
+    // Reset form to fresh defaults after a successful submit
+    form.reset({
+      staffName: '',
+      reporterName: defaultReporter,
+      storeId: defaultStoreId,
+      startDate: new Date().toISOString().slice(0, 10),
+      daysAbsent: 1,
+      reason: '',
+      reasonOther: '',
+      notes: ''
+    });
+  });
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -94,7 +119,7 @@ export default function StaffAbsenceFormComponent({
 
         <div className="p-5">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* Row 1: Staff + Reporter */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -267,6 +292,27 @@ export default function StaffAbsenceFormComponent({
                   />
                 )}
               </div>
+
+              {/* Row 5: Notes (NEW) */}
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Notes</FormLabel>
+                    <FormControl>
+                      <textarea
+                        placeholder="Any extra details…"
+                        className={textareaClass}
+                        {...field}
+                      />
+                    </FormControl>
+                    {fieldState.error && (
+                      <p className="text-sm text-red-500">{fieldState.error.message}</p>
+                    )}
+                  </FormItem>
+                )}
+              />
 
               {/* Actions */}
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-2">

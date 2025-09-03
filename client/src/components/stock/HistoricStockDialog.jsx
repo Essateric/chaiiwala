@@ -347,7 +347,7 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
         `)
         .eq("store_id", selectedStoreState.id);
 
-    if (error) { setStoreProducts([]); return; }
+      if (error) { setStoreProducts([]); return; }
       const unique = {};
       (data || []).forEach((r) => { if (!unique[r.stock_item_id]) unique[r.stock_item_id] = r; });
       setStoreProducts(Object.values(unique));
@@ -474,6 +474,15 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
   const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
   const handlePrevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
 
+  // 👇 FIX: footer close should behave like "Back" if a product is selected
+  const handleFooterClose = () => {
+    if (selectedProduct) {
+      setSelectedProduct(null); // go back to the all-products list
+      return;
+    }
+    onClose?.(); // close the dialog only when already on the list view
+  };
+
   if (!asPage && !isOpen) return null;
 
   return (
@@ -540,7 +549,9 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
 
       {!asPage && (
         <div className="mt-3 flex justify-end">
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={handleFooterClose}>
+            {selectedProduct ? "Back to Products" : "Close"}
+          </Button>
         </div>
       )}
     </div>

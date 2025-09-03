@@ -16,6 +16,8 @@ export default function StaffAbsencePage() {
   const [stores, setStores] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [saving, setSaving] = useState(false);
+  // used to force-reset the form after a successful submission
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     const run = async () => {
@@ -45,12 +47,13 @@ export default function StaffAbsencePage() {
       const storeIdNum = Number(values.storeId || profile?.store_ids?.[0]);
       const storeName = stores.find((s) => s.id === storeIdNum)?.name || null;
       const payload = {
-        staff_name: values.staffName,
-        reporter_name: values.reporterName,
-        reason: values.reason,
-        reason_other: values.reason === 'Other' ? values.reasonOther : null,
-        start_date: values.startDate,
-        days_absent: values.daysAbsent,
+        staff_name: values.staffName?.trim() || null,
+        reporter_name: values.reporterName?.trim() || null,
+        reason: values.reason || null,
+        reason_other: values.reason === 'Other' ? (values.reasonOther?.trim() || null) : null,
+        start_date: values.startDate || null,
+        days_absent: values.daysAbsent ? Number(values.daysAbsent) : null,
+        notes: values.notes?.trim() || null, // NEW
         store_id: storeIdNum,
         store_name: storeName,
         created_by: profile?.id || null
@@ -59,6 +62,8 @@ export default function StaffAbsencePage() {
       if (error) throw error;
       toast.success('Staff absence recorded.');
       qc.invalidateQueries({ queryKey: ['staff_absences'] });
+      // force a clean form
+      setResetKey((k) => k + 1);
     } catch (e) {
       console.error(e);
       toast.error('Failed to save staff absence.');
@@ -82,10 +87,12 @@ export default function StaffAbsencePage() {
     <DashboardLayout title="Staff Absence" profile={profile} announcements={announcements}>
       <div className="space-y-6">
         <StaffAbsenceFormComponent
+          key={resetKey}              // remounts the form → clears inputs
           profile={profile}
           stores={stores}
           onSubmit={handleSubmit}
           isLoading={saving}
+          mode="create"
         />
         <StaffAbsenceList profile={profile} stores={stores} />
       </div>
