@@ -21,6 +21,7 @@ import CustomerFeedbackPage from "./pages/CustomerFeedbackPage.jsx";
 import StaffAbsencePage from "./pages/StaffAbsences.jsx";
 import WasteReportingPage from "./pages/WasteReportingPage.jsx";
 import HolidayRequestPage from "./pages/HolidayRequests.jsx";
+import ExpensesPage from "./pages/ExpensesPage.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
@@ -104,6 +105,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute feature="deep_cleaning">
               <DeepCleaningPage />
+            </ProtectedRoute>
+          }
+        />
+               <Route
+          path="/expenses"
+          element={
+            <ProtectedRoute feature="expenses">
+              <ExpensesPage />
             </ProtectedRoute>
           }
         />

@@ -17,8 +17,9 @@ import {
   ShoppingCartIcon,
   WrenchIcon,
   PackageIcon,
-  HammerIcon
-} from "lucide-react";
+  HammerIcon,
+  CirclePoundSterlingIcon}
+   from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
 import { Trash2 as Trash2Icon } from "lucide-react";
@@ -72,6 +73,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Stock Orders', icon: PackageIcon, href: '/stock-orders', active: currentPage === 'stock-orders', roles: ['admin', 'regional', 'store'] },
     { name: 'Stock Management', icon: ShoppingCartIcon, href: '/stock-management', active: currentPage === 'stock-management', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'Deep Cleaning', icon: ClipboardListIcon, href: '/deep-cleaning', active: currentPage === 'deep-cleaning', roles: ['admin', 'regional', 'store'] },
+    { name: 'Expenses', icon: CirclePoundSterlingIcon, href: '/expenses', active: currentPage === 'expenses', roles: ['admin', 'regional', 'store'] },
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Waste Reporting', icon: Trash2Icon, href: '/waste-reporting', active: currentPage === 'waste-reporting', roles: ['admin','regional','area','store','staff'] },
