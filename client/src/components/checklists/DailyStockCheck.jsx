@@ -19,10 +19,27 @@ export default function DailyStockCheck({
   defaultExpanded = true,
 }) {
   const { profile } = useAuth();
+
   const resolvedStoreId =
     storeIdProp ?? (Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null);
 
-  const isSunday = new Date().getDay() === 0; // Sunday = 0
+  // --- FORCE-SUNDAY TEST SUPPORT ---
+  const getQueryParam = (name) => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get(name);
+  };
+
+  const forceSunday =
+    getQueryParam("forceSunday") === "1" ||
+    (typeof import.meta !== "undefined" && import.meta.env?.VITE_FORCE_SUNDAY === "1") ||
+    (typeof window !== "undefined" && window.localStorage?.getItem("forceSunday") === "1");
+
+  // Use UK time so Sunday is accurate for your users (Sunday = 0)
+  const nowUK = new Date(
+    new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })
+  );
+  const realSunday = nowUK.getDay() === 0;
+  const isSunday = !!forceSunday || realSunday;
 
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [stockItems, setStockItems] = useState([]);
@@ -50,6 +67,8 @@ export default function DailyStockCheck({
       .from("stock_items")
       .select("*")
       .order("name", { ascending: true });
+
+    items = items || [];
 
     // Match your existing logic: hide non-daily items except on Sundays
     if (!itemError && !isSunday) {
@@ -93,7 +112,7 @@ export default function DailyStockCheck({
   useEffect(() => {
     fetchStock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedStoreId]);
+  }, [resolvedStoreId, isSunday]);
 
   const handleEditChange = (id, value) => {
     // Allow empty for “clear”, but guard negative values
@@ -104,7 +123,7 @@ export default function DailyStockCheck({
     }));
   };
 
-  // NEW: Build unique, sorted category list from data
+  // Build unique, sorted category list from data
   const categoryOptions = useMemo(() => {
     const set = new Set(
       (stockItems || []).map((i) => {
@@ -146,7 +165,7 @@ export default function DailyStockCheck({
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  // NEW: Reset to page 1 when filters change
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategory, search]);
@@ -178,10 +197,7 @@ export default function DailyStockCheck({
     setSaving(true);
 
     try {
-      const {
-        data: authData,
-        error: userError
-      } = await supabase.auth.getUser();
+      const { data: authData, error: userError } = await supabase.auth.getUser();
 
       const user = authData?.user;
       if (!user) {
@@ -270,17 +286,16 @@ export default function DailyStockCheck({
       {expanded && (
         <CardContent>
           {/* Toolbar: search + category + save */}
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
               <Input
                 placeholder="Search by name or SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-64"
+                className="w-full sm:w-64"
               />
-
               <select
-                className="border rounded px-3 py-2 text-sm"
+                className="border rounded px-3 py-2 text-sm w-full sm:w-auto"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
               >
@@ -295,6 +310,7 @@ export default function DailyStockCheck({
 
             {/* Save current page button (top-right for convenience) */}
             <Button
+              className="w-full sm:w-auto"
               variant="default"
               size="sm"
               onClick={handleSavePage}
@@ -383,6 +399,34 @@ export default function DailyStockCheck({
                 </div>
               )}
             </>
+          )}
+
+          {/* Spacer so content won't be hidden behind the sticky bar */}
+          <div className="h-20 sm:h-0" />
+
+          {/* Sticky action bar */}
+          <div className="sticky bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t p-3 pb-[env(safe-area-inset-bottom)] z-40">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSavePage}
+                disabled={!hasPageChanges || saving || loading}
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Optional floating Save on small screens when there are edits */}
+          {hasPageChanges && (
+            <Button
+              className="fixed right-4 bottom-20 z-50 sm:hidden"
+              onClick={handleSavePage}
+              disabled={saving || loading}
+            >
+              {saving ? "Saving..." : "Save"}
+            </Button>
           )}
         </CardContent>
       )}

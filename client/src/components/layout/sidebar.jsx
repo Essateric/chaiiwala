@@ -8,7 +8,7 @@ import {
   ClipboardListIcon,
   MicVocalIcon,
    CalendarIcon,
-  // ArchiveIcon,
+   FilePenLineIcon,
   BellIcon,
   UsersIcon,
   SettingsIcon,
@@ -18,7 +18,10 @@ import {
   WrenchIcon,
   PackageIcon,
   HammerIcon,
-  CirclePoundSterlingIcon}
+  CirclePoundSterlingIcon,
+  PenLineIcon,
+  ChartNoAxesCombinedIcon
+}
    from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient.js";
@@ -77,6 +80,8 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Announcements', icon: BellIcon, href: '/announcements', active: currentPage === 'announcements', roles: ['admin', 'regional', 'area', 'store'] },
     { name: 'User Management', icon: UsersIcon, href: '/user-management', active: currentPage === 'user-management', roles: ['admin', 'regional'] },
     { name: 'Waste Reporting', icon: Trash2Icon, href: '/waste-reporting', active: currentPage === 'waste-reporting', roles: ['admin','regional','area','store','staff'] },
+    { name: 'Audit', icon: ChartNoAxesCombinedIcon, href: '/audit', active: currentPage === 'audit', roles: ['admin', 'regional', 'area','store'] },
+    { name: 'Reports', icon: FilePenLineIcon, href: '/reports', active: currentPage === 'reports', roles: ['admin', 'regional', 'area','store'] },
     { name: 'Settings', icon: SettingsIcon, href: '/settings', active: currentPage === 'settings', roles: ['admin', 'regional'] },
     { name: 'Support', icon: WrenchIcon, href: '/support', active: currentPage === 'support', roles: ['admin', 'regional', 'area','store', 'staff'] }
   ];

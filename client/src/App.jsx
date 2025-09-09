@@ -22,14 +22,17 @@ import StaffAbsencePage from "./pages/StaffAbsences.jsx";
 import WasteReportingPage from "./pages/WasteReportingPage.jsx";
 import HolidayRequestPage from "./pages/HolidayRequests.jsx";
 import ExpensesPage from "./pages/ExpensesPage.jsx";
+import AuditPage from "./pages/Audit.jsx";
+import Reports from "./pages/Reports.jsx";
 
 // List of allowed roles for certain pages
 const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 const ANNOUNCEMENTS_ALLOWED_ROLES = ["admin", "area", "regional", "store"];
 const USER_MANAGEMENT_ROLES = ["admin", "regional"];
 const SETTINGS_ALLOWED_ROLES = ["admin", "regional"];
-const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
+const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area"];
 const DAILY_CHECKLIST_ALLOWED_ROLES = ["area", "store"];
+const AUDIT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 
 
 function AppRoutes() {
@@ -73,6 +76,33 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
 <HolidayRequestPage />
+            </ProtectedRoute>
+          }
+        />
+<Route
+  path="/audit"
+  element={
+    <ProtectedRoute roles={AUDIT_ALLOWED_ROLES}>
+      <AuditPage />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/audit/:id"
+  element={
+    <ProtectedRoute roles={AUDIT_ALLOWED_ROLES}>
+      <AuditPage />
+    </ProtectedRoute>
+  }
+/>
+
+
+                        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+<Reports />
             </ProtectedRoute>
           }
         />
