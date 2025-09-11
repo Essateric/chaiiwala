@@ -4,9 +4,7 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
-/* ------------------------------------------------------------------ */
-/* WinAnsi-safe sanitizers (avoid pdf-lib WinAnsi encode errors)      */
-/* ------------------------------------------------------------------ */
+/* ---------------- WinAnsi-safe sanitizers ---------------- */
 const REPLACEMENTS = {
   "≥": ">=",
   "≤": "<=",
@@ -38,28 +36,51 @@ const sanitizeDeep = (x) => {
   return x;
 };
 
-/* ddmmyy date (local time) */
 const ddmmyy = (d) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}${pad(d.getMonth() + 1)}${String(d.getFullYear()).slice(-2)}`;
 };
 
-/* Human store name for display & filename */
-function deriveStoreName(p) {
-  const primary = (p.store_name ?? "").trim();
-  const looksUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(primary);
-  const looksNumericId = /^\d+$/.test(primary);
-
-  if (!primary || looksUuid || looksNumericId) {
-    const fallback = (p.store || p.store_title || p.store_display_name || "").trim();
-    if (fallback) return fallback;
+/* ---------- robust human store name ---------- */
+const asString = (v) => {
+  if (v == null) return "";
+  if (typeof v === "object") {
+    // common nested shapes
+    return String(v.name ?? v.title ?? v.display_name ?? v.store_name ?? v.id ?? "");
   }
-  return primary || "Unknown";
+  return String(v);
+};
+const looksUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+const looksNumericId = (s) => /^\d+$/.test(s);
+
+function deriveStoreName(p) {
+  // try a bunch of fields safely, in order
+  const candidates = [
+    p.store_name,
+    p.store, // may be object or id
+    p.store_title,
+    p.store_display_name,
+    p.store?.name,
+    p.store?.title,
+  ];
+
+  for (const c of candidates) {
+    const s = asString(c).trim();
+    if (!s) continue;
+    // skip obvious ids
+    if (looksUuid(s) || looksNumericId(s)) continue;
+    return s;
+  }
+
+  // if everything looked like an id, still return the first non-empty thing
+  for (const c of candidates) {
+    const s = asString(c).trim();
+    if (s) return s;
+  }
+  return "Unknown";
 }
 
-/* ------------------------------------------------------------------ */
-/* PDF helpers                                                        */
-/* ------------------------------------------------------------------ */
+/* ---------------- PDF helpers ---------------- */
 const red = rgb(1, 0, 0);
 const orange = rgb(1, 0.65, 0);
 const green = rgb(0, 0.6, 0);
@@ -217,7 +238,7 @@ async function generateAuditPDF(payload, fileName) {
   return { buffer: Buffer.from(pdfBytes), fileName: `${fileName}.pdf` };
 }
 
-/* Optional email (skipped unless EMAIL_USER & EMAIL_PASS are set) */
+/* Optional email (skipped unless creds exist) */
 async function sendEmail(pdfBuffer, fileName, to) {
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
@@ -240,9 +261,7 @@ async function sendEmail(pdfBuffer, fileName, to) {
   return { ok: true, id: info.messageId };
 }
 
-/* ------------------------------------------------------------------ */
-/* Netlify handler                                                    */
-/* ------------------------------------------------------------------ */
+/* ---------------- Netlify handler ---------------- */
 export async function handler(event) {
   const cors = {
     "Access-Control-Allow-Origin": "*",
@@ -259,15 +278,20 @@ export async function handler(event) {
     let payload = JSON.parse(event.body || "{}");
     payload = sanitizeDeep(payload);
 
-    // Human store name for display & EXACT filename: Audit_<StoreName>_<ddmmyy>
+    // derive a human name safely (handles numbers/objects/ids)
     const storeHumanName = deriveStoreName(payload);
+
+    // File name EXACT: Audit_<StoreName>_<ddmmyy>
     const when = new Date(payload.submitted_at || Date.now());
-    const storeToken = safeAnsi(storeHumanName).trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    const storeToken = safeAnsi(storeHumanName)
+      .trim()
+      .replace(/[^A-Za-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
     const fileName = `Audit_${storeToken}_${ddmmyy(when)}`;
 
     const pdf = await generateAuditPDF({ ...payload, store_name: storeHumanName }, fileName);
 
-    // Email is optional – skipped if creds absent
+    // Email only if creds provided (otherwise skipped)
     const emailRes = await sendEmail(pdf.buffer, fileName, payload.email_to);
 
     return {
