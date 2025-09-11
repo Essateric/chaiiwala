@@ -1,41 +1,42 @@
+# netlify.toml
 [build]
-command = "npm run build"        # You can still run `npx vite build` manually if needed
-publish = "dist/public" # Do not edit this line
-functions = "netlify/functions"
-framework = "vite"               # Avoids the "Invalid framework" warning
+  command   = "npm run build"
+  publish   = "dist"                 # Vite outputs to /dist by default
+  functions = "netlify/functions"
 
 [functions]
-node_bundler = "esbuild"
-included_files = [".env"]        # Applies to all functions
+  node_bundler   = "esbuild"
+  included_files = [".env"]          # available to all functions
+
+# Make sure both functions can bundle node deps
+[functions."sendAuditPdf"]
+  external_node_modules = ["pdf-lib", "nodemailer", "dotenv"]
 
 [functions."sendFeedbackEmail"]
-node_bundler = "esbuild"
-included_files = [".env"]
-external_node_modules = ["pdf-lib", "nodemailer", "dotenv"]
-js_external_modules = true
+  external_node_modules = ["pdf-lib", "nodemailer", "dotenv"]
 
 [dev]
-framework = "vite"               # ✅ Correct value
-command = "npm run dev"
-targetPort = 5173
-port = 8888
+  command   = "npm run dev"
+  framework = "vite"
+  targetPort = 5173
+  port       = 8888
 
 [[redirects]]
-from = "/api/*"
-to = "/.netlify/functions/api/:splat"
-status = 200
-force = true
+  from   = "/api/*"
+  to     = "/.netlify/functions/api/:splat"
+  status = 200
+  force  = true
 
 [[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
 
 [[headers]]
-for = "/*"
-[headers.values]
-  Referrer-Policy = "strict-origin-when-cross-origin"
-  Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
-  X-Content-Type-Options = "nosniff"
-  X-Frame-Options = "DENY"
-  X-XSS-Protection = "1; mode=block"
+  for = "/*"
+  [headers.values]
+    Referrer-Policy              = "strict-origin-when-cross-origin"
+    Strict-Transport-Security    = "max-age=63072000; includeSubDomains; preload"
+    X-Content-Type-Options       = "nosniff"
+    X-Frame-Options              = "DENY"
+    X-XSS-Protection             = "1; mode=block"

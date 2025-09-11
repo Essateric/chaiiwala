@@ -7,6 +7,38 @@ import { Input } from "@/components/ui/input.jsx";
 import { useAuth } from "@/hooks/UseAuth.jsx";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
+/** Robust: get London day-of-week without Date parsing ambiguity (0=Sun..6=Sat) */
+function getLondonDayOfWeek(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const d = parts.find((p) => p.type === "day")?.value;
+  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const min = parts.find((p) => p.type === "minute")?.value ?? "00";
+  const s = parts.find((p) => p.type === "second")?.value ?? "00";
+
+  // Build a wall-clock London datetime string that Date can read consistently
+  const londonIsoLike = `${y}-${m}-${d}T${h}:${min}:${s}`;
+  return new Date(londonIsoLike).getDay();
+}
+
+function getLondonWeekdayName(now = new Date()) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "long",
+  }).format(now);
+}
+
 export default function DailyStockCheck({
   /** Optional: force a specific store id. If omitted, uses the user's first store. */
   storeId: storeIdProp = null,
@@ -23,23 +55,28 @@ export default function DailyStockCheck({
   const resolvedStoreId =
     storeIdProp ?? (Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null);
 
-  // --- FORCE-SUNDAY TEST SUPPORT ---
-  const getQueryParam = (name) => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get(name);
-  };
+  // --- FORCE-SUNDAY TEST SUPPORT (safe in prod) ---
+  const isDev = typeof import.meta !== "undefined" && import.meta.env?.MODE === "development";
 
-  const forceSunday =
-    getQueryParam("forceSunday") === "1" ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_FORCE_SUNDAY === "1") ||
-    (typeof window !== "undefined" && window.localStorage?.getItem("forceSunday") === "1");
+  const urlForceSunday =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("forceSunday") === "1";
 
-  // Use UK time so Sunday is accurate for your users (Sunday = 0)
-  const nowUK = new Date(
-    new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })
-  );
-  const realSunday = nowUK.getDay() === 0;
-  const isSunday = !!forceSunday || realSunday;
+  const lsForceSunday =
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("forceSunday") === "1";
+
+  const envForceSunday =
+    typeof import.meta !== "undefined" &&
+    isDev &&
+    import.meta.env?.VITE_FORCE_SUNDAY === "1";
+
+  // Only true if explicitly set via URL/localStorage in any env, or via env var in dev
+  const forceSunday = urlForceSunday || lsForceSunday || envForceSunday;
+
+  // Define isSunday BEFORE any hook uses it
+  const isSunday = forceSunday || getLondonDayOfWeek() === 0;
+  const londonWeekdayName = getLondonWeekdayName();
 
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [stockItems, setStockItems] = useState([]);
@@ -70,7 +107,7 @@ export default function DailyStockCheck({
 
     items = items || [];
 
-    // Match your existing logic: hide non-daily items except on Sundays
+    // Hide non-daily items except on Sundays
     if (!itemError && !isSunday) {
       items = items.filter((item) => item.daily_check === true);
     }
@@ -112,7 +149,7 @@ export default function DailyStockCheck({
   useEffect(() => {
     fetchStock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedStoreId, isSunday]);
+  }, [resolvedStoreId, isSunday]); // <-- isSunday is defined above
 
   const handleEditChange = (id, value) => {
     // Allow empty for “clear”, but guard negative values
@@ -258,8 +295,8 @@ export default function DailyStockCheck({
           <CardTitle>{title}</CardTitle>
           <p className="text-sm text-gray-500">
             {isSunday
-              ? "Sunday Weekly Stock Check — update quantities for all stock items."
-              : "Update today’s stock levels for all daily-check items."}
+              ? "Weekly Stock Check — update quantities for all stock items."
+              : `Daily Stock Check for ${londonWeekdayName} — only daily-check items.`}
           </p>
         </div>
 

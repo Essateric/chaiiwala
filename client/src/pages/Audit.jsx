@@ -9,6 +9,39 @@ import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Textarea } from "../components/ui/textarea.jsx";
 
+/* ---------------------- WinAnsi-safe sanitizers (NEW) ---------------------- */
+const REPLACEMENTS = {
+  "≥": ">=",
+  "≤": "<=",
+  "–": "-",
+  "—": "-",
+  "−": "-",
+  "“": '"',
+  "”": '"',
+  "‘": "'",
+  "’": "'",
+  "•": "*",
+  "·": "-",
+  "…": "...",
+  "£": "GBP ",
+  "€": "EUR ",
+};
+const safeAnsi = (v) =>
+  String(v ?? "").replace(/[≥≤–—−“”‘’•·…£€]/g, (ch) => REPLACEMENTS[ch] || "?");
+
+const sanitizeDeep = (x) => {
+  if (x == null) return x;
+  if (typeof x === "string") return safeAnsi(x);
+  if (Array.isArray(x)) return x.map(sanitizeDeep);
+  if (typeof x === "object") {
+    const out = {};
+    for (const k of Object.keys(x)) out[k] = sanitizeDeep(x[k]);
+    return out;
+  }
+  return x;
+};
+/* -------------------------------------------------------------------------- */
+
 export default function AuditEditor() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -26,8 +59,7 @@ export default function AuditEditor() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const q = supabase.from("stores").select("id,name").order("name", { ascending: true });
-      const { data, error } =
-        storeIds.length > 0 ? await q.in("id", storeIds) : await q;
+      const { data, error } = storeIds.length > 0 ? await q.in("id", storeIds) : await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -92,9 +124,7 @@ export default function AuditEditor() {
 
     if (readErr || !readable) {
       console.error(readErr);
-      alert(
-        "Audit was created, but you don't have permission to read it. Please check RLS."
-      );
+      alert("Audit was created, but you don't have permission to read it. Please check RLS.");
       return;
     }
 
@@ -185,7 +215,9 @@ export default function AuditEditor() {
       answers
         .map(
           (a) =>
-            `${a.question_id}|${a.value_bool ?? ""}|${a.value_num ?? ""}|${a.value_text ?? ""}|${a.notes ?? ""}`
+            `${a.question_id}|${a.value_bool ?? ""}|${a.value_num ?? ""}|${
+              a.value_text ?? ""
+            }|${a.notes ?? ""}`
         )
         .join("§"),
     [answers]
@@ -218,7 +250,7 @@ export default function AuditEditor() {
   const clamp = (n, min, max) => {
     if (n == null || Number.isNaN(n)) return null;
     return Math.min(Math.max(n, min), max);
-    };
+  };
 
   const saveAll = async () => {
     const rows = [];
@@ -235,7 +267,7 @@ export default function AuditEditor() {
       };
       if (q.answer_type === "binary") row.value_bool = d.value_bool ?? null;
       else if (q.answer_type === "score") {
-        row.value_bool = d.value_bool ?? null; // store the yes/no alongside the score
+        row.value_bool = d.value_bool ?? null; // yes/no alongside score
         row.value_num = d.value_num ?? null;
       } else if (q.answer_type === "text" || q.answer_type === "photo") {
         row.value_text = d.value_text ?? null;
@@ -253,17 +285,91 @@ export default function AuditEditor() {
     alert("Saved.");
   };
 
+  // --- submits audit, then generates & emails PDF via Netlify function
   const submitAudit = async () => {
-    const { error } = await supabase
-      .from("audits")
-      .update({ submitted_at: new Date().toISOString() })
-      .eq("id", auditId);
-    if (error) {
-      console.error(error);
-      alert(error.message || "Could not submit audit.");
-      return;
+    try {
+      // 1) persist any edits first
+      await saveAll();
+
+      // 2) mark as submitted
+      const submittedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from("audits")
+        .update({ submitted_at: submittedAt })
+        .eq("id", auditId);
+
+      if (error) {
+        console.error(error);
+        alert(error.message || "Could not submit audit.");
+        return;
+      }
+
+      // 3) build the PDF payload from current view state
+      const payload = {
+        id: auditId,
+        store_name: storeName,
+        template_name: templateName,
+        started_at: audit?.started_at ?? null,
+        submitted_at: submittedAt,
+        sections: sections.map((s) => ({
+          title: s.title,
+          questions: (questionsBySection[s.id] || []).map((q) => ({
+            code: q.code,
+            prompt: q.prompt,
+            answer_type: q.answer_type,
+            max_points: q.max_points,
+            answer: {
+              value_bool: draft[q.id]?.value_bool ?? null,
+              value_num: draft[q.id]?.value_num ?? null,
+              value_text: draft[q.id]?.value_text ?? null,
+              notes: draft[q.id]?.notes ?? null,
+              photos: draft[q.id]?.photos || [],
+            },
+          })),
+        })),
+        // optional routing override
+        email_to: "audits@chaiiwala.co.uk",
+        // optional name hint (server can ignore)
+        file_name_hint: safeAnsi(
+          `Audit - ${storeName} - ${new Date(submittedAt)
+            .toLocaleDateString("en-GB")
+            .replace(/\//g, "")}`
+        ),
+      };
+
+      // 4) sanitize the payload for PDF (FIX for WinAnsi error)
+      const cleanPayload = sanitizeDeep(payload);
+
+      // 5) call the Netlify function
+      const base = (import.meta.env.VITE_NETLIFY_BASE || "").replace(/\/$/, "");
+      const url = base
+        ? `${base}/.netlify/functions/sendAuditPdf`
+        : "/.netlify/functions/sendAuditPdf";
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cleanPayload),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.error("sendAuditPdf failed:", json);
+        alert(`PDF/email failed: ${json.error || res.statusText}`);
+        return;
+      }
+
+      alert(
+        `Audit submitted and emailed${json.fileName ? ` (${json.fileName})` : ""}`
+      );
+
+      // (optional) navigate to an “Audit History” page after submit
+      // navigate("/audit");
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Unexpected error submitting audit.");
     }
-    alert("Audit submitted.");
   };
 
   // ---------- RENDER ----------
@@ -315,7 +421,11 @@ export default function AuditEditor() {
                 </div>
 
                 <div className="col-span-1 flex items-end">
-                  <Button className="w-full" onClick={createAndStart} disabled={!selectedStore || !selectedTemplate}>
+                  <Button
+                    className="w-full"
+                    onClick={createAndStart}
+                    disabled={!selectedStore || !selectedTemplate}
+                  >
                     Create & start audit
                   </Button>
                 </div>
@@ -428,7 +538,6 @@ export default function AuditEditor() {
                                   onChange={() =>
                                     handleChange(q.id, {
                                       value_bool: true,
-                                      // keep existing score, else leave null so user types it
                                       value_num: d.value_num ?? null,
                                     })
                                   }
@@ -482,7 +591,7 @@ export default function AuditEditor() {
                           />
                         )}
 
-                        {/* Photo URL (or uploader you already wired elsewhere) */}
+                        {/* Photo URL */}
                         {q.answer_type === "photo" && (
                           <>
                             <Input
@@ -490,7 +599,9 @@ export default function AuditEditor() {
                               value={d.value_text ?? ""}
                               onChange={(e) => handleChange(q.id, { value_text: e.target.value })}
                             />
-                            <p className="text-[11px] text-gray-400 mt-1">Store the uploaded image URL in this field.</p>
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              Store the uploaded image URL in this field.
+                            </p>
                           </>
                         )}
 
