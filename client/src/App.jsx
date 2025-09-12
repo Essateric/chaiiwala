@@ -30,7 +30,7 @@ const EVENT_ORDERS_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 const ANNOUNCEMENTS_ALLOWED_ROLES = ["admin", "area", "regional", "store"];
 const USER_MANAGEMENT_ROLES = ["admin", "regional"];
 const SETTINGS_ALLOWED_ROLES = ["admin", "regional"];
-const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area"];
+const STOCK_MANAGEMENT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 const DAILY_CHECKLIST_ALLOWED_ROLES = ["area", "store"];
 const AUDIT_ALLOWED_ROLES = ["admin", "regional", "area", "store"];
 

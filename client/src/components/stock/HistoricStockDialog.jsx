@@ -24,7 +24,8 @@ const Arrow = ({ dir }) => {
 };
 
 const pad2 = (x) => String(x).padStart(2, "0");
-const localDayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const localDayKey = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const lastNDatesLocal = (n) => {
   const dates = [];
   const end = new Date();
@@ -117,8 +118,15 @@ function ProductTable({
           <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={handlePrevPage}>
             Prev
           </Button>
-          <span>Page {currentPage} of {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={handleNextPage}>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === totalPages}
+            onClick={handleNextPage}
+          >
             Next
           </Button>
         </div>
@@ -128,7 +136,14 @@ function ProductTable({
 }
 
 /* ---------- per-product history table ---------- */
-function ProductHistoryTable({ historyRows, product, onBack, rangeShortLabel, rangeLongLabel }) {
+function ProductHistoryTable({
+  historyRows,
+  product,
+  onBack,
+  onReset, // <<< NEW: reset list + search
+  rangeShortLabel,
+  rangeLongLabel,
+}) {
   const is5d = rangeShortLabel === "5d";
 
   const rowsWithCalcs = useMemo(() => {
@@ -212,10 +227,22 @@ function ProductHistoryTable({ historyRows, product, onBack, rangeShortLabel, ra
     return result;
   }, [historyRows, is5d]);
 
-  const sumOpen = useMemo(() => rowsWithCalcs.reduce((s, r) => s + (r.oldQ ?? 0), 0), [rowsWithCalcs]);
-  const totalDeliveries = useMemo(() => rowsWithCalcs.reduce((s, r) => s + (r.delivery || 0), 0), [rowsWithCalcs]);
-  const sumClose = useMemo(() => rowsWithCalcs.reduce((s, r) => s + (r.newQ ?? 0), 0), [rowsWithCalcs]);
-  const totalUsage = useMemo(() => rowsWithCalcs.reduce((s, r) => s + (r.usage || 0), 0), [rowsWithCalcs]);
+  const sumOpen = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.oldQ ?? 0), 0),
+    [rowsWithCalcs]
+  );
+  const totalDeliveries = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.delivery || 0), 0),
+    [rowsWithCalcs]
+  );
+  const sumClose = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.newQ ?? 0), 0),
+    [rowsWithCalcs]
+  );
+  const totalUsage = useMemo(
+    () => rowsWithCalcs.reduce((s, r) => s + (r.usage || 0), 0),
+    [rowsWithCalcs]
+  );
 
   return (
     <div>
@@ -229,8 +256,12 @@ function ProductHistoryTable({ historyRows, product, onBack, rangeShortLabel, ra
             {rangeShortLabel} usage: <span className="font-semibold">{format2(totalUsage)}</span>
           </div>
           <div className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1">
-            {rangeShortLabel} deliveries: <span className="font-semibold">{format2(totalDeliveries)}</span>
+            {rangeShortLabel} deliveries:{" "}
+            <span className="font-semibold">{format2(totalDeliveries)}</span>
           </div>
+          <Button variant="outline" size="sm" onClick={onReset}>
+            Reset
+          </Button>
           <Button variant="ghost" size="sm" onClick={onBack}>
             Back to Products
           </Button>
@@ -261,9 +292,14 @@ function ProductHistoryTable({ historyRows, product, onBack, rangeShortLabel, ra
                 const dt = row.dayDate ? row.dayDate : row.changed_at ? new Date(row.changed_at) : null;
                 const isSunday = dt ? dt.getDay() === 0 : false;
                 return (
-                  <tr key={(row.changed_at || "") + (row.updated_by_name || "") + i} className={isSunday ? "bg-blue-50" : ""}>
+                  <tr
+                    key={(row.changed_at || "") + (row.updated_by_name || "") + i}
+                    className={isSunday ? "bg-blue-50" : ""}
+                  >
                     <td className={`p-2 ${isSunday ? "text-blue-700 font-medium" : ""}`}>
-                      {dt ? dt.toLocaleDateString() + (is5d ? "" : ` ${dt.toLocaleTimeString()}`) : "—"}
+                      {dt
+                        ? dt.toLocaleDateString() + (is5d ? "" : ` ${dt.toLocaleTimeString()}`)
+                        : "—"}
                     </td>
                     <td className="p-2">{row.updated_by_name || "—"}</td>
                     <td className="p-2">{row.oldQ == null ? "—" : format2(row.oldQ)}</td>
@@ -347,7 +383,7 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
         `)
         .eq("store_id", selectedStoreState.id);
 
-      if (error) { setStoreProducts([]); return; }
+    if (error) { setStoreProducts([]); return; }
       const unique = {};
       (data || []).forEach((r) => { if (!unique[r.stock_item_id]) unique[r.stock_item_id] = r; });
       setStoreProducts(Object.values(unique));
@@ -474,13 +510,20 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
   const handleNextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
   const handlePrevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
 
-  // 👇 FIX: footer close should behave like "Back" if a product is selected
+  // Reset list helper (clears search + page and returns to list)
+  const resetList = () => {
+    setSearch("");
+    setCurrentPage(1);
+    setSelectedProduct(null);
+  };
+
+  // footer close: behave like "Back" if viewing a product
   const handleFooterClose = () => {
     if (selectedProduct) {
-      setSelectedProduct(null); // go back to the all-products list
+      setSelectedProduct(null); // go back to list view
       return;
     }
-    onClose?.(); // close the dialog only when already on the list view
+    onClose?.(); // close dialog when already on list
   };
 
   if (!asPage && !isOpen) return null;
@@ -491,14 +534,33 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
       <div className="flex items-center justify-between mb-2">
         <h4 className="font-semibold">Products in {selectedStoreState?.name ?? "—"}</h4>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant={range === "5d" ? "default" : "outline"} onClick={() => setRange("5d")}>5d</Button>
-          <Button size="sm" variant={range === "14d" ? "default" : "outline"} onClick={() => setRange("14d")}>14d</Button>
-          <Button size="sm" variant={range === "4w" ? "default" : "outline"} onClick={() => setRange("4w")}>4w</Button>
+          <Button
+            size="sm"
+            variant={range === "5d" ? "default" : "outline"}
+            onClick={() => setRange("5d")}
+          >
+            5d
+          </Button>
+          <Button
+            size="sm"
+            variant={range === "14d" ? "default" : "outline"}
+            onClick={() => setRange("14d")}
+          >
+            14d
+          </Button>
+          <Button
+            size="sm"
+            variant={range === "4w" ? "default" : "outline"}
+            onClick={() => setRange("4w")}
+          >
+            4w
+          </Button>
         </div>
       </div>
 
       {!selectedProduct ? (
         <>
+          {/* Sticky search with Reset */}
           <div
             style={{
               position: "sticky",
@@ -509,16 +571,23 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
               marginBottom: 8,
             }}
           >
-            <Input
-              placeholder="Search product name or SKU..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full"
-              autoFocus={!asPage}
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search product name or SKU..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full"
+                autoFocus={!asPage}
+              />
+              {search ? (
+                <Button variant="outline" size="sm" onClick={resetList}>
+                  Reset
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <ProductTable
@@ -542,6 +611,7 @@ function HistoricStockBody({ isOpen, onClose, user, selectedStore, asPage = fals
           historyRows={historyRows}
           product={selectedProduct}
           onBack={() => setSelectedProduct(null)}
+          onReset={resetList} // <<< NEW: clears search + page and returns to list
           rangeShortLabel={rangeShortLabel}
           rangeLongLabel={rangeLongLabel}
         />
@@ -572,7 +642,9 @@ export default function HistoricStockDialog({
       <div className="bg-white rounded-lg border shadow overflow-hidden">
         <div className="px-4 pt-4 pb-2 border-b bg-chai-gold/10">
           <h2 className="text-lg font-semibold">Historic Stock</h2>
-          <p className="text-sm text-gray-600">Search or pick a product to view its quantity history.</p>
+          <p className="text-sm text-gray-600">
+            Search or pick a product to view its quantity history.
+          </p>
         </div>
         <HistoricStockBody
           isOpen={true}
@@ -596,7 +668,9 @@ export default function HistoricStockDialog({
       <DialogContent className="w-[900px] max-w-full rounded-lg p-0">
         <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle>Historic Stock</DialogTitle>
-          <DialogDescription>Search or pick a product to view its quantity history.</DialogDescription>
+          <DialogDescription>
+            Search or pick a product to view its quantity history.
+          </DialogDescription>
         </DialogHeader>
 
         <HistoricStockBody

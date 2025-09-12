@@ -1,5 +1,5 @@
 // components/expenses/ExpenseForm.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "../ui/button.jsx";
 import { Input } from "../ui/input.jsx";
@@ -25,25 +25,24 @@ function resolveReporter(p) {
 export default function ExpenseForm({
   profile,
   stores = [],
-  // Accept both prop names for compatibility
+  // Accept both names for compatibility
   categories = FALLBACK_CATEGORIES,
   categoryOptions,
   defaultCategory,
-  // any truthy flag from older code paths will still render the field
   showCategory,
   includeCategory,
   withCategory,
   enableCategorySelect,
   onSubmit,
   isLoading,
+  // NEW: when this changes (only after parent confirms success), we reset the form
+  resetSignal = 0,
 }) {
-  // unify category options
   const allCategories = useMemo(() => {
     const arr =
       (Array.isArray(categoryOptions) && categoryOptions.length && categoryOptions) ||
       (Array.isArray(categories) && categories.length && categories) ||
       FALLBACK_CATEGORIES;
-    // ensure unique, stable list
     return Array.from(new Set(arr));
   }, [categories, categoryOptions]);
 
@@ -65,6 +64,9 @@ export default function ExpenseForm({
     register,
     handleSubmit,
     control,
+    getValues,
+    reset,
+    setFocus,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -76,20 +78,35 @@ export default function ExpenseForm({
     },
   });
 
-  // Always render category (but we also honor legacy flags if they’re present)
+  // Always render category (legacy props still honored)
   const shouldRenderCategory =
     true || showCategory || includeCategory || withCategory || enableCategorySelect;
+
+  // NEW: Clear/Reset after successful submit (signaled by parent)
+  useEffect(() => {
+    // Keep the store as-is; reset other fields
+    const currentStore = getValues("storeId");
+    reset({
+      storeId: currentStore,
+      expenseDate: new Date().toISOString().slice(0, 10),
+      product: "",
+      amount: "",
+      category: initialCategory,
+    });
+    // Focus the product field for quick entry
+    setTimeout(() => setFocus("product"), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal]);
 
   return (
     <form
       onSubmit={handleSubmit((vals) => {
-        // Defensive: ensure category is set
         if (!vals.category) vals.category = initialCategory;
         onSubmit?.(vals);
       })}
-      className="rounded-xl border border-gray-800 bg-[#0f131a] p-5 text-black shadow"
+      className="rounded-xl border border-gray-800 bg-[#0f131a] p-5 text-white shadow lg:w-[55%] "
     >
-      <div className="text-lg font-semibold mb-1">Record Expense</div>
+      <div className="text-lg text-white font-semibold mb-1">Record Expense</div>
       <p className="text-sm text-gray-400 mb-4">
         Enter the expense details and press <span className="font-semibold">Save Expense</span>.
       </p>
@@ -181,8 +198,6 @@ export default function ExpenseForm({
             <label className="mb-2 block text-sm font-medium text-gray-200">
               Category
             </label>
-
-            {/* shadcn/radix Select bound via RHF Controller */}
             <Controller
               name="category"
               control={control}
@@ -192,7 +207,6 @@ export default function ExpenseForm({
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose category" />
                   </SelectTrigger>
-                  {/* High z-index + popper to avoid clipping in modals/overflow */}
                   <SelectContent
                     className="z-[9999]"
                     position="popper"
@@ -210,7 +224,6 @@ export default function ExpenseForm({
                 </Select>
               )}
             />
-
             {errors.category && (
               <div className="mt-1 text-xs text-red-400">Category is required.</div>
             )}

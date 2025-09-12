@@ -41,17 +41,31 @@ export default function StockManagementView() {
   const [editItem, setEditItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Permissions
-  const isStoreManager = currentUser?.permissions === "store";
-  const isArea = currentUser?.permissions === "area";
-  const isAdminOrRegional =
-    currentUser?.permissions === "admin" || currentUser?.permissions === "regional";
+  // ---- Normalized permissions ----
+  const role = String(currentUser?.permissions || "").toLowerCase().trim();
 
-  // Manager's primary store id
+  const isStoreManager =
+    role === "store" ||
+    role === "manager" ||
+    role === "store_manager" ||
+    role === "store manager";
+
+  const isArea = role === "area" || role === "area manager";
+
+  const isAdminOrRegional =
+    role === "admin" ||
+    role === "administrator" ||
+    role === "regional" ||
+    role === "regional manager";
+
+  // Manager's primary store id (robust)
   const myStoreId = useMemo(() => {
-    if (Array.isArray(currentUser?.store_ids) && currentUser.store_ids.length)
-      return currentUser.store_ids[0];
-    return currentUser?.store_id ?? null;
+    if (Array.isArray(currentUser?.store_ids) && currentUser.store_ids.length) {
+      const v = Number(currentUser.store_ids[0]);
+      return Number.isFinite(v) ? v : null;
+    }
+    const v = Number(currentUser?.store_id);
+    return Number.isFinite(v) ? v : null;
   }, [currentUser]);
 
   // Data used for cards/table
@@ -70,35 +84,46 @@ export default function StockManagementView() {
     fetchStores();
   }, []);
 
-  // Resolve the manager's store name
-  const myStoreName = useMemo(() => {
-    if (!myStoreId) return "";
-    const found = chaiiwalaStores.find((s) => String(s.id) === String(myStoreId));
-    return found?.name || "My Store";
+  // Resolve the manager's store row/name
+  const myStoreRow = useMemo(() => {
+    if (!myStoreId) return null;
+    return chaiiwalaStores.find((s) => Number(s.id) === Number(myStoreId)) || null;
   }, [chaiiwalaStores, myStoreId]);
+
+  const myStoreName = myStoreRow?.name || (myStoreId ? `Store ${myStoreId}` : "");
 
   // ---- Store Manager: render page-style historic view (no table/filters) ----
   if (isStoreManager) {
     return (
       <DashboardLayout title="Stock Management">
         <div className="container mx-auto p-4 space-y-4">
-          <div className="p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Store className="h-5 w-5 text-chai-gold" />
-           <span className="font-medium text-gray-800">
-  Viewing historic stock for:{" "}
-  <span className="text-black font-semibold">{myStoreName}</span>
-</span>
-
+          {!myStoreId ? (
+            <div className="p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-900">
+              <div className="font-semibold mb-1">No Store Assigned</div>
+              <div className="text-sm">
+                Your account doesn’t have a store linked. Please contact an administrator.
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="p-4 bg-chai-gold/10 border border-chai-gold/20 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Store className="h-5 w-5 text-chai-gold" />
+                  <span className="font-medium text-gray-800">
+                    Viewing historic stock for:{" "}
+                    <span className="text-black font-semibold">{myStoreName}</span>
+                  </span>
+                </div>
+              </div>
 
-          {/* Page mode – no modal, no click needed */}
-          <HistoricStockDialog
-            asPage
-            user={currentUser}
-            selectedStore={{ id: myStoreId, name: myStoreName }}
-          />
+              {/* Page mode – no modal, no store switching */}
+              <HistoricStockDialog
+                asPage
+                user={currentUser}
+                selectedStore={{ id: myStoreId, name: myStoreName }}
+              />
+            </>
+          )}
         </div>
       </DashboardLayout>
     );

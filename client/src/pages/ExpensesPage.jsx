@@ -21,6 +21,9 @@ export default function ExpensesPage({ stores = [] }) {
   const qc = useQueryClient();
   const { profile } = useAuth();
 
+  // NEW: signal form reset only on successful create
+  const [resetSignal, setResetSignal] = useState(0);
+
   // ---------- STORES ----------
   const { data: storesFromDb = [] } = useQuery({
     queryKey: ['stores-basic'],
@@ -139,6 +142,8 @@ export default function ExpensesPage({ stores = [] }) {
       qc.setQueryData(['expenses'], (old = []) => [inserted, ...old]);
       if (inserted?.id) prefetchAudit(inserted.id);
       qc.invalidateQueries({ queryKey: ['expenses'] });
+      // Signal the form to reset now that we know it saved
+      setResetSignal((t) => t + 1);
     },
     onError: (err) => {
       console.error('[expenses.insert] onError', err);
@@ -193,11 +198,11 @@ export default function ExpensesPage({ stores = [] }) {
 
   const canEditRow = (row) => canEditAny || myStoreIds.has(Number(row.store_id));
 
-  // ---------- EDIT DIALOG STATE ----------
+  // ---------- EDIT DIALOG ----------
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState(null);
 
-  const { register, handleSubmit, control, reset } = useForm({
+  const { register, handleSubmit, control, reset: editReset } = useForm({
     defaultValues: {
       expense_date: '',
       product: '',
@@ -209,14 +214,14 @@ export default function ExpensesPage({ stores = [] }) {
 
   useEffect(() => {
     if (!editRow) return;
-    reset({
+    editReset({
       expense_date: (editRow.expense_date ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10),
       product: editRow.product ?? '',
       amount: editRow.cost != null ? String(editRow.cost) : '',
       category: CATEGORIES.includes(editRow.category) ? editRow.category : CATEGORIES[0],
       store_id: editRow.store_id ?? '',
     });
-  }, [editRow, reset]);
+  }, [editRow, editReset]);
 
   const openEdit = (row) => {
     setEditRow(row);
@@ -231,7 +236,6 @@ export default function ExpensesPage({ stores = [] }) {
       cost: Number(vals.amount),
       category: CATEGORIES.includes(vals.category) ? vals.category : 'Miscellaneous',
     };
-    // allow store change for admin/regional
     if (canEditAny && vals.store_id) {
       patch.store_id = Number(vals.store_id);
     }
@@ -266,7 +270,7 @@ export default function ExpensesPage({ stores = [] }) {
   return (
     <DashboardLayout title="Expenses" profile={profile} announcements={[]}>
       <div className="p-4">
-        <div className="mx-auto w-full lg:w-[60vw] space-y-6">
+        <div className="mx-auto w-full lg:w-[55%] space-y-6">
           <ExpenseForm
             profile={profile}
             stores={allStores}
@@ -279,9 +283,10 @@ export default function ExpensesPage({ stores = [] }) {
             enableCategorySelect
             onSubmit={(vals) => createMut.mutate(vals)}
             isLoading={createMut.isPending}
+            resetSignal={resetSignal}           // << NEW: triggers form clear
           />
 
-          <div className="rounded-xl border border-gray-800 overflow-hidden text-white">
+          <div className="rounded-xl border border-gray-800 overflow-hidden text-white lg:w-[60vw] justify-center">
             <table className="w-full text-sm">
               <thead className="bg-[#0f131a] text-gray-300">
                 <tr>
@@ -336,15 +341,7 @@ export default function ExpensesPage({ stores = [] }) {
                           >
                             Delete
                           </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleHistory(e)}
-                          >
-                            History
-                          </Button>
-                        </div>
+                          </div>
                       </td>
                     </tr>
                   ))
@@ -368,7 +365,7 @@ export default function ExpensesPage({ stores = [] }) {
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-200">Store</label>
                 <select
-                  className="w-full rounded-md border border-gray-700 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full rounded-md border border-gray-700 bg-[#0b0f16] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
                   {...register('store_id')}
                 >
                   {allStores.map((s) => (
