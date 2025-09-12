@@ -65,6 +65,16 @@ export default function AuditEditor() {
     },
   });
 
+  const displayName = useMemo(() => {
+  const d = new Date(audit?.submitted_at || audit?.started_at || Date.now());
+  const pad = n => String(n).padStart(2, "0");
+  const ddmmyy = `${pad(d.getDate())}${pad(d.getMonth()+1)}${String(d.getFullYear()).slice(-2)}`;
+  const store = audit?.stores?.name || `Store ${audit?.store_id || ""}`;
+  return `Audit_${store.replace(/[^A-Za-z0-9]+/g,"_")}_${ddmmyy}`;
+}, [audit]);
+
+
+
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["audit_templates_active"],
     enabled: isCreateMode,

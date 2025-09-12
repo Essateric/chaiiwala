@@ -1,25 +1,12 @@
 // netlify/functions/sendAuditPdf.js
 import { PDFDocument, rgb, StandardFonts, PDFName, PDFArray } from "pdf-lib";
-import nodemailer from "nodemailer";
-import dotenv from "dotenv";
-dotenv.config();
 
 /* ---------------- WinAnsi-safe sanitizers ---------------- */
 const REPLACEMENTS = {
-  "≥": ">=",
-  "≤": "<=",
-  "–": "-",
-  "—": "-",
-  "−": "-",
-  "“": '"',
-  "”": '"',
-  "‘": "'",
-  "’": "'",
-  "•": "*",
-  "·": "-",
-  "…": "...",
-  "£": "GBP ",
-  "€": "EUR ",
+  "≥": ">=", "≤": "<=", "–": "-", "—": "-", "−": "-",
+  "“": '"', "”": '"', "‘": "'", "’": "'",
+  "•": "*", "·": "-", "…": "...",
+  "£": "GBP ", "€": "EUR "
 };
 const safeAnsi = (v) =>
   String(v ?? "").replace(/[≥≤–—−“”‘’•·…£€]/g, (ch) => REPLACEMENTS[ch] || "?");
@@ -45,34 +32,24 @@ const ddmmyy = (d) => {
 const asString = (v) => {
   if (v == null) return "";
   if (typeof v === "object") {
-    // common nested shapes
     return String(v.name ?? v.title ?? v.display_name ?? v.store_name ?? v.id ?? "");
   }
   return String(v);
 };
-const looksUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+const looksUuid = (s) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 const looksNumericId = (s) => /^\d+$/.test(s);
 
 function deriveStoreName(p) {
-  // try a bunch of fields safely, in order
   const candidates = [
-    p.store_name,
-    p.store, // may be object or id
-    p.store_title,
-    p.store_display_name,
-    p.store?.name,
-    p.store?.title,
+    p.store_name, p.store, p.store_title, p.store_display_name, p.store?.name, p.store?.title,
   ];
-
   for (const c of candidates) {
     const s = asString(c).trim();
     if (!s) continue;
-    // skip obvious ids
-    if (looksUuid(s) || looksNumericId(s)) continue;
+    if (looksUuid(s) || looksNumericId(s)) continue; // skip IDs
     return s;
   }
-
-  // if everything looked like an id, still return the first non-empty thing
   for (const c of candidates) {
     const s = asString(c).trim();
     if (s) return s;
@@ -126,15 +103,7 @@ function drawLine(page, text, y, fontSize, font, link) {
 }
 
 function drawWrappedText({
-  page,
-  text,
-  y,
-  font,
-  size,
-  color,
-  maxWidth,
-  margin = 50,
-  lineHeight = 20,
+  page, text, y, font, size, color, maxWidth, margin = 50, lineHeight = 20,
 }) {
   const words = safeAnsi(text).split(" ");
   let line = "";
@@ -151,7 +120,6 @@ function drawWrappedText({
       line = candidate;
     }
   }
-
   if (line) {
     page.drawText(line, { x: margin, y: currentY, size, font, color });
     currentY -= lineHeight;
@@ -167,8 +135,11 @@ const ratingToColor = (v) => {
   return green;
 };
 
-async function generateAuditPDF(payload, fileName) {
+async function generateAuditPDF(payload, friendlyBaseName) {
   const pdfDoc = await PDFDocument.create();
+  // Set PDF metadata title to the friendly filename
+  pdfDoc.setTitle(safeAnsi(`${friendlyBaseName}.pdf`));
+
   let page = pdfDoc.addPage([595.28, 841.89]); // A4
   let { width, height } = page.getSize();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -209,9 +180,12 @@ async function generateAuditPDF(payload, fileName) {
   const storeHumanName = deriveStoreName(payload);
 
   heading("Chaiiwala Audit");
-  labelValue("Audit ID", payload.id);
+  // Show friendly filename prominently
+  labelValue("File", `${friendlyBaseName}.pdf`);
   labelValue("Store", storeHumanName);
   labelValue("Template", payload.template_name);
+  // Keep Audit ID for traceability (not the filename)
+  labelValue("Audit ID", payload.id);
   labelValue("Started", payload.started_at || "—");
   labelValue("Submitted", payload.submitted_at || "—");
 
@@ -235,30 +209,7 @@ async function generateAuditPDF(payload, fileName) {
   }
 
   const pdfBytes = await pdfDoc.save();
-  return { buffer: Buffer.from(pdfBytes), fileName: `${fileName}.pdf` };
-}
-
-/* Optional email (skipped unless creds exist) */
-async function sendEmail(pdfBuffer, fileName, to) {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
-  if (!emailUser || !emailPass) return { ok: false, skipped: true };
-
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: emailUser, pass: emailPass },
-  });
-
-  await transporter.verify();
-
-  const info = await transporter.sendMail({
-    from: emailUser,
-    to: to || emailUser,
-    subject: `Audit PDF - ${fileName}`,
-    text: `Audit PDF "${fileName}" attached.`,
-    attachments: [{ filename: `${fileName}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
-  });
-  return { ok: true, id: info.messageId };
+  return { buffer: Buffer.from(pdfBytes), fileName: `${friendlyBaseName}.pdf` };
 }
 
 /* ---------------- Netlify handler ---------------- */
@@ -278,29 +229,27 @@ export async function handler(event) {
     let payload = JSON.parse(event.body || "{}");
     payload = sanitizeDeep(payload);
 
-    // derive a human name safely (handles numbers/objects/ids)
+    // Friendly filename: Audit_<StoreName>_<ddmmyy>
     const storeHumanName = deriveStoreName(payload);
-
-    // File name EXACT: Audit_<StoreName>_<ddmmyy>
     const when = new Date(payload.submitted_at || Date.now());
     const storeToken = safeAnsi(storeHumanName)
       .trim()
       .replace(/[^A-Za-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
-    const fileName = `Audit_${storeToken}_${ddmmyy(when)}`;
+    const friendlyBaseName = `Audit_${storeToken}_${ddmmyy(when)}`;
 
-    const pdf = await generateAuditPDF({ ...payload, store_name: storeHumanName }, fileName);
-
-    // Email only if creds provided (otherwise skipped)
-    const emailRes = await sendEmail(pdf.buffer, fileName, payload.email_to);
+    const pdf = await generateAuditPDF(
+      { ...payload, store_name: storeHumanName },
+      friendlyBaseName
+    );
 
     return {
       statusCode: 200,
       headers: cors,
       body: JSON.stringify({
         success: true,
-        fileName: `${fileName}.pdf`,
-        email: emailRes.ok ? "sent" : "skipped",
+        fileName: pdf.fileName, // e.g., Audit_Stockport_110925.pdf
+        // If you want to stream bytes or base64, add that here.
       }),
     };
   } catch (err) {

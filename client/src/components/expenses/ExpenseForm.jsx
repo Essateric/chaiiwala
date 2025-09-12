@@ -1,250 +1,228 @@
-import React, { useState, useEffect } from 'react';
-import { Form, FormControl, FormField, FormLabel, FormItem } from '../ui/form.jsx';
-import { Button } from '../ui/button.jsx';
-import { Loader2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth } from '@/hooks/UseAuth'; // ⬅️ fallback to context if prop missing
+// components/expenses/ExpenseForm.jsx
+import React, { useMemo } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { Button } from "../ui/button.jsx";
+import { Input } from "../ui/input.jsx";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "../ui/select.jsx";
 
-const formSchema = z.object({
-  reporterName: z.string().min(1, "Reporting manager's name is required"),
-  expenseDate: z.string().min(1, 'Choose a date'),
-  product: z.string().min(1, 'Enter a product / description'),
-  amount: z.coerce.number().positive('Amount must be > 0'),
-});
+const FALLBACK_CATEGORIES = ["Food", "Maintenance", "Miscellaneous"];
+
+function resolveReporter(p) {
+  return (
+    [p?.first_name, p?.last_name].filter(Boolean).join(" ") ||
+    p?.name ||
+    (p?.email ? p.email.split("@")[0] : "") ||
+    "Unknown"
+  );
+}
 
 export default function ExpenseForm({
-  profile: propProfile,
-  stores = [],            // kept for signature compatibility
+  profile,
+  stores = [],
+  // Accept both prop names for compatibility
+  categories = FALLBACK_CATEGORIES,
+  categoryOptions,
+  defaultCategory,
+  // any truthy flag from older code paths will still render the field
+  showCategory,
+  includeCategory,
+  withCategory,
+  enableCategorySelect,
   onSubmit,
   isLoading,
-  setIsModalOpen
 }) {
-  // Fallback to context profile if prop is not provided
-  const { profile: ctxProfile } = useAuth();
-  const profile = propProfile ?? ctxProfile;
+  // unify category options
+  const allCategories = useMemo(() => {
+    const arr =
+      (Array.isArray(categoryOptions) && categoryOptions.length && categoryOptions) ||
+      (Array.isArray(categories) && categories.length && categories) ||
+      FALLBACK_CATEGORIES;
+    // ensure unique, stable list
+    return Array.from(new Set(arr));
+  }, [categories, categoryOptions]);
 
-  // Resolve reporter from profile safely
-  const resolveReporter = (p) => {
-    const viaDisplay = (p?.display_name || '').trim();
-    if (viaDisplay) return viaDisplay;
-    const viaName = (p?.name || '').trim();
-    if (viaName) return viaName;
-    const viaFirstLast = [p?.first_name, p?.last_name].filter(Boolean).join(' ').trim();
-    if (viaFirstLast) return viaFirstLast;
-    const email = (p?.email || '').trim();
-    if (email) return email.split('@')[0];
-    return '';
-  };
+  const initialCategory =
+    defaultCategory && allCategories.includes(defaultCategory)
+      ? defaultCategory
+      : allCategories[0] ?? "Miscellaneous";
 
-  const defaultStoreId =
-    profile?.permissions === 'store'
-      ? String(profile?.store_ids?.[0] ?? '')
-      : String(profile?.store_ids?.[0] ?? ''); // auto-pick first store for admin/regional too
+  const myFirstStoreId =
+    Array.isArray(profile?.store_ids) && profile.store_ids.length
+      ? profile.store_ids[0]
+      : stores[0]?.id ?? "";
 
-  const [reportingAt, setReportingAt] = useState(() => new Date());
-  const [savedMsg, setSavedMsg] = useState('');
+  const canChooseStore =
+    (profile?.permissions === "admin" || profile?.permissions === "regional") &&
+    stores?.length > 0;
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const form = useForm({
-    resolver: zodResolver(formSchema),
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm({
     defaultValues: {
-      reporterName: resolveReporter(profile) || '', // ⬅️ seed immediately
-      expenseDate: todayStr,
-      product: '',
-      amount: 0,
-    }
-  });
-
-  // Hydrate / refresh reporter when profile changes
-  useEffect(() => {
-    const computed = resolveReporter(profile);
-    if (computed && form.getValues('reporterName') !== computed) {
-      form.setValue('reporterName', computed, { shouldDirty: false });
-    }
-  }, [
-    profile?.display_name,
-    profile?.name,
-    profile?.first_name,
-    profile?.last_name,
-    profile?.email,
-    form
-  ]);
-
-  const inputClass =
-    'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black/20';
-
-  const handleSubmit = form.handleSubmit(async (values) => {
-    // Derive staff/site from profile; storeId from profile first store
-    const payload = {
-      storeId: defaultStoreId,
-      reporterName: values.reporterName,
-      staffName: values.reporterName, // from profile/useAuth as requested
-      expenseDate: values.expenseDate,
-      product: values.product,
-      amount: values.amount,
-    };
-
-    await onSubmit?.(payload);
-
-    // Success UI + reset
-    setSavedMsg('expenses saved succesfully');
-    setReportingAt(new Date()); // refresh the visible reporting timestamp
-    form.reset({
-      reporterName: resolveReporter(profile), // keep reporter
+      storeId: myFirstStoreId,
       expenseDate: new Date().toISOString().slice(0, 10),
-      product: '',
-      amount: 0,
-    });
-    setTimeout(() => setSavedMsg(''), 2500);
+      product: "",
+      amount: "",
+      category: initialCategory,
+    },
   });
+
+  // Always render category (but we also honor legacy flags if they’re present)
+  const shouldRenderCategory =
+    true || showCategory || includeCategory || withCategory || enableCategorySelect;
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <div className="rounded-2xl border border-gray-800 bg-[#171a23] shadow-lg">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-lg font-semibold text-white">Record Expense</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Enter the expense details and press <span className="text-white">Save Expense</span>.
-          </p>
-          {savedMsg && (
-            <div className="mt-3 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200 rounded px-3 py-2">
-              {savedMsg}
-            </div>
+    <form
+      onSubmit={handleSubmit((vals) => {
+        // Defensive: ensure category is set
+        if (!vals.category) vals.category = initialCategory;
+        onSubmit?.(vals);
+      })}
+      className="rounded-xl border border-gray-800 bg-[#0f131a] p-5 text-white shadow"
+    >
+      <div className="text-lg font-semibold mb-1">Record Expense</div>
+      <p className="text-sm text-gray-400 mb-4">
+        Enter the expense details and press <span className="font-semibold">Save Expense</span>.
+      </p>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Reporting Manager (read-only) */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-200">
+            Reporting Manager
+          </label>
+          <Input value={resolveReporter(profile)} readOnly />
+        </div>
+
+        {/* Reporting Date & Time (read-only) */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-200">
+            Reporting Date &amp; Time
+          </label>
+          <Input value={new Date().toLocaleString()} readOnly />
+        </div>
+
+        {/* Optional store selector (for admin/regional) */}
+        {canChooseStore && (
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-gray-200">
+              Store
+            </label>
+            <select
+              className="w-full rounded-md border border-gray-700 bg-[#0b0f16] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
+              {...register("storeId", { required: true })}
+            >
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {errors.storeId && (
+              <div className="mt-1 text-xs text-red-400">Store is required.</div>
+            )}
+          </div>
+        )}
+
+        {/* Date of Expense */}
+        <div className="md:col-span-2">
+          <label className="mb-2 block text-sm font-medium text-gray-200">
+            Date of Expense
+          </label>
+          <Input type="date" {...register("expenseDate", { required: true })} />
+          {errors.expenseDate && (
+            <div className="mt-1 text-xs text-red-400">Date is required.</div>
           )}
         </div>
 
-        <div className="p-5">
-          <Form {...form}>
-            <form onSubmit={handleSubmit} className="space-y-6">
-
-              {/* Reporter (auto) + Reporting date/time (auto) */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField
-                  name="reporterName"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Reporting Manager</FormLabel>
-                      <FormControl>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          {...field}
-                          placeholder={field.value ? undefined : 'Loading...'}
-                          readOnly   // read-only so it still submits with the form
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-white mb-1">
-                    Reporting Date &amp; Time
-                  </label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    value={reportingAt.toLocaleString()}
-                    readOnly
-                  />
-                </div>
-              </div>
-
-              {/* Date of expense */}
-              <FormField
-                name="expenseDate"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Date of Expense</FormLabel>
-                    <FormControl>
-                      <input type="date" className={inputClass} {...field} />
-                    </FormControl>
-                    {fieldState.error && (
-                      <p className="text-sm text-red-500">{fieldState.error.message}</p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              {/* Product */}
-              <FormField
-                name="product"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Product</FormLabel>
-                    <FormControl>
-                      <input
-                        type="text"
-                        placeholder="What was purchased / monthly service"
-                        className={inputClass}
-                        {...field}
-                      />
-                    </FormControl>
-                    {fieldState.error && (
-                      <p className="text-sm text-red-500">{fieldState.error.message}</p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              {/* Amount (monthly cost) */}
-              <FormField
-                name="amount"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Amount (monthly cost)</FormLabel>
-                    <FormControl>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={inputClass}
-                        {...field}
-                      />
-                    </FormControl>
-                    {fieldState.error && (
-                      <p className="text-sm text-red-500">{fieldState.error.message}</p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              {/* Actions */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-2">
-                {typeof setIsModalOpen === 'function' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </Button>
-                )}
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-chai-gold hover:bg-yellow-600"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
-                    </>
-                  ) : (
-                    'Save Expense'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Form>
+        {/* Product */}
+        <div className="md:col-span-2">
+          <label className="mb-2 block text-sm font-medium text-gray-200">
+            Product
+          </label>
+          <Input
+            placeholder="e.g. Karak Chai"
+            {...register("product", { required: true })}
+          />
+          {errors.product && (
+            <div className="mt-1 text-xs text-red-400">Product is required.</div>
+          )}
         </div>
+
+        {/* Amount */}
+        <div className="md:col-span-2">
+          <label className="mb-2 block text-sm font-medium text-gray-200">
+            Amount (monthly cost)
+          </label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            {...register("amount", { required: true })}
+          />
+          {errors.amount && (
+            <div className="mt-1 text-xs text-red-400">Amount is required.</div>
+          )}
+        </div>
+
+        {/* Category */}
+        {shouldRenderCategory && (
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-gray-200">
+              Category
+            </label>
+
+            {/* shadcn/radix Select bound via RHF Controller */}
+            <Controller
+              name="category"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose category" />
+                  </SelectTrigger>
+                  {/* High z-index + popper to avoid clipping in modals/overflow */}
+                  <SelectContent
+                    className="z-[9999]"
+                    position="popper"
+                    side="bottom"
+                    align="start"
+                    sideOffset={8}
+                    avoidCollisions={false}
+                  >
+                    {allCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+
+            {errors.category && (
+              <div className="mt-1 text-xs text-red-400">Category is required.</div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+
+      <div className="mt-5 flex justify-end">
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Saving..." : "Save Expense"}
+        </Button>
+      </div>
+    </form>
   );
 }

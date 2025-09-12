@@ -108,12 +108,14 @@ export default function Sidebar({ isOpen, onClose }) {
       isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
     )}>
       {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700">
-        <div className="flex items-center">
-          <div className="h-10 bg-white rounded-md flex items-center justify-center px-2">
-           <img src="/assets/chaiiwala.png" alt="Chaiiwala Logo"  className="h-7 sm:h-7 w-auto" />
-          </div>
-        </div>
+<div className="flex items-center justify-between h-20 px-4 border-b border-gray-700">
+  <div className="flex items-center">
+    <img
+      src="/assets/chaiiwalalogobrown.png"
+      alt="Chaiiwala Logo"
+      className="block h-20 lg:h-20 object-contain"  // taller but still within 64px header
+    />
+  </div>
         <button type="button"
           onClick={onClose} 
           className="lg:hidden text-gray-400 hover:text-white focus:outline-none"

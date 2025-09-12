@@ -1,21 +1,55 @@
+// ExpensesPage.jsx
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient.js';
 import ExpenseForm from '../components/expenses/ExpenseForm.jsx';
 import { Button } from '../components/ui/button.jsx';
 import DashboardLayout from '../components/layout/DashboardLayout.jsx';
-import { useAuth } from '@/hooks/UseAuth'; // ⬅️ get profile from context
+import { useAuth } from '@/hooks/UseAuth';
+
+const CATEGORIES = ['Food', 'Maintenance', 'Miscellaneous'];
 
 export default function ExpensesPage({ stores = [] }) {
   const qc = useQueryClient();
-  const { profile } = useAuth(); // ⬅️ reliable profile
+  const { profile } = useAuth();
+
+  const { data: storesFromDb = [] } = useQuery({
+    queryKey: ['stores-basic'],
+    enabled: stores.length === 0,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id,name')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    }
+  });
+
+  const allStores = stores.length ? stores : storesFromDb;
+
+  const storeNameMap = useMemo(() => {
+    const m = new Map();
+    for (const s of allStores) m.set(String(s.id), s.name);
+    return m;
+  }, [allStores]);
+
+  const storeNameOf = (row) =>
+    row?.stores?.name ??
+    storeNameMap.get(String(row.store_id)) ??
+    row.store_id;
 
   const { data: expenses = [], isLoading } = useQuery({
     queryKey: ['expenses'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('*')
+        .select(`
+          id, store_id, expense_date, product, cost, staff_name, category, created_at,
+          stores(name)
+        `)
         .order('expense_date', { ascending: false });
 
       if (error) {
@@ -23,13 +57,10 @@ export default function ExpensesPage({ stores = [] }) {
         throw error;
       }
 
-      // Finish multi-key sort on the client (stable + tolerant)
       const sorted = (data ?? []).slice().sort((a, b) => {
-        // primary: expense_date desc
         if (a.expense_date !== b.expense_date) {
           return (a.expense_date ?? '') < (b.expense_date ?? '') ? 1 : -1;
         }
-        // secondary: created_at desc
         const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
         const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
         return bCreated - aCreated;
@@ -39,7 +70,6 @@ export default function ExpensesPage({ stores = [] }) {
     }
   });
 
-  // helper to prefetch audit for a given expense id
   const prefetchAudit = async (expenseId) => {
     try {
       const { data, error } = await supabase
@@ -48,7 +78,6 @@ export default function ExpensesPage({ stores = [] }) {
         .eq('expense_id', expenseId)
         .order('at', { ascending: false });
       if (error) throw error;
-      // no cache key for audit list — we just warm the network path
       return data;
     } catch (e) {
       console.warn('[expenses_audit.prefetch] warn:', e?.message || e);
@@ -64,19 +93,22 @@ export default function ExpensesPage({ stores = [] }) {
 
   const createMut = useMutation({
     mutationFn: async (vals) => {
-      // --- derive safe values ---
       const storeId = Number(vals.storeId || profile?.store_ids?.[0]);
       if (!Number.isFinite(storeId)) {
         throw new Error('No valid store_id found to save this expense.');
       }
 
+      const chosenCategory = CATEGORIES.includes(vals.category)
+        ? vals.category
+        : 'Miscellaneous';
+
       const payload = {
         store_id: storeId,
-        expense_date: vals.expenseDate,       // DATE
-        product: vals.product,                // TEXT NOT NULL
-        cost: Number(vals.amount),            // NUMERIC(12,2) NOT NULL
-        staff_name: resolveReporter(profile), // TEXT NOT NULL
-        // created_by handled by DB default auth.uid()
+        expense_date: vals.expenseDate,
+        product: vals.product,
+        cost: Number(vals.amount),
+        staff_name: resolveReporter(profile),
+        category: chosenCategory,
       };
 
       const { data, error } = await supabase
@@ -89,15 +121,11 @@ export default function ExpensesPage({ stores = [] }) {
         console.error('[expenses.insert] failed', error, 'payload:', payload);
         throw error;
       }
-
-      return data; // inserted row (has id)
+      return data;
     },
-    // Immediately show the new row with working buttons
     onSuccess: async (inserted) => {
       qc.setQueryData(['expenses'], (old = []) => [inserted, ...old]);
-      // Warm the audit path so History works instantly
       if (inserted?.id) prefetchAudit(inserted.id);
-      // Also refetch to stay consistent with server ordering
       qc.invalidateQueries({ queryKey: ['expenses'] });
     },
     onError: (err) => {
@@ -129,12 +157,14 @@ export default function ExpensesPage({ stores = [] }) {
   });
 
   const canEditAny = ['admin', 'regional'].includes(profile?.permissions);
-  const myStoreIds = useMemo(() => new Set((profile?.store_ids ?? []).map(Number)), [profile]);
+  const myStoreIds = useMemo(
+    () => new Set((profile?.store_ids ?? []).map(Number)),
+    [profile]
+  );
   const canEditRow = (row) => canEditAny || myStoreIds.has(Number(row.store_id));
 
   const handleCreate = (vals) => createMut.mutate(vals);
 
-  // Inline edit: bump cost by £0.01 (same logic, but against 'cost')
   const handleInlineEdit = (row) =>
     updateMut.mutate({
       id: row.id,
@@ -151,7 +181,7 @@ export default function ExpensesPage({ stores = [] }) {
         .eq('expense_id', row.id)
         .order('at', { ascending: false });
       if (error) throw error;
-      console.table(data); // replace with your modal/drawer
+      console.table(data);
     } catch (e) {
       console.error('[expenses_audit.select] failed:', e);
     }
@@ -160,9 +190,17 @@ export default function ExpensesPage({ stores = [] }) {
   return (
     <DashboardLayout title="Expenses" profile={profile} announcements={[]}>
       <div className="space-y-6 p-4">
+        <div className="mx-auto w-full lg:w-[60vw] space-y-6">
         <ExpenseForm
-          profile={profile}           // ⬅️ pass the reliable profile
-          stores={stores}
+          profile={profile}
+          stores={allStores}
+          categories={CATEGORIES}
+          categoryOptions={CATEGORIES}
+          defaultCategory={CATEGORIES[0]}
+          showCategory
+          includeCategory
+          withCategory
+          enableCategorySelect
           onSubmit={handleCreate}
           isLoading={createMut.isPending}
         />
@@ -173,6 +211,7 @@ export default function ExpensesPage({ stores = [] }) {
               <tr>
                 <th className="text-left px-3 py-2">Expense Date</th>
                 <th className="text-left px-3 py-2">Store</th>
+                <th className="text-left px-3 py-2">Category</th>
                 <th className="text-left px-3 py-2">Product</th>
                 <th className="text-left px-3 py-2">Amount</th>
                 <th className="text-left px-3 py-2">Reporter</th>
@@ -182,51 +221,59 @@ export default function ExpensesPage({ stores = [] }) {
             </thead>
             <tbody className="divide-y divide-gray-800">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-3 py-4 text-gray-400">Loading…</td></tr>
-              ) : expenses.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-4 text-gray-400">No expenses yet.</td></tr>
-              ) : expenses.map((e) => (
-                <tr key={e.id} className="bg-[#151924]">
-                  <td className="px-3 py-2">{e.expense_date}</td>
-                  <td className="px-3 py-2">
-                    {stores.find(s => String(s.id) === String(e.store_id))?.name ?? e.store_id}
-                  </td>
-                  <td className="px-3 py-2">{e.product ?? e.description ?? ''}</td>
-                  <td className="px-3 py-2">£{Number(e.cost ?? 0).toFixed(2)}</td>
-                  <td className="px-3 py-2">{e.staff_name}</td>
-                  <td className="px-3 py-2">{e.created_at ? new Date(e.created_at).toLocaleString() : ''}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!canEditRow(e) || updateMut.isPending}
-                        onClick={() => handleInlineEdit(e)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={!canEditRow(e) || deleteMut.isPending}
-                        onClick={() => handleDelete(e)}
-                      >
-                        Delete
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleHistory(e)}
-                      >
-                        History
-                      </Button>
-                    </div>
-                  </td>
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-gray-400">Loading…</td>
                 </tr>
-              ))}
+              ) : expenses.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-gray-400">No expenses yet.</td>
+                </tr>
+              ) : (
+                expenses.map((e) => (
+                  <tr key={e.id} className="bg-[#151924]">
+                    <td className="px-3 py-2">{e.expense_date}</td>
+                    <td className="px-3 py-2">{storeNameOf(e)}</td>
+                    <td className="px-3 py-2">{e.category ?? 'Miscellaneous'}</td>
+                    <td className="px-3 py-2">{e.product ?? e.description ?? ''}</td>
+                    <td className="px-3 py-2">£{Number(e.cost ?? 0).toFixed(2)}</td>
+                    <td className="px-3 py-2">{e.staff_name}</td>
+                    <td className="px-3 py-2">
+                      {e.created_at ? new Date(e.created_at).toLocaleString() : ''}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canEditRow(e) || updateMut.isPending}
+                          onClick={() => handleInlineEdit(e)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={!canEditRow(e) || deleteMut.isPending}
+                          onClick={() => handleDelete(e)}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleHistory(e)}
+                        >
+                          History
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </DashboardLayout>
   );
