@@ -87,7 +87,7 @@ export default function ExpenseForm({
         if (!vals.category) vals.category = initialCategory;
         onSubmit?.(vals);
       })}
-      className="rounded-xl border border-gray-800 bg-[#0f131a] p-5 text-white shadow"
+      className="rounded-xl border border-gray-800 bg-[#0f131a] p-5 text-black shadow"
     >
       <div className="text-lg font-semibold mb-1">Record Expense</div>
       <p className="text-sm text-gray-400 mb-4">
