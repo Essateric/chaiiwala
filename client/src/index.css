@@ -5,7 +5,7 @@
 :root {
   /* Chaiiwala brand colors */
   --chai-gold: #D4AF37;
-  --chai-black: #222222;
+  --chai-black: #000000;
 }
 
 @layer base {

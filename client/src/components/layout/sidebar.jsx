@@ -89,7 +89,7 @@ export default function Sidebar({ isOpen, onClose }) {
   if (loading) {
     console.log('[Sidebar] Profile loading...');
     // Optionally, render a skeleton sidebar or a loading indicator
-    return <div className="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white p-4">Loading...</div>;
+    return <div className="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-black text-white p-4">Loading...</div>;
   }
 
   if (!user) {
@@ -104,7 +104,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <div className={cn(
-      "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#1c1f2a] text-white transform transition-transform duration-300 ease-in-out",
+      "fixed lg:static inset-y-0 left-0 z-30 w-64 bg-black text-white transform transition-transform duration-300 ease-in-out",
       isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
     )}>
       {/* Logo */}

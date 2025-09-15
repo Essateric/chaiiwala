@@ -111,7 +111,7 @@ export default function ExpenseForm({
         Enter the expense details and press <span className="font-semibold">Save Expense</span>.
       </p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 text-black">
         {/* Reporting Manager (read-only) */}
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-200">

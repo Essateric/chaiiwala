@@ -9,6 +9,21 @@ import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Textarea } from "../components/ui/textarea.jsx";
 
+/* ---------------------- Netlify function URL helper ---------------------- */
+const fnUrl = (name) => {
+  const envBase = (import.meta.env.VITE_NETLIFY_BASE || "").trim();
+  if (envBase) {
+    return `${envBase.replace(/\/$/, "")}/.netlify/functions/${name}`;
+  }
+  const { origin, hostname, port } = window.location;
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+  if (isLocal) {
+    if (port === "8888") return `${origin}/.netlify/functions/${name}`;
+    return `http://localhost:8888/.netlify/functions/${name}`;
+  }
+  return `/.netlify/functions/${name}`;
+};
+
 /* ---------------------- WinAnsi-safe sanitizers (NEW) ---------------------- */
 const REPLACEMENTS = {
   "≥": ">=",
@@ -48,6 +63,21 @@ export default function AuditEditor() {
   const { id: auditId } = useParams(); // UUID or undefined
   const queryClient = useQueryClient();
 
+  // Track files generated this session (name, href, createdAt)
+  const [generatedFiles, setGeneratedFiles] = useState([]);
+  const [previewHref, setPreviewHref] = useState(null);
+  const [previewName, setPreviewName] = useState("");
+
+  // revoke blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      generatedFiles.forEach((f) => {
+        if (f._isObjectUrl && f.href) URL.revokeObjectURL(f.href);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ---------- Admin "start audit" (no :id) ----------
   const storeIds = Array.isArray(profile?.store_ids) ? profile.store_ids : [];
   const isCreateMode = !auditId;
@@ -64,16 +94,6 @@ export default function AuditEditor() {
       return data ?? [];
     },
   });
-
-  const displayName = useMemo(() => {
-  const d = new Date(audit?.submitted_at || audit?.started_at || Date.now());
-  const pad = n => String(n).padStart(2, "0");
-  const ddmmyy = `${pad(d.getDate())}${pad(d.getMonth()+1)}${String(d.getFullYear()).slice(-2)}`;
-  const store = audit?.stores?.name || `Store ${audit?.store_id || ""}`;
-  return `Audit_${store.replace(/[^A-Za-z0-9]+/g,"_")}_${ddmmyy}`;
-}, [audit]);
-
-
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["audit_templates_active"],
@@ -128,7 +148,11 @@ export default function AuditEditor() {
 
     const { data: readable, error: readErr } = await supabase
       .from("audits")
-      .select("id, store_id, template_id, started_at, submitted_at")
+      .select(`
+        id, store_id, template_id, started_at, submitted_at,
+        stores(name),
+        audit_templates(name)
+      `)
       .eq("id", newId)
       .maybeSingle();
 
@@ -165,8 +189,17 @@ export default function AuditEditor() {
     },
   });
 
+  // File/display name for generated PDF
+  const displayName = useMemo(() => {
+    const d = new Date(audit?.submitted_at || audit?.started_at || Date.now());
+    const pad = (n) => String(n).padStart(2, "0");
+    const ddmmyy = `${pad(d.getDate())}${pad(d.getMonth() + 1)}${String(d.getFullYear()).slice(-2)}`;
+    const store = audit?.stores?.name || `Store ${audit?.store_id || ""}`;
+    return `Audit_${store.replace(/[^A-Za-z0-9]+/g, "_")}_${ddmmyy}`;
+  }, [audit]);
+
   const templateId = audit?.template_id ?? null;
-  const storeName = audit?.stores?.name ?? audit?.store_id ?? "—";
+  const storeName = audit?.stores?.name ?? "—";
   const templateName = audit?.audit_templates?.name ?? "Template";
 
   const { data: sections = [], isLoading: loadingSections } = useQuery({
@@ -225,9 +258,7 @@ export default function AuditEditor() {
       answers
         .map(
           (a) =>
-            `${a.question_id}|${a.value_bool ?? ""}|${a.value_num ?? ""}|${
-              a.value_text ?? ""
-            }|${a.notes ?? ""}`
+            `${a.question_id}|${a.value_bool ?? ""}|${a.value_num ?? ""}|${a.value_text ?? ""}|${a.notes ?? ""}`
         )
         .join("§"),
     [answers]
@@ -295,26 +326,183 @@ export default function AuditEditor() {
     alert("Saved.");
   };
 
-  // --- submits audit, then generates & emails PDF via Netlify function
+  /* ----------------------- PDF link helpers / upload ----------------------- */
+  const dataUrlToBase64 = (s = "") => {
+    const m = s.match(/^data:application\/pdf;base64,(.+)$/i);
+    return m ? m[1] : null;
+  };
+
+  const arrayBufferToBase64 = (ab) => {
+    const bytes = new Uint8Array(ab);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  };
+
+  const base64ToBlob = (base64) => {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: "application/pdf" });
+  };
+
+  const publicOrSignedUrl = async (bucket, path, ttlSeconds = 60 * 60 * 24 * 365) => {
+    const pub = supabase.storage.from(bucket).getPublicUrl(path);
+    const publicUrl = pub?.data?.publicUrl || null;
+    if (publicUrl) return publicUrl;
+
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, ttlSeconds);
+    if (error) throw error;
+    return data?.signedUrl || "";
+  };
+
+  const uploadPdfToSupabase = async (base64, fileName) => {
+    const cleanName = (fileName || `${displayName}.pdf`).replace(/[/\\]+/g, "_");
+    const path = `${auditId}/${cleanName}`;
+    const blob = base64ToBlob(base64);
+
+    const { error: upErr } = await supabase.storage
+      .from("audit-files")
+      .upload(path, blob, {
+        upsert: true,
+        contentType: "application/pdf",
+        cacheControl: "3600",
+      });
+    if (upErr) throw upErr;
+
+    const href = await publicOrSignedUrl("audit-files", path);
+    return { href, path, name: cleanName };
+  };
+
+  const openInNewTab = (href) => window.open(href, "_blank", "noopener,noreferrer");
+  const copyLink = async (href) => {
+    try {
+      await navigator.clipboard.writeText(href);
+      alert("Link copied to clipboard.");
+    } catch {
+      alert("Could not copy link.");
+    }
+  };
+
+  /* ----------------------- Image capture/upload helpers -------------------- */
+  const dataUrlToFile = async (dataUrl, filename = "image.jpg") => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: blob.type || "image/jpeg" });
+  };
+
+  const resizeImageToJpeg = (file, maxSide = 1600, quality = 0.82) =>
+    new Promise((resolve, reject) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width <= maxSide && height <= maxSide) {
+            return resolve(file);
+          }
+          const scale = Math.min(maxSide / width, maxSide / height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return resolve(file);
+              resolve(
+                new File(
+                  [blob],
+                  file.name.replace(/\.(heic|heif|png|webp)$/i, ".jpg"),
+                  { type: "image/jpeg" }
+                )
+              );
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      } catch (e) {
+        resolve(file);
+      }
+    });
+
+  const uploadAuditImage = async (file, qid) => {
+    if (!auditId) throw new Error("Missing auditId.");
+    const cleanBase = (file.name || "photo.jpg").replace(/[^A-Za-z0-9._-]+/g, "_");
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const path = `${auditId}/${qid}/${ts}_${cleanBase}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("audit-photos")
+      .upload(path, file, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType: file.type || "image/jpeg",
+      });
+    if (upErr) throw upErr;
+
+    const href = await publicOrSignedUrl("audit-photos", path);
+    return { href, path };
+  };
+
+  /* ----------------------- Existing file listing -------------------------- */
+  const refreshFiles = async () => {
+    if (!auditId) return;
+    try {
+      const { data: files, error } = await supabase.storage
+        .from("audit-files")
+        .list(`${auditId}`, {
+          limit: 100,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+      if (error) throw error;
+
+      const items = await Promise.all(
+        (files || []).map(async (f) => {
+          const path = `${auditId}/${f.name}`;
+          const href = await publicOrSignedUrl("audit-files", path);
+          return {
+            name: f.name,
+            href,
+            createdAt: f.created_at || f.updated_at || new Date().toISOString(),
+            _isObjectUrl: false,
+          };
+        })
+      );
+
+      setGeneratedFiles(items);
+    } catch (e) {
+      console.warn("Could not list audit files:", e);
+    }
+  };
+
+  // Load any existing PDFs when the audit loads
+  useEffect(() => {
+    if (auditId) refreshFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditId]);
+
+  // --- submits audit, then generates PDF via Netlify function
   const submitAudit = async () => {
     try {
-      // 1) persist any edits first
       await saveAll();
 
-      // 2) mark as submitted
       const submittedAt = new Date().toISOString();
       const { error } = await supabase
         .from("audits")
         .update({ submitted_at: submittedAt })
         .eq("id", auditId);
-
       if (error) {
         console.error(error);
         alert(error.message || "Could not submit audit.");
         return;
       }
 
-      // 3) build the PDF payload from current view state
       const payload = {
         id: auditId,
         store_name: storeName,
@@ -337,45 +525,134 @@ export default function AuditEditor() {
             },
           })),
         })),
-        // optional routing override
-        email_to: "audits@chaiiwala.co.uk",
-        // optional name hint (server can ignore)
         file_name_hint: safeAnsi(
-          `Audit - ${storeName} - ${new Date(submittedAt)
-            .toLocaleDateString("en-GB")
-            .replace(/\//g, "")}`
+          `Audit - ${storeName} - ${new Date(submittedAt).toLocaleDateString("en-GB").replace(/\//g, "")}`
         ),
+        send_email: false, // no emails
       };
 
-      // 4) sanitize the payload for PDF (FIX for WinAnsi error)
       const cleanPayload = sanitizeDeep(payload);
 
-      // 5) call the Netlify function
-      const base = (import.meta.env.VITE_NETLIFY_BASE || "").replace(/\/$/, "");
-      const url = base
-        ? `${base}/.netlify/functions/sendAuditPdf`
-        : "/.netlify/functions/sendAuditPdf";
+      // ✅ Robust function URL resolution
+      const url = fnUrl("sendAuditPdf");
+      console.log("[Audit] POST", url);
 
-      const res = await fetch(url, {
+      // First attempt: ask for JSON
+      let res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
         body: JSON.stringify(cleanPayload),
       });
 
-      const json = await res.json().catch(() => ({}));
+      // If the function actually returned a PDF binary, handle it right away
+      const ct = res.headers.get("content-type") || "";
+      let nameFromServer = null;
+      let href = null;
 
-      if (!res.ok) {
-        console.error("sendAuditPdf failed:", json);
-        alert(`PDF/email failed: ${json.error || res.statusText}`);
+      if (ct.includes("application/pdf")) {
+        const ab = await res.arrayBuffer();
+        const base64 = arrayBufferToBase64(ab);
+        const uploaded = await uploadPdfToSupabase(base64, `${displayName}.pdf`);
+        href = uploaded.href;
+      } else {
+        // JSON path (original behavior)
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          console.error("sendAuditPdf failed:", json);
+          const msg =
+            res.status === 404
+              ? "PDF function not found. Run `netlify dev` (or set VITE_NETLIFY_BASE to your functions server)."
+              : json.error || res.statusText;
+          alert(`PDF generation failed: ${msg}`);
+          return;
+        }
+
+        nameFromServer = (json.fileName || `${displayName}.pdf`).replace(/[/\\]+/g, "_");
+
+        // Try URLs from server
+        href =
+          json.url ||
+          json.publicUrl ||
+          json.pdfUrl ||
+          json.downloadUrl ||
+          json.file_url ||
+          json.public_url ||
+          json.supabasePublicUrl ||
+          null;
+
+        // Try bucket/path from server
+        if (!href && (json.path || json.storagePath) && (json.bucket || json.bucketName)) {
+          try {
+            const bucket = json.bucket || json.bucketName;
+            const path = json.path || json.storagePath;
+            const pub = supabase.storage.from(bucket).getPublicUrl(path);
+            href = pub?.data?.publicUrl || href;
+            if (!href) {
+              const signed = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 365);
+              href = signed?.data?.signedUrl || href;
+            }
+          } catch (e) {
+            console.warn("Could not resolve Supabase URL from server path:", e);
+          }
+        }
+
+        // Try base64/data URL from server
+        if (!href) {
+          const base64 =
+            json.pdf_base64 || json.base64 || json.pdfBase64 || dataUrlToBase64(json.dataUrl || "");
+          if (base64) {
+            const uploaded = await uploadPdfToSupabase(base64, nameFromServer);
+            href = uploaded.href;
+          }
+        }
+
+        // Still no link? Retry once asking specifically for a PDF binary
+        if (!href) {
+          const resPdf = await fetch(`${url}?format=pdf`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/pdf",
+            },
+            body: JSON.stringify(cleanPayload),
+          });
+          if (resPdf.ok && (resPdf.headers.get("content-type") || "").includes("application/pdf")) {
+            const ab = await resPdf.arrayBuffer();
+            const base64 = arrayBufferToBase64(ab);
+            const uploaded = await uploadPdfToSupabase(base64, nameFromServer || `${displayName}.pdf`);
+            href = uploaded.href;
+          }
+        }
+      }
+
+      // Ensure we have a usable link and refresh the table
+      const finalName = (nameFromServer || `${displayName}.pdf`).replace(/[/\\]+/g, "_");
+      const finalHref = href || "";
+
+      if (!finalHref) {
+        alert("Audit submitted but no PDF link was returned. Please check your Netlify function output.");
         return;
       }
 
-      alert(
-        `Audit submitted and emailed${json.fileName ? ` (${json.fileName})` : ""}`
-      );
+      // Optimistic add so the user sees it instantly
+      setGeneratedFiles((prev) => [
+        {
+          name: finalName,
+          href: finalHref,
+          createdAt: new Date().toISOString(),
+          _isObjectUrl: false,
+        },
+        ...prev,
+      ]);
 
-      // (optional) navigate to an “Audit History” page after submit
-      // navigate("/audit");
+      // Then sync with Storage so the list persists and stays correct
+      await refreshFiles();
+
+      alert(`Audit submitted and PDF generated (${finalName})`);
     } catch (e) {
       console.error(e);
       alert(e.message || "Unexpected error submitting audit.");
@@ -389,9 +666,7 @@ export default function AuditEditor() {
         <div className="p-4 flex justify-center">
           <div className="w-full max-w-3xl space-y-6">
             <div className="rounded-xl border border-gray-800 p-4 bg-[#151924]">
-              <h2 className="text-sm font-semibold text-gray-200 mb-4">
-                Start a new audit
-              </h2>
+              <h2 className="text-sm font-semibold text-gray-200 mb-4">Start a new audit</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="col-span-1">
@@ -431,11 +706,7 @@ export default function AuditEditor() {
                 </div>
 
                 <div className="col-span-1 flex items-end">
-                  <Button
-                    className="w-full"
-                    onClick={createAndStart}
-                    disabled={!selectedStore || !selectedTemplate}
-                  >
+                  <Button className="w-full" onClick={createAndStart} disabled={!selectedStore || !selectedTemplate}>
                     Create & start audit
                   </Button>
                 </div>
@@ -479,7 +750,8 @@ export default function AuditEditor() {
           {/* Header card */}
           <div className="rounded-xl border border-gray-800 p-4 bg-[#151924]">
             <div className="text-sm text-gray-200">
-              <div><b>Audit:</b> {auditId}</div>
+              <div><b>File:</b> {displayName}.pdf</div>
+              <div className="text-[11px] text-gray-400 break-all"><b>Audit ID:</b> {auditId}</div>
               <div><b>Store:</b> {storeName}</div>
               <div><b>Template:</b> {templateName}</div>
               <div><b>Started:</b> {audit.started_at ? new Date(audit.started_at).toLocaleString() : "—"}</div>
@@ -487,7 +759,7 @@ export default function AuditEditor() {
             </div>
           </div>
 
-          {/* Sections */}
+          {/* Sections (form) */}
           {loadingSections || loadingQuestions || loadingAnswers ? (
             <div className="p-4 text-gray-400">Loading questions…</div>
           ) : sections.length === 0 ? (
@@ -536,7 +808,7 @@ export default function AuditEditor() {
                           </div>
                         )}
 
-                        {/* Score questions: default No, disable score until Yes */}
+                        {/* Score questions */}
                         {q.answer_type === "score" && (
                           <div className="flex items-center gap-4">
                             <div className="flex gap-5">
@@ -601,18 +873,85 @@ export default function AuditEditor() {
                           />
                         )}
 
-                        {/* Photo URL */}
+                        {/* Photo (camera/file upload + URL paste) */}
                         {q.answer_type === "photo" && (
-                          <>
-                            <Input
-                              placeholder="Photo URL"
-                              value={d.value_text ?? ""}
-                              onChange={(e) => handleChange(q.id, { value_text: e.target.value })}
-                            />
-                            <p className="text-[11px] text-gray-400 mt-1">
-                              Store the uploaded image URL in this field.
+                          <div className="space-y-2">
+                            {d.value_text ? (
+                              <div className="flex items-start gap-3">
+                                <img
+                                  src={d.value_text}
+                                  alt="Attached"
+                                  className="w-28 h-28 object-cover rounded-md border border-gray-800"
+                                />
+                                <div className="flex flex-col gap-2">
+                                  <div className="text-xs break-all text-gray-400">{d.value_text}</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => window.open(d.value_text, "_blank", "noopener,noreferrer")}
+                                    >
+                                      Open
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(d.value_text);
+                                          alert("Image link copied.");
+                                        } catch {
+                                          alert("Could not copy.");
+                                        }
+                                      }}
+                                    >
+                                      Copy link
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleChange(q.id, { value_text: "" })}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    const sized = await resizeImageToJpeg(file);
+                                    const { href } = await uploadAuditImage(sized, q.id);
+                                    handleChange(q.id, { value_text: href });
+                                  } catch (err) {
+                                    console.error(err);
+                                    alert(err.message || "Failed to upload image.");
+                                  } finally {
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-gray-700 file:bg-[#0f131a] file:text-gray-200 file:cursor-pointer"
+                              />
+
+                              <Input
+                                className="flex-1"
+                                placeholder="…or paste an image URL"
+                                value={d.value_text ?? ""}
+                                onChange={(e) => handleChange(q.id, { value_text: e.target.value })}
+                              />
+                            </div>
+
+                            <p className="text-[11px] text-gray-400">
+                              Tip: On mobile, “Take Photo” opens the camera. On desktop, pick a file or paste a URL.
                             </p>
-                          </>
+                          </div>
                         )}
 
                         {/* Notes */}
@@ -634,8 +973,95 @@ export default function AuditEditor() {
 
           <div className="flex gap-2">
             <Button onClick={saveAll}>Save</Button>
-            <Button variant="outline" onClick={submitAudit}>Submit audit</Button>
+            <Button variant="outline" onClick={submitAudit}>Submit & generate PDF</Button>
           </div>
+
+          {/* Generated files table */}
+          <div className="rounded-xl border border-gray-800 bg-[#151924] p-4">
+            <div className="text-sm font-semibold text-gray-200 mb-3">Generated files</div>
+            {generatedFiles.length === 0 ? (
+              <div className="text-gray-400 text-sm">No files generated yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm text-gray-200">
+                  <thead className="text-gray-300">
+                    <tr>
+                      <th className="text-left py-2 pr-4">Name</th>
+                      <th className="text-left py-2 pr-4">Created</th>
+                      <th className="text-left py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {generatedFiles.map((f, i) => (
+                      <tr key={i} className="border-t border-gray-800">
+                        <td className="py-2 pr-4 break-all">
+                          {f.href ? (
+                            <a className="underline hover:no-underline" href={f.href} target="_blank" rel="noopener noreferrer">
+                              {f.name}
+                            </a>
+                          ) : (
+                            f.name
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">{new Date(f.createdAt).toLocaleString()}</td>
+                        <td className="py-2">
+                          {f.href ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" onClick={() => { setPreviewHref(f.href); setPreviewName(f.name); }}>
+                                Preview
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => openInNewTab(f.href)}>
+                                Open tab
+                              </Button>
+                              <a
+                                className="inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-1 text-sm"
+                                href={f.href}
+                                download={f.name}
+                              >
+                                Download
+                              </a>
+                              <button
+                                className="inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-1 text-sm"
+                                onClick={() => copyLink(f.href)}
+                              >
+                                Copy link
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">No link provided</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Simple Preview Modal */}
+          {previewHref && (
+            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+              <div className="bg-[#151924] w-full max-w-5xl h-[80vh] rounded-xl overflow-hidden border border-gray-800 flex flex-col">
+                <div className="p-2 flex items-center justify-between border-b border-gray-800">
+                  <div className="text-sm text-gray-200 truncate">{previewName}</div>
+                  <div className="flex gap-2">
+                    <a
+                      className="inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-1 text-sm"
+                      href={previewHref}
+                      download={previewName}
+                    >
+                      Download
+                    </a>
+                    <Button variant="outline" onClick={() => setPreviewHref(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+                <iframe src={previewHref} className="flex-1 w-full h-full" title="PDF preview" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
