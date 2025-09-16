@@ -1,5 +1,6 @@
 // netlify/functions/sendAuditPdf.js
 import { PDFDocument, rgb, StandardFonts, PDFName, PDFArray } from "pdf-lib";
+import { createClient } from "@supabase/supabase-js";
 
 /* ---------------- WinAnsi-safe sanitizers ---------------- */
 const REPLACEMENTS = {
@@ -218,12 +219,11 @@ export async function handler(event) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Content-Type": "application/json",
   };
 
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: cors, body: "" };
   if (event.httpMethod !== "POST")
-    return { statusCode: 405, headers: cors, body: JSON.stringify({ error: "Method not allowed" }) };
+    return { statusCode: 405, headers: { ...cors, "Content-Type": "application/json" }, body: JSON.stringify({ error: "Method not allowed" }) };
 
   try {
     let payload = JSON.parse(event.body || "{}");
@@ -238,25 +238,83 @@ export async function handler(event) {
       .replace(/^_+|_+$/g, "");
     const friendlyBaseName = `Audit_${storeToken}_${ddmmyy(when)}`;
 
-    const pdf = await generateAuditPDF(
+    const { buffer, fileName } = await generateAuditPDF(
       { ...payload, store_name: storeHumanName },
       friendlyBaseName
     );
 
+    // If the client asked for a PDF stream, return binary
+    const accept = (event.headers?.accept || event.headers?.Accept || "").toLowerCase();
+    const wantsPdf = (event.queryStringParameters?.format === "pdf") || accept.includes("application/pdf");
+    if (wantsPdf) {
+      return {
+        statusCode: 200,
+        headers: {
+          ...cors,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${fileName}"`,
+          "Cache-Control": "no-store",
+        },
+        body: buffer.toString("base64"),
+        isBase64Encoded: true,
+      };
+    }
+
+    // Otherwise: upload to Supabase and return a URL + { bucket, path }
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+    const BUCKET = process.env.SUPABASE_AUDIT_BUCKET || "audit-files";
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+      return {
+        statusCode: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Supabase environment variables are missing." }),
+      };
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+
+    const cleanId = String(payload.id || "unknown").replace(/[^A-Za-z0-9_-]+/g, "_");
+    const path = `${cleanId}/${fileName}`;
+
+    const { error: upErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, buffer, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType: "application/pdf",
+      });
+    if (upErr) throw upErr;
+
+    let url = null;
+    const pub = supabase.storage.from(BUCKET).getPublicUrl(path);
+    url = pub?.data?.publicUrl || null;
+
+    if (!url) {
+      const { data: signed, error: signErr } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (signErr) throw signErr;
+      url = signed?.signedUrl || null;
+    }
+
     return {
       statusCode: 200,
-      headers: cors,
+      headers: { ...cors, "Content-Type": "application/json" },
       body: JSON.stringify({
         success: true,
-        fileName: pdf.fileName, // e.g., Audit_Stockport_110925.pdf
-        // If you want to stream bytes or base64, add that here.
+        fileName,
+        url,                 // direct link (preferred by the UI)
+        bucket: BUCKET,      // fallback shape
+        path,                // fallback shape
       }),
     };
   } catch (err) {
-    console.error(err);
+    console.error("sendAuditPdf error:", err);
     return {
       statusCode: 500,
-      headers: cors,
+      headers: { ...cors, "Content-Type": "application/json" },
       body: JSON.stringify({ error: err.message || "Internal Server Error" }),
     };
   }
