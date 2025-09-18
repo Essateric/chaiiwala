@@ -72,37 +72,6 @@ const yesNoToColorText = (v) => {
   return { t: "N/A", c: grey };
 };
 
-function drawLine(page, text, y, fontSize, font, link) {
-  const margin = 50;
-  const clean = safeAnsi(text);
-  const textWidth = font.widthOfTextAtSize(clean, fontSize);
-  const color = link ? blue : black;
-
-  page.drawText(clean, { x: margin, y, size: fontSize, font, color });
-
-  if (link) {
-    const context = page.doc.context;
-    const uriAction = context.obj({
-      Type: PDFName.of("Action"),
-      S: PDFName.of("URI"),
-      URI: context.obj(String(link)),
-    });
-    const linkAnnotation = context.obj({
-      Type: PDFName.of("Annot"),
-      Subtype: PDFName.of("Link"),
-      Rect: context.obj([margin, y, margin + textWidth, y + fontSize]),
-      Border: context.obj([0, 0, 0]),
-      A: uriAction,
-    });
-    let annots = page.node.lookup(PDFName.of("Annots"), PDFArray);
-    if (!annots) {
-      annots = context.obj([]);
-      page.node.set(PDFName.of("Annots"), annots);
-    }
-    annots.push(linkAnnotation);
-  }
-}
-
 function drawWrappedText({
   page, text, y, font, size, color, maxWidth, margin = 50, lineHeight = 20,
 }) {
@@ -128,17 +97,204 @@ function drawWrappedText({
   return currentY;
 }
 
-const ratingToColor = (v) => {
+function addLinkAnnotation(page, x, y, width, height, link) {
+  const context = page.doc.context;
+  const uriAction = context.obj({
+    Type: PDFName.of("Action"),
+    S: PDFName.of("URI"),
+    URI: context.obj(String(link)),
+  });
+  const linkAnnotation = context.obj({
+    Type: PDFName.of("Annot"),
+    Subtype: PDFName.of("Link"),
+    Rect: context.obj([x, y, x + width, y + height]),
+    Border: context.obj([0, 0, 0]),
+    A: uriAction,
+  });
+  let annots = page.node.lookup(PDFName.of("Annots"), PDFArray);
+  if (!annots) {
+    annots = context.obj([]);
+    page.node.set(PDFName.of("Annots"), annots);
+  }
+  annots.push(linkAnnotation);
+}
+
+function ratingToColor(v) {
   const n = Number(v || 0);
   if (n <= 0) return grey;
   if (n <= 2) return red;
   if (n <= 4) return orange;
   return green;
-};
+}
+
+/* ---------------- Image handling ---------------- */
+
+/**
+ * Attempts to build a Supabase "render" URL (server-side transform) for images.
+ * Works for both public and signed URLs coming from Supabase Storage.
+ * Example:
+ *   /storage/v1/object/public/bucket/path.jpg
+ * → /storage/v1/render/image/public/bucket/path.jpg?format=jpeg&width=1600&resize=contain
+ */
+function buildSupabaseRenderUrl(originalUrl, { format = "jpeg", width = 1600 } = {}) {
+  try {
+    const u = new URL(originalUrl);
+    if (!u.pathname.includes("/storage/v1/object/")) return null;
+    const renderPath = u.pathname.replace("/storage/v1/object/", "/storage/v1/render/image/");
+    u.pathname = renderPath;
+    u.searchParams.set("format", format);
+    u.searchParams.set("width", String(width));
+    u.searchParams.set("resize", "contain");
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeImageUrl(s) {
+  return /^https?:\/\//i.test(s) && /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(s);
+}
+
+/**
+ * Fetch bytes for an image URL, converting to JPEG via Supabase render if needed.
+ * Returns: { kind: 'jpg'|'png', bytes: Uint8Array } or null on failure.
+ */
+async function fetchImageBytes(url) {
+  const tryFetch = async (u) => {
+    const res = await fetch(u);
+    if (!res.ok) return null;
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const ab = await res.arrayBuffer();
+    return { ct, bytes: new Uint8Array(ab) };
+  };
+
+  // 1) Try as-is
+  let got = await tryFetch(url);
+  if (!got) return null;
+
+  const isJpg = got.ct.includes("image/jpeg") || got.ct.includes("image/jpg");
+  const isPng = got.ct.includes("image/png");
+
+  if (isJpg) return { kind: "jpg", bytes: got.bytes };
+  if (isPng) return { kind: "png", bytes: got.bytes };
+
+  // 2) If heic/webp/etc., try Supabase render→jpeg (works for Supabase Storage URLs)
+  const needsConvert =
+    got.ct.includes("image/heic") ||
+    got.ct.includes("image/heif") ||
+    got.ct.includes("image/webp");
+
+  if (needsConvert || (!isJpg && !isPng)) {
+    const renderUrl = buildSupabaseRenderUrl(url, { format: "jpeg", width: 1600 });
+    if (renderUrl) {
+      const converted = await tryFetch(renderUrl);
+      if (converted && (converted.ct.includes("image/jpeg") || converted.ct.includes("image/jpg"))) {
+        return { kind: "jpg", bytes: converted.bytes };
+      }
+    }
+  }
+
+  // 3) If we got here, we couldn't convert; last resort: try "?format=jpeg" naive param
+  try {
+    const u = new URL(url);
+    u.searchParams.set("format", "jpeg");
+    const fallback = await tryFetch(u.toString());
+    if (fallback && (fallback.ct.includes("image/jpeg") || fallback.ct.includes("image/jpg"))) {
+      return { kind: "jpg", bytes: fallback.bytes };
+    }
+  } catch { /* ignore */ }
+
+  return null;
+}
+
+/** Collect candidate image URLs/paths from a question object (be liberal). */
+function collectQuestionImageUrls(q) {
+  const urls = new Set();
+
+  const pushIfLooksUrl = (v) => {
+    if (!v) return;
+    const s = String(v);
+    if (/^https?:\/\//i.test(s)) urls.add(s);
+  };
+
+  // common shapes you’ve used before—kept liberal for backwards compat:
+  pushIfLooksUrl(q.image_url);
+  pushIfLooksUrl(q.photo_url);
+  pushIfLooksUrl(q.answer?.image_url);
+  pushIfLooksUrl(q.answer?.photo_url);
+
+  (q.answer?.image_urls || q.answer?.photo_urls || q.photos || q.images || [])
+    .forEach(pushIfLooksUrl);
+
+  // sometimes value_text itself is a direct image link
+  if (looksLikeImageUrl(q.answer?.value_text)) pushIfLooksUrl(q.answer?.value_text);
+
+  return Array.from(urls);
+}
+
+/** Draw one or more images on the page, scaling to maxWidth. Returns new Y. */
+async function drawImagesOnPage({ pdfDoc, page, y, maxWidth, margin, imageEntries, font }) {
+  let currentY = y;
+
+  for (const { kind, bytes, sourceUrl } of imageEntries) {
+    // New page if not enough space (reserve ~220px)
+    if (currentY < 90 + 220) {
+      page = pdfDoc.addPage([595.28, 841.89]);
+      currentY = page.getSize().height - 50;
+    }
+
+    try {
+      const img = kind === "png"
+        ? await pdfDoc.embedPng(bytes)
+        : await pdfDoc.embedJpg(bytes);
+
+      const iw = img.width;
+      const ih = img.height;
+      const targetW = Math.min(maxWidth, iw);
+      const scale = targetW / iw;
+      const targetH = ih * scale;
+
+      const x = margin;
+      const yPos = currentY - targetH;
+
+      page.drawImage(img, { x, y: yPos, width: targetW, height: targetH });
+
+      // tiny caption (the URL), clickable
+      const caption = sourceUrl.length > 100 ? `${sourceUrl.slice(0, 100)}…` : sourceUrl;
+      const captionSize = 9;
+      const captionY = yPos - 14;
+      const textWidth = font.widthOfTextAtSize(caption, captionSize);
+
+      page.drawText(safeAnsi(caption), {
+        x,
+        y: captionY,
+        size: captionSize,
+        font,
+        color: blue,
+      });
+      // Add link annotation
+      addLinkAnnotation(page, x, captionY, textWidth, captionSize + 4, sourceUrl);
+
+      currentY = captionY - 10;
+    } catch {
+      // Draw a placeholder box
+      const phW = Math.min(300, maxWidth);
+      const phH = 160;
+      const x = margin;
+      const yPos = currentY - phH;
+
+      page.drawRectangle({ x, y: yPos, width: phW, height: phH, color: rgb(0.95, 0.95, 0.95) });
+      page.drawText("Image unavailable", { x: x + 12, y: yPos + phH / 2 - 6, size: 12, font, color: grey });
+
+      currentY = yPos - 16;
+    }
+  }
+
+  return currentY;
+}
 
 async function generateAuditPDF(payload, friendlyBaseName) {
   const pdfDoc = await PDFDocument.create();
-  // Set PDF metadata title to the friendly filename
   pdfDoc.setTitle(safeAnsi(`${friendlyBaseName}.pdf`));
 
   let page = pdfDoc.addPage([595.28, 841.89]); // A4
@@ -181,11 +337,9 @@ async function generateAuditPDF(payload, friendlyBaseName) {
   const storeHumanName = deriveStoreName(payload);
 
   heading("Chaiiwala Audit");
-  // Show friendly filename prominently
   labelValue("File", `${friendlyBaseName}.pdf`);
   labelValue("Store", storeHumanName);
   labelValue("Template", payload.template_name);
-  // Keep Audit ID for traceability (not the filename)
   labelValue("Audit ID", payload.id);
   labelValue("Started", payload.started_at || "—");
   labelValue("Submitted", payload.submitted_at || "—");
@@ -195,15 +349,38 @@ async function generateAuditPDF(payload, friendlyBaseName) {
     for (const q of s.questions || []) {
       const line = `${q.code} - ${q.prompt}`;
       labelValue("Question", line);
+
       if (q.answer_type === "binary") {
         yesNoLine("Answer", q.answer?.value_bool);
       } else if (q.answer_type === "score") {
         yesNoLine("Pass", q.answer?.value_bool);
         labelValue("Score", q.answer?.value_num ?? "—");
-      } else if (q.answer_type === "text" || q.answer_type === "photo") {
+      } else if (q.answer_type === "text" || q.answer_type === "photo" || q.answer_type === "images") {
         labelValue("Answer", q.answer?.value_text || "—");
       }
       if (q.answer?.notes) labelValue("Notes", q.answer.notes);
+
+      // --- NEW: embed images for this question (JPG/PNG direct, HEIC/WebP via renderer) ---
+      const candidateUrls = collectQuestionImageUrls(q);
+      if (candidateUrls.length) {
+        // fetch + convert as needed, but don't blow up if any fail
+        const imageEntries = [];
+        for (const u of candidateUrls) {
+          try {
+            const got = await fetchImageBytes(u);
+            if (got) imageEntries.push({ ...got, sourceUrl: u });
+          } catch { /* ignore this one */ }
+        }
+
+        if (imageEntries.length) {
+          // leave a tiny gap
+          y -= 4;
+          y = await drawImagesOnPage({
+            pdfDoc, page, y, maxWidth, margin, imageEntries, font
+          });
+        }
+      }
+
       y -= 6;
       newPageIfNeeded();
     }
@@ -222,8 +399,13 @@ export async function handler(event) {
   };
 
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: cors, body: "" };
-  if (event.httpMethod !== "POST")
-    return { statusCode: 405, headers: { ...cors, "Content-Type": "application/json" }, body: JSON.stringify({ error: "Method not allowed" }) };
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers: { ...cors, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Method not allowed" }),
+    };
+  }
 
   try {
     let payload = JSON.parse(event.body || "{}");

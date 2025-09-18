@@ -8,21 +8,7 @@ import { useAuth } from "../hooks/UseAuth.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Textarea } from "../components/ui/textarea.jsx";
-
-/* ---------------------- Netlify function URL helper ---------------------- */
-const fnUrl = (name) => {
-  const envBase = (import.meta.env.VITE_NETLIFY_BASE || "").trim();
-  if (envBase) {
-    return `${envBase.replace(/\/$/, "")}/.netlify/functions/${name}`;
-  }
-  const { origin, hostname, port } = window.location;
-  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-  if (isLocal) {
-    if (port === "8888") return `${origin}/.netlify/functions/${name}`;
-    return `http://localhost:8888/.netlify/functions/${name}`;
-  }
-  return `/.netlify/functions/${name}`;
-};
+import { Loader2 } from "lucide-react";
 
 /* ---------------------- WinAnsi-safe sanitizers (NEW) ---------------------- */
 const REPLACEMENTS = {
@@ -67,6 +53,9 @@ export default function AuditEditor() {
   const [generatedFiles, setGeneratedFiles] = useState([]);
   const [previewHref, setPreviewHref] = useState(null);
   const [previewName, setPreviewName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false); // <- for loader
+
+  const filesTableRef = useRef(null); // to scroll back after closing preview
 
   // revoke blob URLs on unmount
   useEffect(() => {
@@ -347,10 +336,12 @@ export default function AuditEditor() {
   };
 
   const publicOrSignedUrl = async (bucket, path, ttlSeconds = 60 * 60 * 24 * 365) => {
+    // Try public URL first (works instantly if bucket is public)
     const pub = supabase.storage.from(bucket).getPublicUrl(path);
     const publicUrl = pub?.data?.publicUrl || null;
     if (publicUrl) return publicUrl;
 
+    // Fall back to a long-lived signed URL (works even if bucket is private)
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, ttlSeconds);
     if (error) throw error;
     return data?.signedUrl || "";
@@ -358,7 +349,7 @@ export default function AuditEditor() {
 
   const uploadPdfToSupabase = async (base64, fileName) => {
     const cleanName = (fileName || `${displayName}.pdf`).replace(/[/\\]+/g, "_");
-    const path = `${auditId}/${cleanName}`;
+    const path = `${auditId}/${cleanName}`; // keep PDFs grouped by audit
     const blob = base64ToBlob(base64);
 
     const { error: upErr } = await supabase.storage
@@ -413,11 +404,9 @@ export default function AuditEditor() {
             (blob) => {
               if (!blob) return resolve(file);
               resolve(
-                new File(
-                  [blob],
-                  file.name.replace(/\.(heic|heif|png|webp)$/i, ".jpg"),
-                  { type: "image/jpeg" }
-                )
+                new File([blob], file.name.replace(/\.(heic|heif|png|webp)$/i, ".jpg"), {
+                  type: "image/jpeg",
+                })
               );
             },
             "image/jpeg",
@@ -437,7 +426,7 @@ export default function AuditEditor() {
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
     const path = `${auditId}/${qid}/${ts}_${cleanBase}`;
 
-    const { error: upErr } = await supabase.storage
+    const { error: upErr } = await supabase
       .from("audit-photos")
       .upload(path, file, {
         upsert: true,
@@ -490,6 +479,7 @@ export default function AuditEditor() {
   // --- submits audit, then generates PDF via Netlify function
   const submitAudit = async () => {
     try {
+      setIsSubmitting(true); // start loader
       await saveAll();
 
       const submittedAt = new Date().toISOString();
@@ -533,16 +523,15 @@ export default function AuditEditor() {
 
       const cleanPayload = sanitizeDeep(payload);
 
-      // ✅ Robust function URL resolution
-      const url = fnUrl("sendAuditPdf");
-      console.log("[Audit] POST", url);
+      const base = (import.meta.env.VITE_NETLIFY_BASE || "").replace(/\/$/, "");
+      const url = base ? `${base}/.netlify/functions/sendAuditPdf` : "/.netlify/functions/sendAuditPdf";
 
       // First attempt: ask for JSON
       let res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify(cleanPayload),
       });
@@ -616,7 +605,7 @@ export default function AuditEditor() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Accept": "application/pdf",
+              Accept: "application/pdf",
             },
             body: JSON.stringify(cleanPayload),
           });
@@ -656,15 +645,74 @@ export default function AuditEditor() {
     } catch (e) {
       console.error(e);
       alert(e.message || "Unexpected error submitting audit.");
+    } finally {
+      setIsSubmitting(false); // stop loader
     }
   };
+
+  /* ----------------------- PREVIOUS AUDITS (create mode) ------------------- */
+  const { data: pastAudits = [], isLoading: loadingPastAudits } = useQuery({
+    queryKey: ["past_audits", storeIds.join(",")],
+    enabled: isCreateMode,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      let q = supabase
+        .from("audits")
+        .select(`
+          id, store_id, template_id, started_at, submitted_at,
+          stores(name),
+          audit_templates(name)
+        `)
+        .not("submitted_at", "is", null)
+        .order("submitted_at", { ascending: false })
+        .limit(50);
+      if (storeIds.length > 0) q = q.in("store_id", storeIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const [filesByAudit, setFilesByAudit] = useState({});
+
+  const listFilesForAudit = async (aid) => {
+    try {
+      const { data: files, error } = await supabase.storage.from("audit-files").list(`${aid}`, {
+        limit: 100,
+      });
+      if (error) throw error;
+      const items = await Promise.all(
+        (files || []).map(async (f) => {
+          const path = `${aid}/${f.name}`;
+          const href = await publicOrSignedUrl("audit-files", path);
+          return { name: f.name, href };
+        })
+      );
+      return items;
+    } catch (e) {
+      console.warn("Could not list files for audit", aid, e);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    if (!isCreateMode || pastAudits.length === 0) return;
+    (async () => {
+      const entries = await Promise.all(pastAudits.map(async (a) => [a.id, await listFilesForAudit(a.id)]));
+      const map = {};
+      for (const [aid, files] of entries) map[aid] = files;
+      setFilesByAudit(map);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateMode, pastAudits]);
 
   // ---------- RENDER ----------
   if (isCreateMode) {
     return (
       <DashboardLayout title="Audit Editor" profile={profile}>
         <div className="p-4 flex justify-center">
-          <div className="w-full max-w-3xl space-y-6">
+          <div className="w-full max-w-5xl space-y-6">
             <div className="rounded-xl border border-gray-800 p-4 bg-[#151924]">
               <h2 className="text-sm font-semibold text-gray-200 mb-4">Start a new audit</h2>
 
@@ -715,6 +763,73 @@ export default function AuditEditor() {
               <p className="text-[11px] text-gray-400 mt-3">
                 You’re signed in as <b>{profile?.first_name} {profile?.last_name}</b>. We’ll record you as the auditor.
               </p>
+            </div>
+
+            {/* Previous audits */}
+            <div className="rounded-xl border border-gray-800 p-4 bg-[#151924]">
+              <div className="text-sm font-semibold text-gray-200 mb-3">Previous audits</div>
+              {loadingPastAudits ? (
+                <div className="text-gray-400 text-sm">Loading…</div>
+              ) : pastAudits.length === 0 ? (
+                <div className="text-gray-400 text-sm">No completed audits yet.</div>
+              ) : (
+                <div className="overflow-x-auto" ref={filesTableRef}>
+                  <table className="min-w-full text-sm text-gray-200">
+                    <thead className="text-gray-300">
+                      <tr>
+                        <th className="text-left py-2 pr-4">Submitted</th>
+                        <th className="text-left py-2 pr-4">Store</th>
+                        <th className="text-left py-2 pr-4">Template</th>
+                        <th className="text-left py-2 pr-4">Files</th>
+                        <th className="text-left py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pastAudits.map((a) => {
+                        const store = a?.stores?.name ?? `Store ${a.store_id ?? ""}`;
+                        const template = a?.audit_templates?.name ?? "Template";
+                        const files = filesByAudit[a.id] || null;
+                        return (
+                          <tr key={a.id} className="border-t border-gray-800 align-top">
+                            <td className="py-2 pr-4">
+                              {a.submitted_at ? new Date(a.submitted_at).toLocaleString() : "—"}
+                            </td>
+                            <td className="py-2 pr-4">{store}</td>
+                            <td className="py-2 pr-4">{template}</td>
+                            <td className="py-2 pr-4">
+                              {!files ? (
+                                <span className="text-gray-400">Loading…</span>
+                              ) : files.length === 0 ? (
+                                <span className="text-gray-400">No files</span>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {files.map((f, i) => (
+                                    <a
+                                      key={i}
+                                      className="underline hover:no-underline"
+                                      href={f.href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={f.name}
+                                    >
+                                      {f.name}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2">
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/audit/${a.id}`)}>
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -873,7 +988,7 @@ export default function AuditEditor() {
                           />
                         )}
 
-                        {/* Photo (camera/file upload + URL paste) */}
+                        {/* Photo URL + camera/file input */}
                         {q.answer_type === "photo" && (
                           <div className="space-y-2">
                             {d.value_text ? (
@@ -972,12 +1087,21 @@ export default function AuditEditor() {
           )}
 
           <div className="flex gap-2">
-            <Button onClick={saveAll}>Save</Button>
-            <Button variant="outline" onClick={submitAudit}>Submit & generate PDF</Button>
+            <Button onClick={saveAll} disabled={isSubmitting}>Save</Button>
+            <Button variant="outline" onClick={submitAudit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                "Submit & generate PDF"
+              )}
+            </Button>
           </div>
 
           {/* Generated files table */}
-          <div className="rounded-xl border border-gray-800 bg-[#151924] p-4">
+          <div className="rounded-xl border border-gray-800 bg-[#151924] p-4" ref={filesTableRef}>
             <div className="text-sm font-semibold text-gray-200 mb-3">Generated files</div>
             {generatedFiles.length === 0 ? (
               <div className="text-gray-400 text-sm">No files generated yet.</div>
@@ -1010,22 +1134,15 @@ export default function AuditEditor() {
                               <Button size="sm" onClick={() => { setPreviewHref(f.href); setPreviewName(f.name); }}>
                                 Preview
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => openInNewTab(f.href)}>
-                                Open tab
-                              </Button>
-                              <a
-                                className="inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-1 text-sm"
-                                href={f.href}
-                                download={f.name}
-                              >
-                                Download
-                              </a>
-                              <button
-                                className="inline-flex items-center justify-center rounded-md border border-gray-700 px-3 py-1 text-sm"
-                                onClick={() => copyLink(f.href)}
-                              >
-                                Copy link
-                              </button>
+            <Button
+  variant="outline"
+  onClick={() => {
+    setPreviewHref(null);
+    navigate("/audit"); // go to the page that lists all completed audits
+  }}
+>
+  Back to list
+</Button>
                             </div>
                           ) : (
                             <span className="text-gray-400">No link provided</span>
@@ -1053,8 +1170,15 @@ export default function AuditEditor() {
                     >
                       Download
                     </a>
-                    <Button variant="outline" onClick={() => setPreviewHref(null)}>
-                      Close
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPreviewHref(null);
+                        // go back to the table smoothly
+                        setTimeout(() => filesTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+                      }}
+                    >
+                      Back to list
                     </Button>
                   </div>
                 </div>
