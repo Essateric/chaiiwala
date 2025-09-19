@@ -1035,25 +1035,26 @@ export default function AuditEditor() {
 
                             <div className="flex items-center gap-3">
                               <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  try {
-                                    const sized = await resizeImageToJpeg(file);
-                                    const { href } = await uploadAuditImage(sized, q.id);
-                                    handleChange(q.id, { value_text: href });
-                                  } catch (err) {
-                                    console.error(err);
-                                    alert(err.message || "Failed to upload image.");
-                                  } finally {
-                                    e.target.value = "";
-                                  }
-                                }}
-                                className="text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-gray-700 file:bg-[#0f131a] file:text-gray-200 file:cursor-pointer"
-                              />
+  type="file"
+  accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"  // allow iPhone HEIC etc.
+  // no `capture` attribute -> lets users choose Camera or Photo Library
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const sized = await resizeImageToJpeg(file);
+      const { href } = await uploadAuditImage(sized, q.id);
+      handleChange(q.id, { value_text: href });
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to upload image.");
+    } finally {
+      e.target.value = "";
+    }
+  }}
+  className="text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-gray-700 file:bg-[#0f131a] file:text-gray-200 file:cursor-pointer"
+/>
+
 
                               <Input
                                 className="flex-1"
