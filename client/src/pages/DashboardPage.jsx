@@ -1,7 +1,8 @@
 // client/src/pages/DashboardPage.jsx
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
-import StatsCard from "../components/dashboard/stats-card.jsx";
+import StockWidget from "../components/dashboard/stock-widget.jsx";
 import TaskItem from "../components/dashboard/task-item.jsx";
+import StatsCard from "../components/dashboard/stats-card.jsx";
 import AnnouncementItem from "../components/announcements/announcement-item.jsx";
 import {
   Building,
@@ -396,33 +397,21 @@ export default function DashboardPage() {
                 />
                 <DailytaskListChart storeTaskData={storeTaskData} dateISO={todayISO} />
 
-                {/* Weekly Stock Check Compliance - Regional/Admin Only */}
-                <StatsCard
-                  title={
-                    <span className="flex flex-col">
-                      Low Stock Items
-                      <select
-                        className="border border-gray-200 rounded px-2 py-1 mt-1 text-xs bg-white"
-                        value={selectedStockStoreId}
-                        onChange={e => setSelectedStockStoreId(e.target.value)}
-                      >
-                        <option value="all">All Stores</option>
-                        {stores.map(store => (
-                          <option key={store.id} value={store.id}>{store.name}</option>
-                        ))}
-                      </select>
-                    </span>
-                  }
-                  value={isLoadingLowStock
-                    ? <Loader2 className="h-6 w-6 animate-spin" />
-                    : lowStockCount}
-                  icon={Package}
-                  iconColor="text-red-600"
-                  iconBgColor="bg-red-100"
-                  change={{ value: "Immediate attention", isPositive: false, text: "" }}
-                />
-
                 <StockCheckCompliancePanel />
+                  {/* 👇 NEW: threshold-aware stock widget */}
+  <Card className="relative bg-amber-50 border border-amber-100 shadow-sm h-full">
+    <CardHeader className="pt-4 pb-2">
+      <CardTitle className="text-base font-bold text-gray-800">
+        Stock Status (by Threshold)
+      </CardTitle>
+      <CardDescription>
+        Highlights items at/below their effective limit
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="px-5 pb-5">
+      <StockWidget />
+    </CardContent>
+  </Card>
 
                 {/* Freshways Widget */}
                 <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
