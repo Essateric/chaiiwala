@@ -86,14 +86,28 @@ export default function StoreStockUpdatePage() {
     enabled: !!user && !!storeId,
   });
 
-  // Create combined data for display
+  // Create combined data for display (🔧 includes effective threshold + reliable itemCode)
   const combinedStockData = stockItems.map(item => {
-    const stockLevel = stockLevels.find(level => level.stockItemId === item.id);
+    const level = stockLevels.find(l => l.stockItemId === item.id);
+    const effectiveThreshold =
+      // prefer per-store override if present
+      (typeof level?.threshold === 'number' ? level.threshold : undefined) ??
+      // then API camelCase if your /api/stock-config provides it
+      (typeof item?.lowStockThreshold === 'number' ? item.lowStockThreshold : undefined) ??
+      // finally, DB snake_case if passed through
+      (typeof item?.low_stock_threshold === 'number' ? item.low_stock_threshold : undefined) ??
+      1;
+
     return {
       ...item,
-      quantity: stockLevel?.quantity || 0,
-      lastUpdated: stockLevel?.lastUpdated || null,
-      isEdited: false
+      // stable code for UI/search
+      itemCode: item.itemCode || item.item_code || item.sku || '',
+      // quantity from store row
+      quantity: typeof level?.quantity === 'number' ? level.quantity : 0,
+      lastUpdated: level?.lastUpdated || null,
+      // make sure the rest of the page uses this
+      lowStockThreshold: effectiveThreshold,
+      isEdited: false,
     };
   });
 
@@ -137,22 +151,24 @@ export default function StoreStockUpdatePage() {
     handleQuantityChange(itemId, Math.max(0, (editedItems[itemId] !== undefined ? editedItems[itemId] : currentQuantity) - 1));
   };
 
-  // Save all edited items
-  const handleSaveChanges = async () => {
-    const updatePromises = Object.entries(editedItems).map(([itemId, quantity]) => {
-      return updateStockLevelMutation.mutateAsync({
-        storeId: storeId,
-        stockItemId: parseInt(itemId),
-        quantity
-      });
+// ✅ this is the one you want on StoreStockUpdatePage
+const handleSaveChanges = async () => {
+  const updatePromises = Object.entries(editedItems).map(([itemId, quantity]) => {
+    return updateStockLevelMutation.mutateAsync({
+      storeId: storeId,
+      stockItemId: parseInt(itemId, 10),
+      quantity
     });
+  });
 
-    try {
-      await Promise.all(updatePromises);
-    } catch (error) {
-      // Error toast already handled in onError
-    }
-  };
+  try {
+    await Promise.all(updatePromises);
+  } catch (error) {
+    // toast handled in onError
+  }
+};
+
+
 
   // Reset all changes
   const handleResetChanges = () => {
@@ -165,19 +181,20 @@ export default function StoreStockUpdatePage() {
 
   // Filter stock items based on search, category, and stock status
   const filteredStockItems = combinedStockData.filter(item => {
-    // Search filter
-    const matchesSearch = searchTerm === '' || 
-      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.sku ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) : false);
+    // Search filter (🔧 now checks code fallbacks too)
+    const s = (searchTerm || '').toLowerCase();
+    const matchesSearch = s === '' || 
+      (item.name || '').toLowerCase().includes(s) ||
+      (item.itemCode || '').toLowerCase().includes(s) ||
+      (item.sku ? item.sku.toLowerCase().includes(s) : false);
     
     // Category filter
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     
-    // Stock status filter
+    // Stock status filter (uses effective lowStockThreshold)
     const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
     const isOutOfStock = quantity === 0;
-    const isLowStock = !isOutOfStock && quantity <= item.lowStockThreshold;
+    const isLowStock = !isOutOfStock && quantity <= (item.lowStockThreshold ?? 1);
     const isInStock = !isOutOfStock && !isLowStock;
     
     const matchesStockStatus = 
@@ -198,7 +215,7 @@ export default function StoreStockUpdatePage() {
     const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
     if (quantity === 0) {
       return 'bg-red-100 text-red-800 border-red-200';
-    } else if (quantity <= item.lowStockThreshold) {
+    } else if (quantity <= (item.lowStockThreshold ?? 1)) {
       return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     } else {
       return 'bg-green-100 text-green-800 border-green-200';
@@ -210,7 +227,7 @@ export default function StoreStockUpdatePage() {
     const quantity = editedItems[item.id] !== undefined ? editedItems[item.id] : item.quantity;
     if (quantity === 0) {
       return 'Out of Stock';
-    } else if (quantity <= item.lowStockThreshold) {
+    } else if (quantity <= (item.lowStockThreshold ?? 1)) {
       return 'Low Stock';
     } else {
       return 'In Stock';
@@ -333,14 +350,14 @@ export default function StoreStockUpdatePage() {
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
-  <Input
-  type="number"
-  step="any"
-  value={editedQuantity}
-  onChange={(e) => handleQuantityChange(item.id, parseFloat(e.target.value) || 0)}
-  className="w-16 text-center"
-  min="0"
-/>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  value={editedQuantity}
+                                  onChange={(e) => handleQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+                                  className="w-16 text-center"
+                                  min="0"
+                                />
                                 <Button 
                                   variant="outline" 
                                   size="icon" 

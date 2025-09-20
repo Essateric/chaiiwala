@@ -2,7 +2,7 @@
 import DashboardLayout from "../components/layout/DashboardLayout.jsx";
 import StatsCard from "../components/dashboard/stats-card.jsx";
 import TaskItem from "../components/dashboard/task-item.jsx";
-import AnnouncementItem from "../components/dashboard/announcement-item.jsx";
+import AnnouncementItem from "../components/announcements/announcement-item.jsx";
 import {
   Building,
   ClipboardList,
