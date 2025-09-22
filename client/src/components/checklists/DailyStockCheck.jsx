@@ -39,6 +39,22 @@ function getLondonWeekdayName(now = new Date()) {
   }).format(now);
 }
 
+/* ----- small helpers ----- */
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// prefer per-store override → legacy override → master item threshold
+const calcEffectiveThreshold = (row) => {
+  const override = toNum(row.threshold);        // from store_stock_levels
+  const legacy = toNum(row.low_stock_limit);    // from store_stock_levels (legacy)
+  const master  = toNum(row.low_stock_threshold); // from stock_items
+  if (override > 0) return override;
+  if (legacy > 0) return legacy;
+  return master; // may be 0 if unset
+};
+
 export default function DailyStockCheck({
   /** Optional: force a specific store id. If omitted, uses the user's first store. */
   storeId: storeIdProp = null,
@@ -100,6 +116,7 @@ export default function DailyStockCheck({
 
     setLoading(true);
 
+    // pull all columns so we include low_stock_threshold, sku, category, daily_check, etc.
     let { data: items, error: itemError } = await supabase
       .from("stock_items")
       .select("*")
@@ -122,6 +139,7 @@ export default function DailyStockCheck({
 
     let levels = [];
     if (itemIds.length > 0) {
+      // select * so we have quantity, threshold, low_stock_limit, id, etc.
       const { data: levelData, error: levelsError } = await supabase
         .from("store_stock_levels")
         .select("*")
@@ -136,11 +154,18 @@ export default function DailyStockCheck({
       levelsByItem[level.stock_item_id] = level;
     });
 
-    const merged = items.map((item) => ({
-      ...item,
-      current_qty: levelsByItem[item.id]?.quantity ?? 0,
-      store_stock_level_id: levelsByItem[item.id]?.id ?? null,
-    }));
+    // Merge fields we need for highlighting
+    const merged = items.map((item) => {
+      const lvl = levelsByItem[item.id] ?? {};
+      return {
+        ...item,
+        current_qty: toNum(lvl.quantity ?? 0),
+        store_stock_level_id: lvl.id ?? null,
+        // bring overrides onto the row so we can compute an effective threshold later
+        threshold: lvl.threshold,           // per-store override (new)
+        low_stock_limit: lvl.low_stock_limit, // per-store override (legacy)
+      };
+    });
 
     setStockItems(merged);
     setLoading(false);
@@ -376,26 +401,46 @@ export default function DailyStockCheck({
                       </tr>
                     </thead>
                     <tbody>
-                      {pageItems.map((item) => (
-                        <tr key={item.id} className="border-t">
-                          <td className="px-4 py-2">{item.sku}</td>
-                          <td className="px-4 py-2">{item.name}</td>
-                          <td className="px-4 py-2">
-                            {(item.category ?? "").trim() || "Uncategorized"}
-                          </td>
-                          <td className="px-4 py-2 text-right">{item.current_qty}</td>
-                          <td className="px-4 py-2 text-right">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={editing[item.id] ?? ""}
-                              onChange={(e) => handleEditChange(item.id, e.target.value)}
-                              placeholder="Qty"
-                              className="w-24"
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                      {pageItems.map((item) => {
+                        const currentQty = toNum(item.current_qty);
+                        const limit = calcEffectiveThreshold(item);
+                        const isLow = limit > 0 && currentQty <= limit; // includes 0 as low when threshold exists
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className={`border-t ${isLow ? "bg-red-50 hover:bg-red-50/80 border-l-4 border-red-400" : ""}`}
+                          >
+                            <td className="px-4 py-2">{item.sku}</td>
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2">
+                                {item.name}
+                                {isLow && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">
+                                    LOW
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              {(item.category ?? "").trim() || "Uncategorized"}
+                            </td>
+                            <td className={`px-4 py-2 text-right ${isLow ? "text-red-800 font-semibold" : ""}`}>
+                              {currentQty}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={editing[item.id] ?? ""}
+                                onChange={(e) => handleEditChange(item.id, e.target.value)}
+                                placeholder="Qty"
+                                className={`w-24 ${isLow ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400" : ""}`}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
 
