@@ -27,7 +27,6 @@ function getLondonDayOfWeek(now = new Date()) {
   const min = parts.find((p) => p.type === "minute")?.value ?? "00";
   const s = parts.find((p) => p.type === "second")?.value ?? "00";
 
-  // Build a wall-clock London datetime string that Date can read consistently
   const londonIsoLike = `${y}-${m}-${d}T${h}:${min}:${s}`;
   return new Date(londonIsoLike).getDay();
 }
@@ -47,22 +46,18 @@ const toNum = (v) => {
 
 // prefer per-store override → legacy override → master item threshold
 const calcEffectiveThreshold = (row) => {
-  const override = toNum(row.threshold);        // from store_stock_levels
-  const legacy = toNum(row.low_stock_limit);    // from store_stock_levels (legacy)
-  const master  = toNum(row.low_stock_threshold); // from stock_items
+  const override = toNum(row.threshold);         // store_stock_levels.threshold
+  const legacy   = toNum(row.low_stock_limit);   // store_stock_levels.low_stock_limit (legacy)
+  const master   = toNum(row.low_stock_threshold); // stock_items.low_stock_threshold
   if (override > 0) return override;
   if (legacy > 0) return legacy;
   return master; // may be 0 if unset
 };
 
 export default function DailyStockCheck({
-  /** Optional: force a specific store id. If omitted, uses the user's first store. */
   storeId: storeIdProp = null,
-  /** Optional: page size (defaults to 10) */
   itemsPerPageProp = 10,
-  /** Optional: custom title (defaults to "Daily Stock Check") */
   title = "Daily Stock Check",
-  /** NEW: collapsible header + default state */
   collapsible = true,
   defaultExpanded = true,
 }) {
@@ -87,7 +82,6 @@ export default function DailyStockCheck({
     isDev &&
     import.meta.env?.VITE_FORCE_SUNDAY === "1";
 
-  // Only true if explicitly set via URL/localStorage in any env, or via env var in dev
   const forceSunday = urlForceSunday || lsForceSunday || envForceSunday;
 
   // Define isSunday BEFORE any hook uses it
@@ -101,8 +95,6 @@ export default function DailyStockCheck({
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
   const [search, setSearch] = useState("");
-
-  // NEW: Category filter state
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   const itemsPerPage = itemsPerPageProp;
@@ -116,7 +108,6 @@ export default function DailyStockCheck({
 
     setLoading(true);
 
-    // pull all columns so we include low_stock_threshold, sku, category, daily_check, etc.
     let { data: items, error: itemError } = await supabase
       .from("stock_items")
       .select("*")
@@ -139,7 +130,6 @@ export default function DailyStockCheck({
 
     let levels = [];
     if (itemIds.length > 0) {
-      // select * so we have quantity, threshold, low_stock_limit, id, etc.
       const { data: levelData, error: levelsError } = await supabase
         .from("store_stock_levels")
         .select("*")
@@ -154,16 +144,14 @@ export default function DailyStockCheck({
       levelsByItem[level.stock_item_id] = level;
     });
 
-    // Merge fields we need for highlighting
     const merged = items.map((item) => {
       const lvl = levelsByItem[item.id] ?? {};
       return {
         ...item,
         current_qty: toNum(lvl.quantity ?? 0),
         store_stock_level_id: lvl.id ?? null,
-        // bring overrides onto the row so we can compute an effective threshold later
-        threshold: lvl.threshold,           // per-store override (new)
-        low_stock_limit: lvl.low_stock_limit, // per-store override (legacy)
+        threshold: lvl.threshold,
+        low_stock_limit: lvl.low_stock_limit,
       };
     });
 
@@ -174,10 +162,9 @@ export default function DailyStockCheck({
   useEffect(() => {
     fetchStock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedStoreId, isSunday]); // <-- isSunday is defined above
+  }, [resolvedStoreId, isSunday]);
 
   const handleEditChange = (id, value) => {
-    // Allow empty for “clear”, but guard negative values
     const v = value === "" ? "" : Math.max(0, Number(value));
     setEditing((prev) => ({
       ...prev,
@@ -185,7 +172,7 @@ export default function DailyStockCheck({
     }));
   };
 
-  // Build unique, sorted category list from data
+  // Categories
   const categoryOptions = useMemo(() => {
     const set = new Set(
       (stockItems || []).map((i) => {
@@ -196,7 +183,7 @@ export default function DailyStockCheck({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [stockItems]);
 
-  // Filtering (category + search)
+  // Filtering
   const filteredStockItems = useMemo(() => {
     let list = stockItems;
 
@@ -222,12 +209,10 @@ export default function DailyStockCheck({
   // Pagination
   const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage) || 1;
 
-  // Keep currentPage in range if filtering changes total
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategory, search]);
@@ -238,7 +223,7 @@ export default function DailyStockCheck({
     return filteredStockItems.slice(start, end);
   }, [filteredStockItems, currentPage, itemsPerPage]);
 
-  // Determine which edits on this page are valid and changed
+  // Changed rows on this page
   const pageChanges = useMemo(() => {
     return pageItems
       .map((item) => {
@@ -260,7 +245,6 @@ export default function DailyStockCheck({
 
     try {
       const { data: authData, error: userError } = await supabase.auth.getUser();
-
       const user = authData?.user;
       if (!user) {
         console.error("❌ No user found:", userError);
@@ -269,7 +253,6 @@ export default function DailyStockCheck({
         return;
       }
 
-      // Build batched rows for upsert
       const now = new Date().toISOString();
       const rows = pageChanges.map(({ item, qty }) => ({
         id: item.store_stock_level_id ?? undefined,
@@ -292,7 +275,6 @@ export default function DailyStockCheck({
         return;
       }
 
-      // Refresh and clear only the edited entries for this page
       await fetchStock();
 
       setEditing((prev) => {
@@ -347,7 +329,7 @@ export default function DailyStockCheck({
 
       {expanded && (
         <CardContent>
-          {/* Toolbar: search + category + save */}
+          {/* Toolbar */}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
               <Input
@@ -370,7 +352,6 @@ export default function DailyStockCheck({
               </select>
             </div>
 
-            {/* Save current page button (top-right for convenience) */}
             <Button
               className="w-full sm:w-auto"
               variant="default"
@@ -390,21 +371,32 @@ export default function DailyStockCheck({
                 <div className="p-4 text-center text-gray-500">No stock items found.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full table-fixed divide-y divide-gray-200">
+                    {/* Ensure header aligns perfectly with cells */}
+                    <colgroup>
+                      <col className="w-24" />  {/* SKU */}
+                      <col />                   {/* Name */}
+                      <col className="w-40" />  {/* Category */}
+                      <col className="w-28" />  {/* Current Qty */}
+                      <col className="w-32" />  {/* New Qty */}
+                    </colgroup>
+
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Category</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">SKU</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">Name</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">Category</th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Current Qty</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">New Qty</th>
+                        {/* centered so it sits right above inputs */}
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">New Qty</th>
                       </tr>
                     </thead>
+
                     <tbody>
                       {pageItems.map((item) => {
                         const currentQty = toNum(item.current_qty);
                         const limit = calcEffectiveThreshold(item);
-                        const isLow = limit > 0 && currentQty <= limit; // includes 0 as low when threshold exists
+                        const isLow = limit > 0 && currentQty <= limit; // includes 0 as low
 
                         return (
                           <tr
@@ -428,14 +420,15 @@ export default function DailyStockCheck({
                             <td className={`px-4 py-2 text-right ${isLow ? "text-red-800 font-semibold" : ""}`}>
                               {currentQty}
                             </td>
-                            <td className="px-4 py-2 text-right">
+                            {/* center to match header */}
+                            <td className="px-4 py-2 text-center">
                               <Input
                                 type="number"
                                 min={0}
                                 value={editing[item.id] ?? ""}
                                 onChange={(e) => handleEditChange(item.id, e.target.value)}
                                 placeholder="Qty"
-                                className={`w-24 ${isLow ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400" : ""}`}
+                                className={`w-24 text-center ${isLow ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400" : ""}`}
                               />
                             </td>
                           </tr>
@@ -467,7 +460,6 @@ export default function DailyStockCheck({
                         Next
                       </Button>
 
-                      {/* Duplicate Save at bottom for easy access */}
                       <Button
                         variant="default"
                         size="sm"
