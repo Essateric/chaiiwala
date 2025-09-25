@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient.js";
+import {
+  STORE_STOCK_LEVELS_TABLE,
+  STORE_STOCK_LEVELS_SELECT,
+} from '../../lib/db-columns.js';
 
 export default function StockWidget() {
   const [selectedStoreId, setSelectedStoreId] = useState("all");
@@ -28,19 +32,16 @@ export default function StockWidget() {
       return data || [];
     },
   });
-
-  const { data: levels = [], isLoading: levelsLoading } = useQuery({
-    queryKey: ["store_stock_levels"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("store_stock_levels")
-        .select(
-          "store_id, stock_item_id, threshold, low_stock_limit, daily_check, quantity, current_qty, onhand"
-        );
-      if (error) throw error;
-      return data || [];
-    },
-  });
+const { data: levels = [], isLoading: levelsLoading } = useQuery({
+  queryKey: ['store_stock_levels'],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from(STORE_STOCK_LEVELS_TABLE)
+      .select(STORE_STOCK_LEVELS_SELECT); // 'id,store_id,stock_item_id,quantity,last_updated,updated_by,threshold'
+    if (error) throw error;
+    return data ?? [];
+  },
+});
 
   const isLoading = storesLoading || itemsLoading || levelsLoading;
 

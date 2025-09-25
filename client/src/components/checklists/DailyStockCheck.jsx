@@ -1,4 +1,4 @@
-// components/stock/DailyStockCheck.jsx
+// components/checklists/DailyStockCheck.jsx
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient.js";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { useAuth } from "@/hooks/UseAuth.jsx";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useLast5DayHistoryForRows } from "@/hooks/useStockHistory.jsx";
 
 /** Robust: get London day-of-week without Date parsing ambiguity (0=Sun..6=Sat) */
 function getLondonDayOfWeek(now = new Date()) {
@@ -30,7 +31,6 @@ function getLondonDayOfWeek(now = new Date()) {
   const londonIsoLike = `${y}-${m}-${d}T${h}:${min}:${s}`;
   return new Date(londonIsoLike).getDay();
 }
-
 function getLondonWeekdayName(now = new Date()) {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
@@ -38,21 +38,55 @@ function getLondonWeekdayName(now = new Date()) {
   }).format(now);
 }
 
-/* ----- small helpers ----- */
+/* ----- helpers ----- */
 const toNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
-
 // prefer per-store override → legacy override → master item threshold
 const calcEffectiveThreshold = (row) => {
-  const override = toNum(row.threshold);         // store_stock_levels.threshold
-  const legacy   = toNum(row.low_stock_limit);   // store_stock_levels.low_stock_limit (legacy)
-  const master   = toNum(row.low_stock_threshold); // stock_items.low_stock_threshold
+  const override = toNum(row.threshold);            // store_stock_levels.threshold
+  const legacy   = toNum(row.low_stock_limit);      // legacy (no longer in table; may be 0)
+  const master   = toNum(row.low_stock_threshold);  // stock_items.low_stock_threshold
   if (override > 0) return override;
   if (legacy > 0) return legacy;
   return master; // may be 0 if unset
 };
+
+/** dd MMM for yyyy-mm-dd (London) */
+function fmtShortDay(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)); // noon UTC avoids DST wobble
+  return dt.toLocaleDateString("en-GB", {
+    timeZone: "Europe/London",
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+/** Get last N consecutive London calendar days (yyyy-mm-dd), oldest → newest */
+function getLastNDatesLondon(n = 5, now = new Date()) {
+  const toLondonISO = (d) => {
+    const [dd, mm, yyyy] = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format(d)
+      .split("/"); // dd/mm/yyyy
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  // Build dates ending today (London), oldest → newest
+  const result = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (n - 1 - i));
+    result.push(toLondonISO(d));
+  }
+  return result.reverse();
+}
 
 export default function DailyStockCheck({
   storeId: storeIdProp = null,
@@ -62,29 +96,20 @@ export default function DailyStockCheck({
   defaultExpanded = true,
 }) {
   const { profile } = useAuth();
-
   const resolvedStoreId =
     storeIdProp ?? (Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null);
 
-  // --- FORCE-SUNDAY TEST SUPPORT (safe in prod) ---
+  // Sunday logic
   const isDev = typeof import.meta !== "undefined" && import.meta.env?.MODE === "development";
-
   const urlForceSunday =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("forceSunday") === "1";
-
   const lsForceSunday =
-    typeof window !== "undefined" &&
-    window.localStorage?.getItem("forceSunday") === "1";
-
+    typeof window !== "undefined" && window.localStorage?.getItem("forceSunday") === "1";
   const envForceSunday =
-    typeof import.meta !== "undefined" &&
-    isDev &&
-    import.meta.env?.VITE_FORCE_SUNDAY === "1";
-
+    typeof import.meta !== "undefined" && isDev && import.meta.env?.VITE_FORCE_SUNDAY === "1";
   const forceSunday = urlForceSunday || lsForceSunday || envForceSunday;
 
-  // Define isSunday BEFORE any hook uses it
   const isSunday = forceSunday || getLondonDayOfWeek() === 0;
   const londonWeekdayName = getLondonWeekdayName();
 
@@ -97,17 +122,23 @@ export default function DailyStockCheck({
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
+  useEffect(() => {
+    fetchStock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedStoreId, isSunday]);
+
   const itemsPerPage = itemsPerPageProp;
 
+  /** ------- data fetch: current stock rows ------- */
   const fetchStock = async () => {
     if (!resolvedStoreId) {
       setStockItems([]);
       setLoading(false);
       return;
     }
-
     setLoading(true);
 
+    // all item fields (need low_stock_threshold, sku, category, daily_check)
     let { data: items, error: itemError } = await supabase
       .from("stock_items")
       .select("*")
@@ -115,11 +146,10 @@ export default function DailyStockCheck({
 
     items = items || [];
 
-    // Hide non-daily items except on Sundays
+    // hide non-daily except Sundays
     if (!itemError && !isSunday) {
       items = items.filter((item) => item.daily_check === true);
     }
-
     if (itemError) {
       setStockItems([]);
       setLoading(false);
@@ -132,7 +162,7 @@ export default function DailyStockCheck({
     if (itemIds.length > 0) {
       const { data: levelData, error: levelsError } = await supabase
         .from("store_stock_levels")
-        .select("*")
+        .select("id, store_id, stock_item_id, quantity, threshold, last_updated, updated_by")
         .in("stock_item_id", itemIds)
         .eq("store_id", resolvedStoreId);
 
@@ -151,6 +181,7 @@ export default function DailyStockCheck({
         current_qty: toNum(lvl.quantity ?? 0),
         store_stock_level_id: lvl.id ?? null,
         threshold: lvl.threshold,
+        // legacy property left for compatibility (will be 0/undefined)
         low_stock_limit: lvl.low_stock_limit,
       };
     });
@@ -158,11 +189,6 @@ export default function DailyStockCheck({
     setStockItems(merged);
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchStock();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedStoreId, isSunday]);
 
   const handleEditChange = (id, value) => {
     const v = value === "" ? "" : Math.max(0, Number(value));
@@ -172,7 +198,7 @@ export default function DailyStockCheck({
     }));
   };
 
-  // Categories
+  // category options
   const categoryOptions = useMemo(() => {
     const set = new Set(
       (stockItems || []).map((i) => {
@@ -183,17 +209,15 @@ export default function DailyStockCheck({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [stockItems]);
 
-  // Filtering
+  // filtering
   const filteredStockItems = useMemo(() => {
     let list = stockItems;
-
     if (selectedCategory !== "all") {
       list = list.filter((i) => {
         const cat = (i.category ?? "").trim() || "Uncategorized";
         return cat === selectedCategory;
       });
     }
-
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -202,17 +226,14 @@ export default function DailyStockCheck({
           item.sku?.toLowerCase().includes(q)
       );
     }
-
     return list;
   }, [stockItems, selectedCategory, search]);
 
-  // Pagination
+  // pagination
   const totalPages = Math.ceil(filteredStockItems.length / itemsPerPage) || 1;
-
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategory, search]);
@@ -223,7 +244,30 @@ export default function DailyStockCheck({
     return filteredStockItems.slice(start, end);
   }, [filteredStockItems, currentPage, itemsPerPage]);
 
-  // Changed rows on this page
+  // 🔁 Build "rows" for shared history hook (one store, page's item ids)
+  const historyRows = useMemo(
+    () =>
+      pageItems.map((item) => ({
+        storeId: Number(resolvedStoreId),
+        sku: String(item.id), // id is the stock_item_id
+      })),
+    [pageItems, resolvedStoreId]
+  );
+  const { historyMap: histMap, loading: loadingHist } = useLast5DayHistoryForRows(historyRows);
+
+  // ✅ Last 5 full days + today (6 columns), oldest → newest
+  const lastDates = useMemo(() => getLastNDatesLondon(6, new Date()), []);
+
+  /** Map item → aligned qty array for the header dates */
+  const getHistoryCells = (itemId) => {
+    const key = `${resolvedStoreId}:${String(itemId)}`;
+    const timelineNewestFirst = histMap[key] || [];
+    const byDate = new Map();
+    timelineNewestFirst.forEach(({ date, qty }) => byDate.set(date, qty));
+    return lastDates.map((d) => (typeof byDate.get(d) === "number" ? byDate.get(d) : null));
+  };
+
+  // changed rows on this page
   const pageChanges = useMemo(() => {
     return pageItems
       .map((item) => {
@@ -236,13 +280,11 @@ export default function DailyStockCheck({
       })
       .filter(Boolean);
   }, [pageItems, editing]);
-
   const hasPageChanges = pageChanges.length > 0;
 
   const handleSavePage = async () => {
     if (!resolvedStoreId || !hasPageChanges) return;
     setSaving(true);
-
     try {
       const { data: authData, error: userError } = await supabase.auth.getUser();
       const user = authData?.user;
@@ -372,31 +414,43 @@ export default function DailyStockCheck({
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full table-fixed divide-y divide-gray-200">
-                    {/* Ensure header aligns perfectly with cells */}
-                    <colgroup>
-                      <col className="w-24" />  {/* SKU */}
-                      <col />                   {/* Name */}
-                      <col className="w-40" />  {/* Category */}
-                      <col className="w-28" />  {/* Current Qty */}
-                      <col className="w-32" />  {/* New Qty */}
-                    </colgroup>
-
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">SKU</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-24">SKU</th>
                         <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">Name</th>
-                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">Category</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Current Qty</th>
-                        {/* centered so it sits right above inputs */}
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">New Qty</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-40">Category</th>
+
+                        {/* Last 5 full days + today (6 columns), oldest → newest */}
+                        {lastDates.map((d, idx) => {
+                          const isTodayCol = idx === lastDates.length - 1;
+                          return (
+                            <th
+                              key={d}
+                              className={[
+                                "px-2 py-2 text-right text-xs font-medium w-20",
+                                idx > 0 ? "border-l border-gray-200" : "",
+                                isTodayCol ? "text-gray-900" : "text-gray-500"
+                              ].join(" ")}
+                              title={d}
+                            >
+                              {fmtShortDay(d)}
+                            </th>
+                          );
+                        })}
+
+                        {/* Removed the “Current Qty” column to avoid duplicating today */}
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">New Qty</th>
                       </tr>
                     </thead>
 
                     <tbody>
                       {pageItems.map((item) => {
-                        const currentQty = toNum(item.current_qty);
+                        const currentQty = Number(item.current_qty) || 0;
                         const limit = calcEffectiveThreshold(item);
-                        const isLow = limit > 0 && currentQty <= limit; // includes 0 as low
+                        const isLow = limit > 0 && currentQty <= limit;
+
+                        // aligned quantities for the header dates (oldest → newest)
+                        const cells = getHistoryCells(item.id);
 
                         return (
                           <tr
@@ -404,6 +458,7 @@ export default function DailyStockCheck({
                             className={`border-t ${isLow ? "bg-red-50 hover:bg-red-50/80 border-l-4 border-red-400" : ""}`}
                           >
                             <td className="px-4 py-2">{item.sku}</td>
+
                             <td className="px-4 py-2">
                               <div className="flex items-center gap-2">
                                 {item.name}
@@ -414,13 +469,40 @@ export default function DailyStockCheck({
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2">
-                              {(item.category ?? "").trim() || "Uncategorized"}
-                            </td>
-                            <td className={`px-4 py-2 text-right ${isLow ? "text-red-800 font-semibold" : ""}`}>
-                              {currentQty}
-                            </td>
-                            {/* center to match header */}
+
+                            <td className="px-4 py-2">{(item.category ?? "").trim() || "Uncategorized"}</td>
+
+                           {/* 6 date columns with vertical separators; last (today) emphasized */}
+{cells.map((qty, idx) => {
+  const isTodayCol = idx === cells.length - 1;
+  const isNumber = typeof qty === "number";
+
+  return (
+    <td
+      key={idx}
+      className={[
+        "px-2 py-2 text-right",
+        idx > 0 ? "border-l border-gray-200" : "",
+        isTodayCol && isNumber ? "font-semibold text-gray-900" : ""
+      ].filter(Boolean).join(" ")}
+    >
+      {isNumber ? (
+        // Bigger number + aligned digits
+        <span className="font-mono tabular-nums text-base sm:text-lg leading-none">
+          {qty}
+        </span>
+      ) : (
+        // Subtle "No Entry"
+        <span className="text-[11px] uppercase tracking-wide text-gray-400">
+          No Entry
+        </span>
+      )}
+    </td>
+  );
+})}
+
+
+                            {/* New Qty input */}
                             <td className="px-4 py-2 text-center">
                               <Input
                                 type="number"
@@ -436,42 +518,43 @@ export default function DailyStockCheck({
                       })}
                     </tbody>
                   </table>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
-                    <span>
-                      Page {currentPage} of {totalPages}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={currentPage === 1}
-                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      >
-                        Prev
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={currentPage === totalPages || totalPages === 0}
-                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      >
-                        Next
-                      </Button>
-
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleSavePage}
-                        disabled={!hasPageChanges || saving || loading}
-                      >
-                        {saving ? "Saving..." : "Save This Page"}
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               )}
+
+              {/* Pagination + bottom save */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  >
+                    Next
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleSavePage}
+                    disabled={!hasPageChanges || saving || loading}
+                  >
+                    {saving ? "Saving..." : "Save This Page"}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
 
@@ -492,7 +575,7 @@ export default function DailyStockCheck({
             </div>
           </div>
 
-          {/* Optional floating Save on small screens when there are edits */}
+          {/* Optional floating Save on small screens */}
           {hasPageChanges && (
             <Button
               className="fixed right-4 bottom-20 z-50 sm:hidden"

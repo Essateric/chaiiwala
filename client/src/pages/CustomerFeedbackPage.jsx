@@ -1,13 +1,13 @@
 // src/pages/CustomerFeedbackPage.jsx
 import { useState, useEffect } from 'react';
 import { Camera, Star, Send, MapPin, Clock, User } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient.js';
 
-// Create Supabase client OUTSIDE the component to avoid GoTrueClient warning
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+// // Create Supabase client OUTSIDE the component to avoid GoTrueClient warning
+// const supabase = createClient(
+//   import.meta.env.VITE_SUPABASE_URL,
+//   import.meta.env.VITE_SUPABASE_ANON_KEY
+// );
 
 // Helper to upload all images and return their public URLs
 async function uploadImagesToSupabase(files) {
@@ -185,7 +185,6 @@ const response = await fetch('/.netlify/functions/sendFeedbackEmail', {
     fetchStores();
   }, []);
 
-  // StarRating component
 // StarRating component
 const StarRating = ({ label, value, onChange }) => {
   const getColorClass = (star) => {

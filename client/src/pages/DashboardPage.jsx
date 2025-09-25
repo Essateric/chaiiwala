@@ -37,9 +37,14 @@ import TaskProgressPanel from "../components/dashboard/TaskProgressPanel.jsx";
 /* ✅ Use the exact same components as the Daily Checklist page */
 import DailyStoreChecklistCard from "../components/checklists/DailyStoreChecklistCard.jsx";
 import DailyStockCheck from "../components/checklists/DailyStockCheck.jsx";
-import TasksLast7DaysTable from "../components/dashboard/TasksLast7DaysTable.jsx";
 
-// Get the most recent delivery date (today if valid, else yesterday, else last valid)
+/* ✅ Centralized columns for store_stock_levels */
+import {
+  STORE_STOCK_LEVELS_TABLE,
+  STORE_STOCK_LEVELS_SELECT,
+} from "@/lib/db-columns.js";
+
+// ---------- Freshways delivery context ----------
 const deliveryDateISO = getMostRecentFreshwaysDeliveryDate();
 const today = new Date();
 
@@ -47,10 +52,10 @@ let deliveryDateStr = null;
 let orderDeadlineDate = null;
 
 if (isTodayDeliveryDay(today)) {
-  deliveryDateStr = today.toISOString().split("T")[0]; // Use today as delivery date
-  orderDeadlineDate = getOrderDateForTodayDelivery(today); // JS Date for cutoff
+  deliveryDateStr = today.toISOString().split("T")[0];
+  orderDeadlineDate = getOrderDateForTodayDelivery(today);
 } else {
-  deliveryDateStr = getMostRecentFreshwaysDeliveryDate(today); // Fallback to most recent delivery
+  deliveryDateStr = getMostRecentFreshwaysDeliveryDate(today);
   orderDeadlineDate = null;
 }
 
@@ -69,8 +74,9 @@ export default function DashboardPage() {
   const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
   const endOfToday   = new Date(now); endOfToday.setHours(23, 59, 59, 999);
 
+  // ---------- Freshways orders placed today ----------
   const { data: orderLogsToday = [], isLoading: isLoadingOrders } = useQuery({
-    queryKey: ["freshways_order_log_today", startOfToday.toISOString()],
+    queryKey: ["freshways_order_log_today", startOfToday.toISOString(), endOfToday.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("freshways_orders")
@@ -83,6 +89,7 @@ export default function DashboardPage() {
     }
   });
 
+  // ---------- Stores ----------
   const { data: stores = [], isLoading: isLoadingStores } = useQuery({
     queryKey: ["stores"],
     queryFn: async () => {
@@ -92,11 +99,11 @@ export default function DashboardPage() {
     }
   });
 
-  // 2 dropdowns (one for tasks, one for stock), default "all"
+  // Two dropdown states (tasks + stock), default "all"
   const [selectedTaskStoreId, setSelectedTaskStoreId] = useState("all");
   const [selectedStockStoreId, setSelectedStockStoreId] = useState("all");
 
-  // Fetch dashboard user profile
+  // ---------- Current user profile for dashboard ----------
   const [dashboardProfile, setDashboardProfile] = useState(null);
   useEffect(() => {
     const fetchProfile = async () => {
@@ -115,7 +122,7 @@ export default function DashboardPage() {
     fetchProfile();
   }, [user]);
 
-  // Announcements
+  // ---------- Announcements ----------
   const { data: announcements = [], isLoading: isLoadingAnnouncements } = useQuery({
     queryKey: ["recent_announcements"],
     queryFn: async () => {
@@ -129,7 +136,7 @@ export default function DashboardPage() {
     }
   });
 
-  // Staff count
+  // ---------- Staff count ----------
   const { data: staffCount = 0 } = useQuery({
     queryKey: ["staff_count"],
     queryFn: async () => {
@@ -141,31 +148,37 @@ export default function DashboardPage() {
     }
   });
 
-  // Low stock count for selected store or all stores
+  // ---------- Low stock count (UPDATED: uses store_stock_levels + threshold) ----------
   const { data: lowStockCount = 0, isLoading: isLoadingLowStock } = useQuery({
-    queryKey: ["low_stock_count", selectedStockStoreId],
+    queryKey: ["low_stock_count_threshold", selectedStockStoreId],
     queryFn: async () => {
-      if (selectedStockStoreId === "all") {
-        const { count, error } = await supabase
-          .from("stock_items")
-          .lt("quantity", 10)
-          .select("id", { count: "exact" });
-        if (error) throw error;
-        return count || 0;
-      } else {
-        const { count, error } = await supabase
-          .from("stock_items")
-          .eq("store_id", selectedStockStoreId)
-          .lt("quantity", 10)
-          .select("id", { count: "exact" });
-        if (error) throw error;
-        return count || 0;
+      // Fetch minimal columns, then compute client-side due to column-vs-column compare
+      let query = supabase
+        .from(STORE_STOCK_LEVELS_TABLE)
+        .select("id, store_id, quantity, threshold");
+
+      if (selectedStockStoreId !== "all") {
+        query = query.eq("store_id", selectedStockStoreId);
       }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const FALLBACK_THRESHOLD = 10; // business default if no per-row threshold
+      const count = (data || []).reduce((acc, row) => {
+        const qty = typeof row.quantity === "number" ? row.quantity : null;
+        const thr = typeof row.threshold === "number" ? row.threshold : null;
+        if (qty === null) return acc;
+        const effectiveLimit = thr ?? FALLBACK_THRESHOLD;
+        return acc + (qty <= effectiveLimit ? 1 : 0);
+      }, 0);
+
+      return count;
     },
-    enabled: !!stores.length
+    enabled: true
   });
 
-  // Fetch all checklist rows for today (all stores)
+  // ---------- Daily checklist rows (today) ----------
   const todayISO = new Date().toISOString().split("T")[0];
   const { data: checklistRows = [], isLoading: isLoadingTasks } = useQuery({
     queryKey: ["v_daily_checklist_with_status", todayISO, selectedTaskStoreId],
@@ -199,6 +212,7 @@ export default function DashboardPage() {
     });
   }, [stores, checklistRows]);
 
+  // ---------- Freshways status merge ----------
   const mergedOrderLog = useMemo(() => {
     return stores.map(store => {
       const todays = orderLogsToday.filter(o => o.store_id === store.id);
@@ -225,7 +239,7 @@ export default function DashboardPage() {
     });
   }, [stores, orderLogsToday, todayIsOrderDay, now, cutoff11]);
 
-  // For stats card: SUM all rows across all stores if "all"
+  // ---------- Stats: open/completed ----------
   let filteredChecklistRows = checklistRows;
   if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
     filteredChecklistRows = checklistRows.filter(row => String(row.store_id) === String(selectedTaskStoreId));
@@ -244,7 +258,7 @@ export default function DashboardPage() {
     openTasksStatDisplay = `${completedTasks}/${totalTasks}`;
   }
 
-  // Fetch task titles for today's tasks (allDailyTasks)
+  // ---------- Task titles for list ----------
   const { data: allDailyTasks = [] } = useQuery({
     queryKey: ["all_daily_tasks"],
     queryFn: async () => {
@@ -257,7 +271,6 @@ export default function DashboardPage() {
     enabled: !!todayISO
   });
 
-  // Map tasks for "Today's Tasks" list
   const todaysTasksForList = useMemo(() => {
     let filteredRows = checklistRows;
     if (selectedTaskStoreId && selectedTaskStoreId !== "all") {
@@ -270,7 +283,7 @@ export default function DashboardPage() {
     }));
   }, [checklistRows, allDailyTasks, stores, selectedTaskStoreId]);
 
-  // Task complete handler (kept for backwards compatibility)
+  // ---------- Toggle task complete ----------
   const handleTaskComplete = async (id, newStatus) => {
     setUpdatingTaskId(id);
     const { error } = await supabase
@@ -289,11 +302,11 @@ export default function DashboardPage() {
         variant: "destructive"
       });
     }
-    queryClient.invalidateQueries(["freshways_order_log", deliveryDate]);
+    queryClient.invalidateQueries(["freshways_order_log_today"]);
     setUpdatingTaskId(null);
   };
 
-  // Loading and error handling
+  // ---------- Role gates ----------
   if (isAuthLoading || isLoadingStores) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -331,7 +344,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Only admin/regional users can see stats and chart
   const canViewStatsAndChart =
     dashboardProfile?.permissions === "admin" ||
     dashboardProfile?.permissions === "regional";
@@ -342,7 +354,7 @@ export default function DashboardPage() {
       ? (dashboardProfile?.store_ids?.[0] ?? "all")
       : "all";
 
-  // ========== MAIN DASHBOARD RENDER ===========
+  // ---------- MAIN DASH ----------
   return (
     <DashboardLayout title="Dashboard" profile={dashboardProfile} announcements={announcements || []}>
       <div className="mb-6 flex flex-wrap items-center gap-4">
@@ -353,31 +365,28 @@ export default function DashboardPage() {
 
       <Tabs defaultValue="overview" className="mb-6">
         <TabsContent value="overview">
-          {/* Store Manager view: two cards – checklist + stock check */}
-{/* Store Manager view: stacked cards – checklist then stock check */}
-{!canViewStatsAndChart && (
-  <div className="flex flex-col gap-6 mb-6">
-    <DailyStoreChecklistCard
-      title="Daily Store Checklist"
-      collapsible
-      defaultExpanded={true}
-    />
+          {/* Store Manager view: stacked cards – checklist then stock check */}
+          {!canViewStatsAndChart && (
+            <div className="flex flex-col gap-6 mb-6">
+              <DailyStoreChecklistCard
+                title="Daily Store Checklist"
+                collapsible
+                defaultExpanded={true}
+              />
 
-    <DailyStockCheck
-      title="Daily Stock Check"
-      // storeId={myStoreId} // optional; it auto-uses the manager’s first store
-      itemsPerPageProp={10}
-      collapsible
-      defaultExpanded={true}
-    />
-  </div>
-)}
+              <DailyStockCheck
+                title="Daily Stock Check"
+                // storeId={myStoreId}
+                itemsPerPageProp={10}
+                collapsible
+                defaultExpanded={true}
+              />
+            </div>
+          )}
 
-
-          {/* Admin/Regional widgets remain unchanged */}
+          {/* Admin/Regional widgets */}
           {canViewStatsAndChart && (
             <>
-              {/* Stats cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <MaintenanceRequestsPie
                   daysBack={14}
@@ -385,7 +394,9 @@ export default function DashboardPage() {
                   iconColor="text-blue-600"
                   iconBgColor="bg-blue-100"
                 />
+
                 <ChaiiwalaOrderStatusWidget />
+
                 <TaskProgressPanel
                   stores={stores}
                   selectedTaskStoreId={selectedTaskStoreId}
@@ -395,23 +406,27 @@ export default function DashboardPage() {
                   completedTasks={completedTasks}
                   totalTasks={totalTasks}
                 />
+
                 <DailytaskListChart storeTaskData={storeTaskData} dateISO={todayISO} />
 
                 <StockCheckCompliancePanel />
-                  {/* 👇 NEW: threshold-aware stock widget */}
-  <Card className="relative bg-amber-50 border border-amber-100 shadow-sm h-full">
-    <CardHeader className="pt-4 pb-2">
-      <CardTitle className="text-base font-bold text-gray-800">
-        Stock Status (by Threshold)
-      </CardTitle>
-      <CardDescription>
-        Highlights items at/below their effective limit
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="px-5 pb-5">
-      <StockWidget />
-    </CardContent>
-  </Card>
+
+                {/* Threshold-aware stock widget */}
+                <Card className="relative bg-amber-50 border border-amber-100 shadow-sm h-full">
+                  <CardHeader className="pt-4 pb-2">
+                    <CardTitle className="text-base font-bold text-gray-800">
+                      Stock Status (by Threshold)
+                    </CardTitle>
+                    <CardDescription>
+                      Highlights items at/below their effective limit
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5">
+                    <StockWidget />
+                    {/* You can surface lowStockCount here if useful */}
+                    {/* <p className="text-sm text-amber-700 mt-3">Low items: {lowStockCount}</p> */}
+                  </CardContent>
+                </Card>
 
                 {/* Freshways Widget */}
                 <Card className="relative bg-blue-50 border border-blue-100 shadow-sm h-full">
@@ -451,12 +466,16 @@ export default function DashboardPage() {
                                   <span className="text-green-600 font-semibold">Placed</span>
                                 ) : log.status === "missed" ? (
                                   <span className="text-red-600 font-semibold">Missed</span>
+                                ) : log.status === "missed_late" ? (
+                                  <span className="text-orange-600 font-semibold">Late (after 11:00)</span>
+                                ) : log.status === "pending" ? (
+                                  <span className="text-yellow-600 font-semibold">Pending</span>
                                 ) : (
-                                  <span className="text-yellow-600 font-semibold">No Entry</span>
+                                  <span className="text-gray-500 font-semibold">No Entry</span>
                                 )}
                               </td>
                               <td className="py-2">
-                                {log.status === "placed" && log.createdAt
+                                {log.createdAt
                                   ? new Date(log.createdAt).toLocaleString("en-GB", {
                                       day: "2-digit",
                                       month: "short",
