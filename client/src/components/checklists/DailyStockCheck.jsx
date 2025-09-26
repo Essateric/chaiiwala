@@ -78,7 +78,7 @@ function getLastNDatesLondon(n = 5, now = new Date()) {
       .split("/"); // dd/mm/yyyy
     return `${yyyy}-${mm}-${dd}`;
   };
-  // Build dates ending today (London), oldest → newest
+  // Build dates ending today (London), newest-first then reverse to oldest → newest
   const result = [];
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now);
@@ -119,8 +119,42 @@ export default function DailyStockCheck({
   const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editing, setEditing] = useState({});
+  // Per-row delivery quantities (adds to current on-hand if New Qty not provided)
+  const [editingDelivery, setEditingDelivery] = useState({});
+  const handleDeliveryChange = (id, value) => {
+    const v = value === "" ? "" : Math.max(0, Number(value));
+    setEditingDelivery((prev) => ({
+      ...prev,
+      [id]: value === "" ? "" : String(v),
+    }));
+  };
+
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  // --- Delivery modal state ---
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [deliveredAt, setDeliveredAt] = useState(() => {
+    // local datetime-local default (no seconds), e.g., "2025-09-25T10:30"
+    const d = new Date();
+    d.setSeconds(0, 0);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  });
+  const [supplier, setSupplier] = useState("");
+  const [reference, setReference] = useState("");
+  const [deliveryRows, setDeliveryRows] = useState([
+    { stock_item_id: null, quantity: "" },
+  ]);
+
+  const addDeliveryRow = () =>
+    setDeliveryRows((r) => [...r, { stock_item_id: null, quantity: "" }]);
+
+  const removeDeliveryRow = (idx) =>
+    setDeliveryRows((r) => r.filter((_, i) => i !== idx));
+
+  const updateDeliveryRow = (idx, patch) =>
+    setDeliveryRows((r) => r.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
 
   useEffect(() => {
     fetchStock();
@@ -271,15 +305,34 @@ export default function DailyStockCheck({
   const pageChanges = useMemo(() => {
     return pageItems
       .map((item) => {
-        const raw = editing[item.id];
-        if (typeof raw === "undefined" || raw === "") return null;
-        const qty = Number(raw);
-        if (Number.isNaN(qty)) return null;
-        if (qty === item.current_qty) return null;
-        return { item, qty };
+        const rawNew = editing[item.id];
+        const rawDel = editingDelivery[item.id];
+
+        const hasNew = typeof rawNew !== "undefined" && rawNew !== "";
+        const hasDel = typeof rawDel !== "undefined" && rawDel !== "";
+
+        if (!hasNew && !hasDel) return null;
+
+        const current = Number(item.current_qty) || 0;
+        let finalQty;
+
+        if (hasNew) {
+          const newQty = Number(rawNew);
+          if (Number.isNaN(newQty)) return null;
+          finalQty = newQty; // absolute override
+        } else {
+          const delQty = Number(rawDel);
+          if (Number.isNaN(delQty)) return null;
+          finalQty = current + delQty; // increment current by delivery
+        }
+
+        if (finalQty === current) return null;
+
+        return { item, finalQty, usedNewQty: hasNew, usedDelivery: !hasNew && hasDel };
       })
       .filter(Boolean);
-  }, [pageItems, editing]);
+  }, [pageItems, editing, editingDelivery]);
+
   const hasPageChanges = pageChanges.length > 0;
 
   const handleSavePage = async () => {
@@ -296,11 +349,12 @@ export default function DailyStockCheck({
       }
 
       const now = new Date().toISOString();
-      const rows = pageChanges.map(({ item, qty }) => ({
+      // ✅ use finalQty (not 'qty')
+      const rows = pageChanges.map(({ item, finalQty }) => ({
         id: item.store_stock_level_id ?? undefined,
         stock_item_id: item.id,
         store_id: resolvedStoreId,
-        quantity: qty,
+        quantity: finalQty,
         last_updated: now,
         updated_by: user.id,
       }));
@@ -319,7 +373,19 @@ export default function DailyStockCheck({
 
       await fetchStock();
 
+      // clear inputs only for rows we changed
       setEditing((prev) => {
+        const next = { ...prev };
+        pageItems.forEach((item) => {
+          if (typeof next[item.id] !== "undefined") {
+            const wasChanged = pageChanges.some((c) => c.item.id === item.id);
+            if (wasChanged) delete next[item.id];
+          }
+        });
+        return next;
+      });
+      // also clear Delivery inputs
+      setEditingDelivery((prev) => {
         const next = { ...prev };
         pageItems.forEach((item) => {
           if (typeof next[item.id] !== "undefined") {
@@ -393,6 +459,14 @@ export default function DailyStockCheck({
                 ))}
               </select>
             </div>
+            <Button
+              className="w-full sm:w-auto"
+              variant="secondary"
+              size="sm"
+              onClick={() => setDeliveryOpen(true)}
+            >
+              Record Delivery
+            </Button>
 
             <Button
               className="w-full sm:w-auto"
@@ -440,6 +514,8 @@ export default function DailyStockCheck({
 
                         {/* Removed the “Current Qty” column to avoid duplicating today */}
                         <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">New Qty</th>
+                        {/* NEW: Delivery column */}
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">Delivery</th>
                       </tr>
                     </thead>
 
@@ -472,35 +548,34 @@ export default function DailyStockCheck({
 
                             <td className="px-4 py-2">{(item.category ?? "").trim() || "Uncategorized"}</td>
 
-                           {/* 6 date columns with vertical separators; last (today) emphasized */}
-{cells.map((qty, idx) => {
-  const isTodayCol = idx === cells.length - 1;
-  const isNumber = typeof qty === "number";
+                            {/* 6 date columns with vertical separators; last (today) emphasized */}
+                            {cells.map((qty, idx) => {
+                              const isTodayCol = idx === cells.length - 1;
+                              const isNumber = typeof qty === "number";
 
-  return (
-    <td
-      key={idx}
-      className={[
-        "px-2 py-2 text-right",
-        idx > 0 ? "border-l border-gray-200" : "",
-        isTodayCol && isNumber ? "font-semibold text-gray-900" : ""
-      ].filter(Boolean).join(" ")}
-    >
-      {isNumber ? (
-        // Bigger number + aligned digits
-        <span className="font-mono tabular-nums text-base sm:text-lg leading-none">
-          {qty}
-        </span>
-      ) : (
-        // Subtle "No Entry"
-        <span className="text-[11px] uppercase tracking-wide text-gray-400">
-          No Entry
-        </span>
-      )}
-    </td>
-  );
-})}
-
+                              return (
+                                <td
+                                  key={idx}
+                                  className={[
+                                    "px-2 py-2 text-right",
+                                    idx > 0 ? "border-l border-gray-200" : "",
+                                    isTodayCol && isNumber ? "font-semibold text-gray-900" : ""
+                                  ].filter(Boolean).join(" ")}
+                                >
+                                  {isNumber ? (
+                                    // Bigger number + aligned digits
+                                    <span className="font-mono tabular-nums text-base sm:text-lg leading-none">
+                                      {qty}
+                                    </span>
+                                  ) : (
+                                    // Subtle "No Entry"
+                                    <span className="text-[11px] uppercase tracking-wide text-gray-400">
+                                      No Entry
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
 
                             {/* New Qty input */}
                             <td className="px-4 py-2 text-center">
@@ -511,6 +586,19 @@ export default function DailyStockCheck({
                                 onChange={(e) => handleEditChange(item.id, e.target.value)}
                                 placeholder="Qty"
                                 className={`w-24 text-center ${isLow ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400" : ""}`}
+                              />
+                            </td>
+
+                            {/* NEW: Delivery Qty input */}
+                            <td className="px-4 py-2 text-center">
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={editingDelivery[item.id] ?? ""}
+                                onChange={(e) => handleDeliveryChange(item.id, e.target.value)}
+                                placeholder="0"
+                                className="w-24 text-center"
                               />
                             </td>
                           </tr>
@@ -584,6 +672,147 @@ export default function DailyStockCheck({
             >
               {saving ? "Saving..." : "Save"}
             </Button>
+          )}
+
+          {/* Record Delivery Modal */}
+          {deliveryOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-xl w-full max-w-2xl p-4 shadow-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold">Record Delivery</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setDeliveryOpen(false)}>Close</Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <Input
+                    placeholder="Supplier (optional)"
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    className="sm:col-span-1"
+                  />
+                  <Input
+                    placeholder="Reference (optional)"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    className="sm:col-span-1"
+                  />
+                  <input
+                    type="datetime-local"
+                    className="border rounded px-3 py-2 text-sm sm:col-span-1"
+                    value={deliveredAt}
+                    onChange={(e) => setDeliveredAt(e.target.value)}
+                  />
+                </div>
+
+                {/* Lines editor */}
+                <div className="border rounded">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2">Item</th>
+                        <th className="text-right px-3 py-2 w-32">Quantity</th>
+                        <th className="px-3 py-2 w-20"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deliveryRows.map((row, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full border rounded px-2 py-1"
+                              value={row.stock_item_id ?? ""}
+                              onChange={(e) =>
+                                updateDeliveryRow(idx, {
+                                  stock_item_id: e.target.value ? Number(e.target.value) : null,
+                                })
+                              }
+                            >
+                              <option value="">Select item…</option>
+                              {stockItems.map((si) => (
+                                <option key={si.id} value={si.id}>
+                                  {si.sku ? `${si.sku} — ` : ""}{si.name || "Untitled"}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0"
+                              value={row.quantity}
+                              onChange={(e) => updateDeliveryRow(idx, { quantity: e.target.value })}
+                              className="text-right"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeDeliveryRow(idx)}
+                              disabled={deliveryRows.length === 1}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-between mt-3">
+                  <Button variant="outline" size="sm" onClick={addDeliveryRow}>
+                    Add Line
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!resolvedStoreId) return;
+                      const items = deliveryRows
+                        .filter((r) => r.stock_item_id && Number(r.quantity) > 0)
+                        .map((r) => ({
+                          stock_item_id: Number(r.stock_item_id),
+                          quantity: Number(r.quantity),
+                          unit_cost: null, // extend later if you add cost
+                        }));
+
+                      if (items.length === 0) {
+                        alert("Add at least one line with quantity > 0");
+                        return;
+                      }
+
+                      try {
+                        // RPC that records a delivery and (via trigger) updates on-hand
+                        await supabase.rpc("record_delivery", {
+                          p_store_id: Number(resolvedStoreId),
+                          p_supplier_name: supplier || null,
+                          p_reference_code: reference || null,
+                          p_delivered_at: new Date(deliveredAt).toISOString(),
+                          p_items: items,
+                        });
+
+                        // Refresh on-hand so the table shows new totals immediately
+                        await fetchStock();
+
+                        // reset & close
+                        setSupplier("");
+                        setReference("");
+                        setDeliveryRows([{ stock_item_id: null, quantity: "" }]);
+                        setDeliveryOpen(false);
+                      } catch (err) {
+                        console.error("record_delivery failed", err);
+                        alert(err?.message || "Failed to record delivery");
+                      }
+                    }}
+                  >
+                    Save Delivery
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       )}
