@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { useAuth } from "@/hooks/UseAuth.jsx";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useLast5DayHistoryForRows } from "@/hooks/useStockHistory.jsx";
+import { londonTodayDateISO } from "@/lib/dates.js";
 
 /** Robust: get London day-of-week without Date parsing ambiguity (0=Sun..6=Sat) */
 function getLondonDayOfWeek(now = new Date()) {
@@ -43,11 +44,36 @@ const toNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+/** Return YYYY-MM-DD for a timestamp, using Europe/London calendar date */
+function londonDateKeyFromTs(ts) {
+  const d = new Date(ts);
+  const [dd, mm, yyyy] = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(d)
+    .split("/");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** add n days to a YYYY-MM-DD string */
+function addDaysISO(iso, n) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  const yyyy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // prefer per-store override → legacy override → master item threshold
 const calcEffectiveThreshold = (row) => {
-  const override = toNum(row.threshold);            // store_stock_levels.threshold
-  const legacy   = toNum(row.low_stock_limit);      // legacy (no longer in table; may be 0)
-  const master   = toNum(row.low_stock_threshold);  // stock_items.low_stock_threshold
+  const override = toNum(row.threshold); // store_stock_levels.threshold
+  const legacy = toNum(row.low_stock_limit); // legacy
+  const master = toNum(row.low_stock_threshold); // stock_items.low_stock_threshold
   if (override > 0) return override;
   if (legacy > 0) return legacy;
   return master; // may be 0 if unset
@@ -66,7 +92,7 @@ function fmtShortDay(iso) {
 }
 
 /** Get last N consecutive London calendar days (yyyy-mm-dd), oldest → newest */
-function getLastNDatesLondon(n = 5, now = new Date()) {
+function getLastNDatesLondon(n = 6, now = new Date()) {
   const toLondonISO = (d) => {
     const [dd, mm, yyyy] = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Europe/London",
@@ -99,8 +125,13 @@ export default function DailyStockCheck({
   const resolvedStoreId =
     storeIdProp ?? (Array.isArray(profile?.store_ids) ? profile.store_ids[0] : null);
 
+  // ✅ normalize store_id for all queries/keys (works for bigint strings or uuids)
+  const storeIdForQuery =
+    /^\d+$/.test(String(resolvedStoreId)) ? Number(resolvedStoreId) : resolvedStoreId;
+
   // Sunday logic
-  const isDev = typeof import.meta !== "undefined" && import.meta.env?.MODE === "development";
+  const isDev =
+    typeof import.meta !== "undefined" && import.meta.env?.MODE === "development";
   const urlForceSunday =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("forceSunday") === "1";
@@ -159,13 +190,13 @@ export default function DailyStockCheck({
   useEffect(() => {
     fetchStock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedStoreId, isSunday]);
+  }, [storeIdForQuery, isSunday]);
 
   const itemsPerPage = itemsPerPageProp;
 
   /** ------- data fetch: current stock rows ------- */
   const fetchStock = async () => {
-    if (!resolvedStoreId) {
+    if (!storeIdForQuery) {
       setStockItems([]);
       setLoading(false);
       return;
@@ -196,9 +227,11 @@ export default function DailyStockCheck({
     if (itemIds.length > 0) {
       const { data: levelData, error: levelsError } = await supabase
         .from("store_stock_levels")
-        .select("id, store_id, stock_item_id, quantity, threshold, last_updated, updated_by")
+        .select(
+          "id, store_id, stock_item_id, quantity, threshold, last_updated, updated_by"
+        )
         .in("stock_item_id", itemIds)
-        .eq("store_id", resolvedStoreId);
+        .eq("store_id", storeIdForQuery);
 
       if (!levelsError && levelData) levels = levelData;
     }
@@ -282,23 +315,130 @@ export default function DailyStockCheck({
   const historyRows = useMemo(
     () =>
       pageItems.map((item) => ({
-        storeId: Number(resolvedStoreId),
+        storeId: storeIdForQuery, // normalized
         sku: String(item.id), // id is the stock_item_id
       })),
-    [pageItems, resolvedStoreId]
+    [pageItems, storeIdForQuery]
   );
-  const { historyMap: histMap, loading: loadingHist } = useLast5DayHistoryForRows(historyRows);
+  const { historyMap: histMap } = useLast5DayHistoryForRows(historyRows);
 
   // ✅ Last 5 full days + today (6 columns), oldest → newest
   const lastDates = useMemo(() => getLastNDatesLondon(6, new Date()), []);
+  const dateStart = lastDates[0];
+  const dateEnd = lastDates[lastDates.length - 1];
 
-  /** Map item → aligned qty array for the header dates */
+  // 🔁 Overlay: fetch EXACT per-day entries for visible page
+  // Prefer stock_history (daily snapshots), fallback to latest stock_history_changes per day
+  const [overrideHistMap, setOverrideHistMap] = useState({});
+
+  const refetchOverlay = async () => {
+    if (!storeIdForQuery || pageItems.length === 0) {
+      setOverrideHistMap({});
+      return;
+    }
+
+    const ids = pageItems.map((i) => i.id);
+
+    const fetchDaily = async () =>
+      supabase
+        .from("stock_history")
+        .select("stock_item_id, date, quantity")
+        .eq("store_id", storeIdForQuery)
+        .in("stock_item_id", ids)
+        .gte("date", dateStart)
+        .lte("date", dateEnd);
+
+    const fetchChanges = async () =>
+      supabase
+        .from("stock_history_changes")
+        .select("stock_item_id, new_quantity, changed_at, updated_by")
+        .eq("store_id", storeIdForQuery)
+        .in("stock_item_id", ids)
+        .gte("changed_at", `${dateStart}T00:00:00Z`)
+        .lt("changed_at", `${addDaysISO(dateEnd, 1)}T00:00:00Z`)
+        .order("changed_at", { ascending: true });
+
+    try {
+      // A) Primary: snapshots
+      const dailyRes = await fetchDaily();
+      if (dailyRes.error) throw dailyRes.error;
+      const snapshots = dailyRes.data || [];
+
+      const out = {};
+      // Fill from stock_history first
+      for (const r of snapshots) {
+        const key = `${storeIdForQuery}:${String(r.stock_item_id)}`;
+        out[key] = out[key] || {};
+        out[key][r.date] = typeof r.quantity === "number" ? r.quantity : null;
+      }
+
+      // B) Fallback: use latest change of the day (absolute = new_quantity)
+      const changesRes = await fetchChanges();
+      if (changesRes.error) throw changesRes.error;
+      const chRows = changesRes.data || [];
+
+      const chosen = {};
+      for (const r of chRows) {
+        const key = `${storeIdForQuery}:${String(r.stock_item_id)}`;
+        const day = londonDateKeyFromTs(r.changed_at);
+        chosen[key] = chosen[key] || {};
+        const prev = chosen[key][day];
+        if (!prev) {
+          chosen[key][day] = r;
+          continue;
+        }
+        const prevUser = prev.updated_by != null;
+        const curUser = r.updated_by != null;
+        if (!prevUser && curUser) {
+          chosen[key][day] = r;
+          continue;
+        }
+        // both user or both non-user → keep latest by changed_at
+        if (new Date(r.changed_at) > new Date(prev.changed_at)) {
+          chosen[key][day] = r;
+        }
+      }
+
+      // Only fill cells missing from stock_history
+      Object.entries(chosen).forEach(([k, byDay]) => {
+        out[k] = out[k] || {};
+        Object.entries(byDay).forEach(([d, row]) => {
+          if (typeof out[k][d] !== "number") {
+            out[k][d] =
+              typeof row.new_quantity === "number" ? Number(row.new_quantity) : null;
+          }
+        });
+      });
+
+      setOverrideHistMap(out);
+    } catch (e) {
+      console.error("history overlay fetch failed", e);
+      setOverrideHistMap({});
+    }
+  };
+
+  useEffect(() => {
+    refetchOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeIdForQuery, pageItems, dateStart, dateEnd]);
+
+  /** Map item → aligned qty array for the header dates (prefer overlay, fallback to hook) */
   const getHistoryCells = (itemId) => {
-    const key = `${resolvedStoreId}:${String(itemId)}`;
+    const key = `${storeIdForQuery}:${String(itemId)}`;
+
+    if (overrideHistMap[key]) {
+      const byDate = overrideHistMap[key];
+      return lastDates.map((d) =>
+        typeof byDate[d] === "number" ? byDate[d] : null
+      );
+    }
+
     const timelineNewestFirst = histMap[key] || [];
     const byDate = new Map();
     timelineNewestFirst.forEach(({ date, qty }) => byDate.set(date, qty));
-    return lastDates.map((d) => (typeof byDate.get(d) === "number" ? byDate.get(d) : null));
+    return lastDates.map((d) =>
+      typeof byDate.get(d) === "number" ? byDate.get(d) : null
+    );
   };
 
   // changed rows on this page
@@ -314,21 +454,28 @@ export default function DailyStockCheck({
         if (!hasNew && !hasDel) return null;
 
         const current = Number(item.current_qty) || 0;
-        let finalQty;
 
-        if (hasNew) {
-          const newQty = Number(rawNew);
-          if (Number.isNaN(newQty)) return null;
-          finalQty = newQty; // absolute override
-        } else {
-          const delQty = Number(rawDel);
-          if (Number.isNaN(delQty)) return null;
-          finalQty = current + delQty; // increment current by delivery
-        }
+        // values entered by the user (parsed)
+        const newQty = hasNew ? Number(rawNew) : null;
+        const delQty = hasDel ? Number(rawDel) : null;
+        if ((hasNew && Number.isNaN(newQty)) || (hasDel && Number.isNaN(delQty)))
+          return null;
+
+        // what snapshot should become (for store_stock_levels)
+        const finalQty = hasNew ? newQty : current + delQty;
+
+        // what to store in daily history (what was entered today) — not used for changes table now
+        const historyQty = hasNew ? newQty : delQty;
 
         if (finalQty === current) return null;
 
-        return { item, finalQty, usedNewQty: hasNew, usedDelivery: !hasNew && hasDel };
+        return {
+          item,
+          finalQty,
+          historyQty, // left as-is for UI semantics
+          usedNewQty: hasNew,
+          usedDelivery: !hasNew && hasDel,
+        };
       })
       .filter(Boolean);
   }, [pageItems, editing, editingDelivery]);
@@ -336,7 +483,7 @@ export default function DailyStockCheck({
   const hasPageChanges = pageChanges.length > 0;
 
   const handleSavePage = async () => {
-    if (!resolvedStoreId || !hasPageChanges) return;
+    if (!storeIdForQuery || !hasPageChanges) return;
     setSaving(true);
     try {
       const { data: authData, error: userError } = await supabase.auth.getUser();
@@ -348,30 +495,74 @@ export default function DailyStockCheck({
         return;
       }
 
-      const now = new Date().toISOString();
-      // ✅ use finalQty (not 'qty')
-      const rows = pageChanges.map(({ item, finalQty }) => ({
+      const nowIso = new Date().toISOString();
+      const todayISO = londonTodayDateISO(); // London calendar date (YYYY-MM-DD)
+
+      // 1) Update snapshot/current rows (store_stock_levels) using finalQty
+      const snapshotRows = pageChanges.map(({ item, finalQty }) => ({
         id: item.store_stock_level_id ?? undefined,
         stock_item_id: item.id,
-        store_id: resolvedStoreId,
+        store_id: storeIdForQuery,
         quantity: finalQty,
-        last_updated: now,
+        last_updated: nowIso,
         updated_by: user.id,
       }));
 
-      const { data, error } = await supabase
+      const { error: snapshotErr } = await supabase
         .from("store_stock_levels")
-        .upsert(rows)
-        .select();
+        .upsert(snapshotRows);
 
-      if (error) {
-        console.error("❌ Supabase error:", error);
+      if (snapshotErr) {
+        console.error("❌ Supabase error (store_stock_levels):", snapshotErr);
         alert("Failed to save this page.");
         setSaving(false);
         return;
       }
 
+      // 2) Append change rows (audit) to stock_history_changes (today only)
+      //    We record the absolute after-value in new_quantity, and the prior in old_quantity.
+      const changeRows = pageChanges.map(({ item, finalQty }) => ({
+        store_id: storeIdForQuery,
+        stock_item_id: Number(item.id),
+        old_quantity: Number(item.current_qty) || 0,
+        new_quantity: Number(finalQty),
+        updated_by: user.id,
+        changed_at: nowIso,
+      }));
+
+      const { error: changeErr } = await supabase
+        .from("stock_history_changes")
+        .insert(changeRows);
+
+      if (changeErr) {
+        console.error("❌ stock_history_changes insert failed", changeErr);
+        alert(changeErr.message || "Failed to write history rows");
+        setSaving(false);
+        return;
+      }
+
+      // 3) Upsert daily snapshot for reporting & the grid (one row per day)
+      const dailyRows = pageChanges.map(({ item, finalQty }) => ({
+        store_id: storeIdForQuery,
+        stock_item_id: Number(item.id),
+        date: todayISO, // London day
+        quantity: Number(finalQty),
+        recorded_at: nowIso,
+      }));
+
+      const { error: dailyErr } = await supabase
+        .from("stock_history")
+        .upsert(dailyRows, { onConflict: "store_id,stock_item_id,date" });
+
+      if (dailyErr) {
+        console.error("❌ stock_history upsert failed", dailyErr);
+        alert(dailyErr.message || "Failed to write daily snapshots");
+        setSaving(false);
+        return;
+      }
+
       await fetchStock();
+      await refetchOverlay();
 
       // clear inputs only for rows we changed
       setEditing((prev) => {
@@ -384,7 +575,6 @@ export default function DailyStockCheck({
         });
         return next;
       });
-      // also clear Delivery inputs
       setEditingDelivery((prev) => {
         const next = { ...prev };
         pageItems.forEach((item) => {
@@ -396,7 +586,6 @@ export default function DailyStockCheck({
         return next;
       });
 
-      console.log("✅ Page saved successfully:", data);
       alert("Saved this page!");
     } finally {
       setSaving(false);
@@ -480,19 +669,29 @@ export default function DailyStockCheck({
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Loading stock items...</div>
+            <div className="p-8 text-center text-gray-500">
+              Loading stock items...
+            </div>
           ) : (
             <>
               {pageItems.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">No stock items found.</div>
+                <div className="p-4 text-center text-gray-500">
+                  No stock items found.
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full table-fixed divide-y divide-gray-200">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-24">SKU</th>
-                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">Name</th>
-                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-40">Category</th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-24">
+                          SKU
+                        </th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500">
+                          Name
+                        </th>
+                        <th className="px-4 py-2 text-left  text-xs font-medium text-gray-500 w-40">
+                          Category
+                        </th>
 
                         {/* Last 5 full days + today (6 columns), oldest → newest */}
                         {lastDates.map((d, idx) => {
@@ -503,7 +702,7 @@ export default function DailyStockCheck({
                               className={[
                                 "px-2 py-2 text-right text-xs font-medium w-20",
                                 idx > 0 ? "border-l border-gray-200" : "",
-                                isTodayCol ? "text-gray-900" : "text-gray-500"
+                                isTodayCol ? "text-gray-900" : "text-gray-500",
                               ].join(" ")}
                               title={d}
                             >
@@ -512,10 +711,13 @@ export default function DailyStockCheck({
                           );
                         })}
 
-                        {/* Removed the “Current Qty” column to avoid duplicating today */}
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">New Qty</th>
-                        {/* NEW: Delivery column */}
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">Delivery</th>
+                        {/* Inputs */}
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">
+                          New Qty
+                        </th>
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">
+                          Delivery
+                        </th>
                       </tr>
                     </thead>
 
@@ -531,7 +733,11 @@ export default function DailyStockCheck({
                         return (
                           <tr
                             key={item.id}
-                            className={`border-t ${isLow ? "bg-red-50 hover:bg-red-50/80 border-l-4 border-red-400" : ""}`}
+                            className={`border-t ${
+                              isLow
+                                ? "bg-red-50 hover:bg-red-50/80 border-l-4 border-red-400"
+                                : ""
+                            }`}
                           >
                             <td className="px-4 py-2">{item.sku}</td>
 
@@ -546,7 +752,9 @@ export default function DailyStockCheck({
                               </div>
                             </td>
 
-                            <td className="px-4 py-2">{(item.category ?? "").trim() || "Uncategorized"}</td>
+                            <td className="px-4 py-2">
+                              {(item.category ?? "").trim() || "Uncategorized"}
+                            </td>
 
                             {/* 6 date columns with vertical separators; last (today) emphasized */}
                             {cells.map((qty, idx) => {
@@ -559,16 +767,18 @@ export default function DailyStockCheck({
                                   className={[
                                     "px-2 py-2 text-right",
                                     idx > 0 ? "border-l border-gray-200" : "",
-                                    isTodayCol && isNumber ? "font-semibold text-gray-900" : ""
-                                  ].filter(Boolean).join(" ")}
+                                    isTodayCol && isNumber
+                                      ? "font-semibold text-gray-900"
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
                                 >
                                   {isNumber ? (
-                                    // Bigger number + aligned digits
                                     <span className="font-mono tabular-nums text-base sm:text-lg leading-none">
                                       {qty}
                                     </span>
                                   ) : (
-                                    // Subtle "No Entry"
                                     <span className="text-[11px] uppercase tracking-wide text-gray-400">
                                       No Entry
                                     </span>
@@ -577,26 +787,34 @@ export default function DailyStockCheck({
                               );
                             })}
 
-                            {/* New Qty input */}
+                            {/* New Qty input (no “No Entry” here) */}
                             <td className="px-4 py-2 text-center">
                               <Input
                                 type="number"
                                 min={0}
                                 value={editing[item.id] ?? ""}
-                                onChange={(e) => handleEditChange(item.id, e.target.value)}
+                                onChange={(e) =>
+                                  handleEditChange(item.id, e.target.value)
+                                }
                                 placeholder="Qty"
-                                className={`w-24 text-center ${isLow ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400" : ""}`}
+                                className={`w-24 text-center ${
+                                  isLow
+                                    ? "border-red-300 bg-red-50/70 focus-visible:ring-red-400"
+                                    : ""
+                                }`}
                               />
                             </td>
 
-                            {/* NEW: Delivery Qty input */}
+                            {/* Delivery Qty input (no “No Entry” here) */}
                             <td className="px-4 py-2 text-center">
                               <Input
                                 type="number"
                                 min={0}
                                 step="0.01"
                                 value={editingDelivery[item.id] ?? ""}
-                                onChange={(e) => handleDeliveryChange(item.id, e.target.value)}
+                                onChange={(e) =>
+                                  handleDeliveryChange(item.id, e.target.value)
+                                }
                                 placeholder="0"
                                 className="w-24 text-center"
                               />
@@ -620,7 +838,9 @@ export default function DailyStockCheck({
                     variant="outline"
                     size="sm"
                     disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
                   >
                     Prev
                   </Button>
@@ -628,7 +848,9 @@ export default function DailyStockCheck({
                     variant="outline"
                     size="sm"
                     disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
                   >
                     Next
                   </Button>
@@ -674,13 +896,19 @@ export default function DailyStockCheck({
             </Button>
           )}
 
-          {/* Record Delivery Modal */}
+          {/* Record Delivery Modal (unchanged, still uses RPC) */}
           {deliveryOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
               <div className="bg-white rounded-xl w-full max-w-2xl p-4 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-semibold">Record Delivery</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setDeliveryOpen(false)}>Close</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDeliveryOpen(false)}
+                  >
+                    Close
+                  </Button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -723,14 +951,17 @@ export default function DailyStockCheck({
                               value={row.stock_item_id ?? ""}
                               onChange={(e) =>
                                 updateDeliveryRow(idx, {
-                                  stock_item_id: e.target.value ? Number(e.target.value) : null,
+                                  stock_item_id: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
                                 })
                               }
                             >
                               <option value="">Select item…</option>
                               {stockItems.map((si) => (
                                 <option key={si.id} value={si.id}>
-                                  {si.sku ? `${si.sku} — ` : ""}{si.name || "Untitled"}
+                                  {si.sku ? `${si.sku} — ` : ""}
+                                  {si.name || "Untitled"}
                                 </option>
                               ))}
                             </select>
@@ -742,7 +973,11 @@ export default function DailyStockCheck({
                               step="0.01"
                               placeholder="0"
                               value={row.quantity}
-                              onChange={(e) => updateDeliveryRow(idx, { quantity: e.target.value })}
+                              onChange={(e) =>
+                                updateDeliveryRow(idx, {
+                                  quantity: e.target.value,
+                                })
+                              }
                               className="text-right"
                             />
                           </td>
@@ -770,9 +1005,11 @@ export default function DailyStockCheck({
                   <Button
                     size="sm"
                     onClick={async () => {
-                      if (!resolvedStoreId) return;
+                      if (!storeIdForQuery) return;
                       const items = deliveryRows
-                        .filter((r) => r.stock_item_id && Number(r.quantity) > 0)
+                        .filter(
+                          (r) => r.stock_item_id && Number(r.quantity) > 0
+                        )
                         .map((r) => ({
                           stock_item_id: Number(r.stock_item_id),
                           quantity: Number(r.quantity),
@@ -787,15 +1024,16 @@ export default function DailyStockCheck({
                       try {
                         // RPC that records a delivery and (via trigger) updates on-hand
                         await supabase.rpc("record_delivery", {
-                          p_store_id: Number(resolvedStoreId),
+                          p_store_id: storeIdForQuery,
                           p_supplier_name: supplier || null,
                           p_reference_code: reference || null,
                           p_delivered_at: new Date(deliveredAt).toISOString(),
                           p_items: items,
                         });
 
-                        // Refresh on-hand so the table shows new totals immediately
+                        // Refresh on-hand + day entries
                         await fetchStock();
+                        await refetchOverlay();
 
                         // reset & close
                         setSupplier("");
