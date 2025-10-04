@@ -1,338 +1,797 @@
-import React from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabaseClient";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabaseClient.js";
+import { useAuth } from "@/hooks/UseAuth.jsx";
 import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
-import { useAuth } from "@/hooks/UseAuth";
+
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent,
+} from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
-import { Label } from "@/components/ui/label.jsx";
-import { Card } from "@/components/ui/card.jsx";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select.jsx";
+import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from "@/components/ui/tabs.jsx";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import { Separator } from "@/components/ui/separator.jsx";
+import {
+  Loader2, Filter, Building, Calendar as CalendarIcon,
+  FileDown, AlertTriangle, ListChecks, PoundSterling, Trash2, Users,
+} from "lucide-react";
 
-/** ---------------------------
- * Small helpers
- * -------------------------- */
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-GB") : "—");
-const fmtMoney = (n) => `£${Number(n ?? 0).toFixed(2)}`;
+/** ==== TABLES & COLS — matches your schema ==== */
+const TABLES = {
+  stores: "stores",
+  expenses: "expenses",                 // cost, expense_date, store_id (bigint)
+  audits: "audits",                     // id, store_id, submitted_at
+  auditAnswers: "audit_answers",        // audit_id, value_bool, points_awarded
+  absences: "staff_absences",           // staff_name, start_date, store_id
+  wasteQty: "waste_reports",            // quantity, report_date, store_id
+  wasteCostView: "waste_reports_costed" // OPTIONAL view: store_id, report_date, cost
+};
 
-// CSV export for any array of objects
-function exportCsv(rows, filename) {
-  if (!rows || rows.length === 0) return;
-  const headers = Object.keys(rows[0]);
-  const csv = [
-    headers.join(","), // header row
-    ...rows.map((r) =>
-      headers
-        .map((h) => {
-          const v = r[h] ?? "";
-          // basic escaping for commas/quotes/newlines
-          const s = String(v).replace(/"/g, '""');
-          return s.includes(",") || s.includes("\n") ? `"${s}"` : s;
-        })
-        .join(",")
-    ),
-  ].join("\n");
+const COLS = {
+  expenses: { amount: "cost", date: "expense_date" },
+  audits:   { date: "submitted_at" },
+  answers:  { failBool: "value_bool", points: "points_awarded" },
+  absences: { staff: "staff_name", date: "start_date" },
+  wasteQty: { qty: "quantity", date: "report_date" },
+  wasteCost:{ cost: "cost", date: "report_date" },
+};
 
+/** ==== helpers ==== */
+function getLondonNow() {
+  return new Date(new Date().toLocaleString("en-GB", { timeZone: "Europe/London" }));
+}
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function startOfWeekMonday(date) {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7; // 0=Mon
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function weekKey(d) {
+  const s = startOfWeekMonday(d);
+  return toISODate(s);
+}
+function downloadCSV(filename, rows) {
+  if (!rows?.length) return;
+  const header = Object.keys(rows[0]);
+  const csv = [header.join(",")]
+    .concat(
+      rows.map((r) =>
+        header
+          .map((k) => {
+            const val = r[k] ?? "";
+            const needsQuote = /[",\n]/.test(String(val));
+            const escaped = String(val).replace(/"/g, '""');
+            return needsQuote ? `"${escaped}"` : escaped;
+          })
+          .join(",")
+      )
+    )
+    .join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
+// half-open range upper bound helper (exclusive)
+function nextDayISO(dateStr /* 'YYYY-MM-DD' */) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
-/** ---------------------------
- * Reports Page
- * -------------------------- */
-export default function ReportsPage() {
-  const qc = useQueryClient();
-  const { profile } = useAuth();
+/** Generic, defensive fetch with optional store scoping and date filtering */
+async function scopedFetch({ table, select, dateCol, fromISO, toISO, orderCol, allowedIds }) {
+  const base = supabase.from(table).select(select);
+  let q = base;
+  if (fromISO && dateCol) q = q.gte(dateCol, fromISO); // inclusive lower
+  if (toISO && dateCol)   q = q.lt(dateCol, toISO);    // exclusive upper (half-open)
+  if (orderCol) q = q.order(orderCol, { ascending: false });
 
-  // --- Filters (defaults = this month) ---
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const firstOfMonthIso = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
+  const hasIds = Array.isArray(allowedIds) && allowedIds.length > 0;
 
-  const [tab, setTab] = React.useState("audits");
-  const [storeId, setStoreId] = React.useState(""); // '' = all
-  const [dateFrom, setDateFrom] = React.useState(firstOfMonthIso);
-  const [dateTo, setDateTo] = React.useState(todayIso);
+  try {
+    if (hasIds) {
+      const { data, error, status } = await q.in("store_id", allowedIds);
+      if (error) {
+        if (status === 400 || status === 404) throw { retry: true };
+        throw error;
+      }
+      return data || [];
+    } else {
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+  } catch (e) {
+    // Retry without .in() and filter client-side (handles type mismatches)
+    try {
+      const { data, error, status } = await q;
+      if (error) {
+        if (status === 404) return [];
+        throw error;
+      }
+      if (!hasIds) return data || [];
+      const set = new Set(allowedIds.map(Number));
+      return (data || []).filter((r) => set.has(Number(r.store_id)));
+    } catch {
+      return [];
+    }
+  }
+}
 
-  // --- Stores list (restrict to user’s stores unless admin/regional) ---
-  const { data: stores = [] } = useQuery({
-    queryKey: ["reports-stores", profile?.id],
+/** Chunk helper for IN (...) lists (to avoid URL/param limits) */
+function chunk(arr, size = 200) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+export default function Reports() {
+  const { user, profile, loading: authLoading } = useAuth();
+
+  // filters
+  const now = getLondonNow();
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date(now); d.setDate(d.getDate() - 30); return toISODate(d);
+  });
+  const [dateTo, setDateTo] = useState(toISODate(now));
+  const [storeFilter, setStoreFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("expenses");
+
+  // half-open range works for DATE and TIMESTAMP columns
+  const dateFromISO = dateFrom;            // inclusive
+  const dateToISO   = nextDayISO(dateTo);  // exclusive
+
+  // stores
+  const { data: stores = [], isLoading: storesLoading } = useQuery({
+    queryKey: ["stores"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("stores")
-        .select("id, name")
+        .from(TABLES.stores)
+        .select("id,name,region")
         .order("name", { ascending: true });
       if (error) throw error;
-      return data ?? [];
+      return data || [];
     },
-    enabled: !!profile,
   });
 
-  const permittedStoreIds = React.useMemo(() => {
-    const mine = new Set((profile?.store_ids ?? []).map((n) => Number(n)));
-    const canSeeAll = ["admin", "regional"].includes(profile?.permissions);
-    const pool = canSeeAll ? stores.map((s) => Number(s.id)) : Array.from(mine);
-    return new Set(pool);
-  }, [profile, stores]);
+  const adminOrRegional = useMemo(
+    () => profile?.permissions === "admin" || profile?.permissions === "regional",
+    [profile]
+  );
 
-  const visibleStores = stores.filter((s) => permittedStoreIds.has(Number(s.id)));
+  // ensure numeric IDs to match bigint/int store_id columns
+  const allowedStoreIdsAll = useMemo(() => {
+    const raw = adminOrRegional
+      ? (stores ?? []).map((s) => s.id)
+      : (profile?.store_ids ?? []);
+    return Array.from(
+      new Set(raw.map((v) => Number(v)).filter((n) => Number.isFinite(n)))
+    );
+  }, [adminOrRegional, stores, profile]);
 
-  /** ---------------------------
-   * Audits tab
-   * -------------------------- */
-  const { data: audits = [], isLoading: loadingAudits } = useQuery({
-    queryKey: ["rpt-audits", storeId, dateFrom, dateTo],
-    enabled: !!profile,
+  const selectedStoreId = storeFilter === "all" ? null : Number(storeFilter);
+
+  const allowedIdsForQuery = useMemo(() => {
+    if (selectedStoreId == null) return allowedStoreIdsAll;
+    return allowedStoreIdsAll.includes(selectedStoreId) ? [selectedStoreId] : [];
+  }, [allowedStoreIdsAll, selectedStoreId]);
+
+  const visibleStoreList = useMemo(
+    () => (adminOrRegional ? stores : stores.filter((s) => allowedIdsForQuery.includes(Number(s.id)))),
+    [adminOrRegional, stores, allowedIdsForQuery]
+  );
+  const storeName = (id) => stores.find((s) => Number(s.id) === Number(id))?.name || "-";
+
+  /** ===== QUERIES ===== */
+
+  // 1) Expenses (sum cost by store)
+  const { data: expensesRows = [], isLoading: expensesLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["expenses", dateFromISO, dateToISO, allowedIdsForQuery.join(",")],
+    queryFn: () =>
+      scopedFetch({
+        table: TABLES.expenses,
+        select: `id,store_id,${COLS.expenses.amount},${COLS.expenses.date}`,
+        dateCol: COLS.expenses.date,
+        fromISO: dateFromISO,
+        toISO: dateToISO,
+        orderCol: COLS.expenses.date,
+        allowedIds: allowedIdsForQuery,
+      }),
+  });
+
+  // 2) Audits → get audits in scope first…
+  const { data: auditsInScope = [], isLoading: auditsLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["audits_base", dateFromISO, dateToISO, allowedIdsForQuery.join(",")],
+    queryFn: () =>
+      scopedFetch({
+        table: TABLES.audits,
+        select: `id,store_id,${COLS.audits.date}`,
+        dateCol: COLS.audits.date,
+        fromISO: dateFromISO,
+        toISO: dateToISO,
+        orderCol: COLS.audits.date,
+        allowedIds: allowedIdsForQuery,
+      }),
+  });
+
+  // …then answers for those audits (chunked IN (…) on audit_id)
+  const { data: auditAnswersRaw = [], isLoading: answersLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["audit_answers", dateFromISO, dateToISO, auditsInScope.map(a => a.id).join(",")],
     queryFn: async () => {
-      // We filter by created_at (fallback to started_at if created_at is null)
-      // Since v_report_audits is a view, we can filter server-side on created_at and store_id
-      let q = supabase.from("v_report_audits").select("*");
-
-      if (storeId) q = q.eq("store_id", Number(storeId));
-      // date filters (inclusive)
-      if (dateFrom) q = q.gte("created_at", `${dateFrom}T00:00:00`);
-      if (dateTo) q = q.lte("created_at", `${dateTo}T23:59:59.999`);
-
-      q = q.order("created_at", { ascending: false });
-
-      const { data, error } = await q;
-      if (error) throw error;
-      // lock down to permitted stores client-side as well (defense in depth)
-      return (data ?? []).filter((r) => permittedStoreIds.has(Number(r.store_id)));
+      const ids = auditsInScope.map((a) => a.id);
+      if (!ids.length) return [];
+      const chunksArr = chunk(ids, 200);
+      const all = [];
+      for (const idsChunk of chunksArr) {
+        const { data, error } = await supabase
+          .from(TABLES.auditAnswers)
+          .select(`id,audit_id,question_id,${COLS.answers.failBool},${COLS.answers.points},created_at`);
+        if (error) throw error;
+        all.push(...(data || []).filter((r) => idsChunk.includes(r.audit_id)));
+      }
+      return all;
     },
   });
 
-  // Simple audit KPIs (client-side)
-  const auditCount = audits.length;
-  const avgPct =
-    auditCount > 0
-      ? (audits.reduce((sum, a) => sum + Number(a.total_pct ?? 0), 0) / auditCount).toFixed(1)
-      : "0.0";
-
-  /** ---------------------------
-   * Expenses tab (monthly rollup)
-   * -------------------------- */
-  const { data: expenses = [], isLoading: loadingExpenses } = useQuery({
-    queryKey: ["rpt-expenses", storeId, dateFrom, dateTo],
-    enabled: !!profile,
-    queryFn: async () => {
-      // We’ll query the monthly view and filter client-side by month range.
-      // Optionally, you can add a WHERE between months server-side too.
-      let q = supabase.from("v_report_expenses_monthly").select("*").order("month", { ascending: false });
-      if (storeId) q = q.eq("store_id", Number(storeId));
-      const { data, error } = await q;
-      if (error) throw error;
-
-      // keep rows within dateFrom..dateTo
-      const from = dateFrom ? new Date(dateFrom) : null;
-      const to = dateTo ? new Date(dateTo) : null;
-
-      return (data ?? []).filter((r) => {
-        const m = new Date(r.month);
-        if (from && m < new Date(from.getFullYear(), from.getMonth(), 1)) return false;
-        if (to && m > new Date(to.getFullYear(), to.getMonth(), 31)) return false;
-        return permittedStoreIds.has(Number(r.store_id));
-      });
-    },
+  // 3) Absences
+  const { data: absenceRows = [], isLoading: absencesLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["absences", dateFromISO, dateToISO, allowedIdsForQuery.join(",")],
+    queryFn: () =>
+      scopedFetch({
+        table: TABLES.absences,
+        select: `id,store_id,${COLS.absences.staff},${COLS.absences.date}`,
+        dateCol: COLS.absences.date,
+        fromISO: dateFromISO,
+        toISO: dateToISO,
+        orderCol: COLS.absences.date,
+        allowedIds: allowedIdsForQuery,
+      }),
   });
 
-  const expensesTotal = expenses.reduce((sum, r) => sum + Number(r.total_cost ?? 0), 0);
+  // 4) Waste cost (optional view)
+  const { data: wasteCostRows = [], isLoading: wasteCostLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["waste_cost", dateFromISO, dateToISO, allowedIdsForQuery.join(",")],
+    queryFn: () =>
+      scopedFetch({
+        table: TABLES.wasteCostView,
+        select: `store_id,${COLS.wasteCost.cost},${COLS.wasteCost.date}`,
+        dateCol: COLS.wasteCost.date,
+        fromISO: dateFromISO,
+        toISO: dateToISO,
+        orderCol: COLS.wasteCost.date,
+        allowedIds: allowedIdsForQuery,
+      }),
+  });
 
-  /** ---------------------------
-   * UI
-   * -------------------------- */
+  // 5) Waste quantity (fallback)
+  const { data: wasteQtyRows = [], isLoading: wasteQtyLoading } = useQuery({
+    enabled: !!user && !storesLoading,
+    queryKey: ["waste_qty", dateFromISO, dateToISO, allowedIdsForQuery.join(",")],
+    queryFn: () =>
+      scopedFetch({
+        table: TABLES.wasteQty,
+        select: `id,store_id,${COLS.wasteQty.qty},${COLS.wasteQty.date}`,
+        dateCol: COLS.wasteQty.date,
+        fromISO: dateFromISO,
+        toISO: dateToISO,
+        orderCol: COLS.wasteQty.date,
+        allowedIds: allowedIdsForQuery,
+      }),
+  });
+
+  /** ===== DERIVED AGGREGATES ===== */
+
+  // Expenses totals per store
+  const expensesByStore = useMemo(() => {
+    const map = {};
+    for (const r of expensesRows) {
+      const sid = String(r.store_id);
+      const amt = Number(r[COLS.expenses.amount]) || 0;
+      map[sid] = (map[sid] || 0) + amt;
+    }
+    return map;
+  }, [expensesRows]);
+
+  // Weekly helper
+  function rollupWeekly(rows, dateCol, valueSelector = () => 1) {
+    const byWeek = {};
+    for (const r of rows) {
+      const d = r[dateCol] ? new Date(r[dateCol]) : null;
+      if (!d) continue;
+      const key = weekKey(d);
+      byWeek[key] = (byWeek[key] || 0) + valueSelector(r);
+    }
+    return Object.entries(byWeek)
+      .map(([week_start, count]) => ({ week_start, count }))
+      .sort((a, b) => (a.week_start < b.week_start ? -1 : 1));
+  }
+
+  // Weekly counts
+  const weeklyExpensesCount = useMemo(
+    () => rollupWeekly(expensesRows, COLS.expenses.date, () => 1),
+    [expensesRows]
+  );
+  const weeklyWasteEntries = useMemo(
+    () => rollupWeekly(wasteQtyRows, COLS.wasteQty.date, () => 1),
+    [wasteQtyRows]
+  );
+  const weeklyWasteCost = useMemo(
+    () => rollupWeekly(wasteCostRows, COLS.wasteCost.date, (r) => Number(r[COLS.wasteCost.cost]) || 0),
+    [wasteCostRows]
+  );
+  const weeklyAbsenceEntries = useMemo(
+    () => rollupWeekly(absenceRows, COLS.absences.date, () => 1),
+    [absenceRows]
+  );
+
+  // Audit failed points (answers joined to audits for date)
+  const auditsIndex = useMemo(() => {
+    const m = new Map();
+    for (const a of auditsInScope) m.set(a.id, a); // {id, store_id, submitted_at}
+    return m;
+  }, [auditsInScope]);
+
+  const failedAuditAnswers = useMemo(() => {
+    // Failed if value_bool === false OR points_awarded === 0
+    return auditAnswersRaw.filter((ans) => {
+      const vb = ans[COLS.answers.failBool];
+      const pts = Number(ans[COLS.answers.points]) || 0;
+      return vb === false || pts === 0;
+    });
+  }, [auditAnswersRaw]);
+
+  const failedAuditRows = useMemo(() => {
+    // shape: { id, store_id, date, point }
+    return failedAuditAnswers.map((ans) => {
+      const a = auditsIndex.get(ans.audit_id);
+      return {
+        id: ans.id,
+        store_id: a?.store_id,
+        date: a?.[COLS.audits.date] || ans.created_at,
+        point: `Question ${ans.question_id}`,
+      };
+    }).filter(r => r.store_id);
+  }, [failedAuditAnswers, auditsIndex]);
+
+  const weeklyAuditFails = useMemo(
+    () => rollupWeekly(failedAuditRows, "date", () => 1),
+    [failedAuditRows]
+  );
+
+  // Waste totals per store (prefer cost)
+  const hasWasteCost = wasteCostRows.length > 0;
+  const wasteTotalsByStore = useMemo(() => {
+    const map = {};
+    if (hasWasteCost) {
+      for (const r of wasteCostRows) {
+        const sid = String(r.store_id);
+        const cost = Number(r[COLS.wasteCost.cost]) || 0;
+        map[sid] = (map[sid] || 0) + cost;
+      }
+    } else {
+      for (const r of wasteQtyRows) {
+        const sid = String(r.store_id);
+        const qty = Number(r[COLS.wasteQty.qty]) || 0;
+        map[sid] = (map[sid] || 0) + qty;
+      }
+    }
+    return map;
+  }, [hasWasteCost, wasteCostRows, wasteQtyRows]);
+
+  // Absence flags (≥3 records per staff)
+  const absencesByStaff = useMemo(() => {
+    const m = {};
+    for (const r of absenceRows) {
+      const key = `${r.store_id}::${r[COLS.absences.staff] || "Unknown"}`;
+      if (!m[key]) m[key] = { store_id: String(r.store_id), staff_name: r[COLS.absences.staff] || "Unknown", count: 0 };
+      m[key].count += 1;
+    }
+    return Object.values(m).sort((a, b) => b.count - a.count);
+  }, [absenceRows]);
+  const flaggedAbsences = useMemo(() => absencesByStaff.filter((x) => x.count >= 3), [absencesByStaff]);
+
+  /** ===== CSV EXPORTS ===== */
+  const exportExpensesByStoreCSV = () => {
+    const rows = (visibleStoreList).map((s) => ({
+      store: s.name,
+      total_expenses: Number(expensesByStore[String(s.id)] || 0).toFixed(2),
+    }));
+    downloadCSV(`expenses_totals_${dateFrom}_${dateTo}${selectedStoreId ? `_store_${selectedStoreId}` : ""}.csv`, rows);
+  };
+  const exportWeeklyCountsCSV = () => {
+    const keys = new Set([
+      ...weeklyExpensesCount.map((x) => x.week_start),
+      ...weeklyAuditFails.map((x) => x.week_start),
+      ...weeklyWasteEntries.map((x) => x.week_start),
+      ...weeklyWasteCost.map((x) => x.week_start),
+      ...weeklyAbsenceEntries.map((x) => x.week_start),
+    ]);
+    const weeks = Array.from(keys).sort((a, b) => (a < b ? -1 : 1));
+    const idx = (arr) => Object.fromEntries(arr.map((r) => [r.week_start, r.count]));
+    const e = idx(weeklyExpensesCount);
+    const a = idx(weeklyAuditFails);
+    const w = idx(weeklyWasteEntries);
+    const wc = idx(weeklyWasteCost);
+    const ab = idx(weeklyAbsenceEntries);
+    const rows = weeks.map((wk) => ({
+      week_start: wk,
+      expenses_entries: e[wk] || 0,
+      audit_failed_points: a[wk] || 0,
+      waste_entries: w[wk] || 0,
+      waste_cost: Number(wc[wk] || 0).toFixed(2),
+      absences_entries: ab[wk] || 0,
+    }));
+    downloadCSV(`weekly_counts_${dateFrom}_${dateTo}.csv`, rows);
+  };
+  const exportAuditFailsCSV = () => {
+    const rows = failedAuditRows.map((r) => ({
+      date: r.date?.slice(0, 10) || "",
+      store: storeName(r.store_id),
+      point: r.point || "",
+      status: "Fail",
+    }));
+    downloadCSV(`audit_failed_points_${dateFrom}_${dateTo}${selectedStoreId ? `_store_${selectedStoreId}` : ""}.csv`, rows);
+  };
+  const exportWasteTotalsCSV = () => {
+    const rows = visibleStoreList.map((s) => ({
+      store: s.name,
+      ...(hasWasteCost
+        ? { total_waste_cost: Number(wasteTotalsByStore[String(s.id)] || 0).toFixed(2) }
+        : { total_waste_qty: Number(wasteTotalsByStore[String(s.id)] || 0).toFixed(3) }),
+    }));
+    downloadCSV(
+      `${hasWasteCost ? "waste_cost_totals" : "waste_qty_totals"}_${dateFrom}_${dateTo}${selectedStoreId ? `_store_${selectedStoreId}` : ""}.csv`,
+      rows
+    );
+  };
+  const exportAbsenceFlagsCSV = () => {
+    const rows = flaggedAbsences.map((x) => ({
+      store: storeName(x.store_id),
+      staff_name: x.staff_name,
+      absence_count: x.count,
+    }));
+    downloadCSV(`absence_flags_${dateFrom}_${dateTo}${selectedStoreId ? `_store_${selectedStoreId}` : ""}.csv`, rows);
+  };
+
+  const loadingAny =
+    authLoading || storesLoading || expensesLoading || auditsLoading || answersLoading ||
+    absencesLoading || wasteCostLoading || wasteQtyLoading;
+
+  /** ===== UI ===== */
   return (
-    <DashboardLayout title="Reports" profile={profile} announcements={[]}>
-      <div className="p-4 space-y-6">
-        {/* Filters */}
-        <Card className="p-4 bg-[#151924] border border-gray-800">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-gray-200">Store</Label>
-              <select
-                className="mt-1 w-full rounded-md border border-gray-700 bg-transparent text-white px-3 py-2"
-                value={storeId}
-                onChange={(e) => setStoreId(e.target.value)}
-              >
-                <option value="">All permitted</option>
-                {visibleStores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name ?? s.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label className="text-gray-200">Date from</Label>
-              <Input
-                type="date"
-                className="mt-1"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-200">Date to</Label>
-              <Input
-                type="date"
-                className="mt-1"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-end gap-2">
-              <Button variant="outline" onClick={() => window.print()}>
-                Print / PDF
-              </Button>
-
-              {tab === "audits" ? (
-                <Button
-                  onClick={() => {
-                    const rows = audits.map((a) => ({
-                      audit_id: a.audit_id,
-                      store_id: a.store_id,
-                      store_name: a.store_name,
-                      created_at: a.created_at,
-                      submitted_at: a.submitted_at,
-                      template: a.template_name,
-                      version: a.template_version,
-                      total_points: a.total_points,
-                      max_points: a.max_points,
-                      total_pct: a.total_pct,
-                    }));
-                    exportCsv(rows, "audits_report.csv");
-                  }}
-                >
-                  Export CSV
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => {
-                    const rows = expenses.map((r) => ({
-                      month: r.month,
-                      store_id: r.store_id,
-                      total_cost: r.total_cost,
-                      entries: r.entries,
-                    }));
-                    exportCsv(rows, "expenses_monthly.csv");
-                  }}
-                >
-                  Export CSV
-                </Button>
-              )}
-            </div>
+    <DashboardLayout>
+      <div className="px-4 md:px-6 lg:px-8 pb-10 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
+            <p className="text-muted-foreground">
+              Expenses, Weekly Counts, Audit Fails, Waste {hasWasteCost ? "Cost" : "Quantity"}, Absence Flags.
+            </p>
           </div>
-        </Card>
-
-        {/* KPIs quick row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4 bg-[#151924] border border-gray-800">
-            <div className="text-gray-400 text-sm">Audits (in range)</div>
-            <div className="text-white text-2xl font-semibold">{auditCount}</div>
-          </Card>
-          <Card className="p-4 bg-[#151924] border border-gray-800">
-            <div className="text-gray-400 text-sm">Avg Audit %</div>
-            <div className="text-white text-2xl font-semibold">{avgPct}%</div>
-          </Card>
-          <Card className="p-4 bg-[#151924] border border-gray-800">
-            <div className="text-gray-400 text-sm">Expenses (sum)</div>
-            <div className="text-white text-2xl font-semibold">{fmtMoney(expensesTotal)}</div>
-          </Card>
         </div>
 
-        {/* Tabs: Audits / Expenses */}
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-2 w-full md:w-[320px]">
-            <TabsTrigger value="audits">Audits</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
+        {/* Filters */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Filter className="h-5 w-5" /> Filters
+            </CardTitle>
+            <CardDescription>Pick a date range and (optionally) a store.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div className="col-span-2">
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  <CalendarIcon className="inline-block mr-2 h-4 w-4" /> From
+                </label>
+                <Input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  <CalendarIcon className="inline-block mr-2 h-4 w-4" /> To
+                </label>
+                <Input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+              <div className="col-span-1">
+                <label className="text-sm text-muted-foreground mb-1 block">
+                  <Building className="inline-block mr-2 h-4 w-4" /> Store
+                </label>
+                <Select value={storeFilter} onValueChange={setStoreFilter} disabled={visibleStoreList.length === 0}>
+                  <SelectTrigger><SelectValue placeholder="Select a store" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All visible stores</SelectItem>
+                    {visibleStoreList.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="expenses" className="flex gap-2"><PoundSterling className="h-4 w-4" /> Expenses</TabsTrigger>
+            <TabsTrigger value="weeks" className="flex gap-2"><ListChecks className="h-4 w-4" /> Weekly Counts</TabsTrigger>
+            <TabsTrigger value="audits" className="flex gap-2"><AlertTriangle className="h-4 w-4" /> Audit Fails</TabsTrigger>
+            <TabsTrigger value="waste" className="flex gap-2"><Trash2 className="h-4 w-4" /> Waste {hasWasteCost ? "Cost" : "Qty"}</TabsTrigger>
+            <TabsTrigger value="absence" className="flex gap-2"><Users className="h-4 w-4" /> Absence Flags</TabsTrigger>
           </TabsList>
 
-          {/* Audits table */}
-          <TabsContent value="audits" className="mt-4">
-            <div className="rounded-xl border border-gray-800 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-[#0f131a] text-gray-300">
-                  <tr>
-                    <th className="text-left px-3 py-2">Date</th>
-                    <th className="text-left px-3 py-2">Store</th>
-                    <th className="text-left px-3 py-2">Template</th>
-                    <th className="text-left px-3 py-2">Points</th>
-                    <th className="text-left px-3 py-2">% Score</th>
-                    <th className="text-left px-3 py-2">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {loadingAudits ? (
-                    <tr><td colSpan={6} className="px-3 py-4 text-gray-400">Loading…</td></tr>
-                  ) : audits.length === 0 ? (
-                    <tr><td colSpan={6} className="px-3 py-4 text-gray-400">No audits in range.</td></tr>
-                  ) : (
-                    audits.map((a) => (
-                      <tr key={a.audit_id} className="bg-[#151924]">
-                        <td className="px-3 py-2">{fmtDate(a.created_at ?? a.started_at)}</td>
-                        <td className="px-3 py-2">{a.store_name ?? a.store_id}</td>
-                        <td className="px-3 py-2">{a.template_name} v{a.template_version}</td>
-                        <td className="px-3 py-2">
-                          {Number(a.total_points ?? 0).toFixed(0)} / {a.max_points}
-                        </td>
-                        <td className="px-3 py-2">{Number(a.total_pct ?? 0).toFixed(1)}%</td>
-                        <td className="px-3 py-2">{a.submitted_at ? fmtDate(a.submitted_at) : "—"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+          {/* Expenses Totals */}
+          <TabsContent value="expenses" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Total Expenses by Store</CardTitle>
+                <CardDescription>
+                  Sum of <code>cost</code> within the selected range.
+                  {loadingAny && <span className="inline-flex items-center gap-2 ml-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</span>}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <div className="flex justify-end pb-3">
+                  <Button onClick={exportExpensesByStoreCSV} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Store</TableHead>
+                      <TableHead className="text-right">Total (£)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleStoreList && visibleStoreList.length > 0 ? (
+                      visibleStoreList.map((s) => (
+                        <TableRow key={String(s.id)}>
+                          <TableCell>{s.name}</TableCell>
+                          <TableCell className="text-right">
+                            {(Number(expensesByStore[String(s.id)]) || 0).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center text-muted-foreground">
+                          No stores visible.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          {/* Expenses table */}
-          <TabsContent value="expenses" className="mt-4">
-            <div className="rounded-xl border border-gray-800 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-[#0f131a] text-gray-300">
-                  <tr>
-                    <th className="text-left px-3 py-2">Month</th>
-                    <th className="text-left px-3 py-2">Store</th>
-                    <th className="text-left px-3 py-2">Entries</th>
-                    <th className="text-left px-3 py-2">Total Cost</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {loadingExpenses ? (
-                    <tr><td colSpan={4} className="px-3 py-4 text-gray-400">Loading…</td></tr>
-                  ) : expenses.length === 0 ? (
-                    <tr><td colSpan={4} className="px-3 py-4 text-gray-400">No expenses in range.</td></tr>
-                  ) : (
-                    expenses.map((r) => {
-                      const storeLabel =
-                        visibleStores.find((s) => String(s.id) === String(r.store_id))?.name ??
-                        r.store_id;
-                      return (
-                        <tr key={`${r.month}-${r.store_id}`} className="bg-[#151924]">
-                          <td className="px-3 py-2">
-                            {new Date(r.month).toLocaleDateString("en-GB", {
-                              year: "numeric",
-                              month: "short",
-                            })}
-                          </td>
-                          <td className="px-3 py-2">{storeLabel}</td>
-                          <td className="px-3 py-2">{r.entries}</td>
-                          <td className="px-3 py-2">{fmtMoney(r.total_cost)}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+          {/* Weekly Counts */}
+          <TabsContent value="weeks" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Weekly Counts Overview</CardTitle>
+                <CardDescription>
+                  Monday-start weekly rollups.
+                  {loadingAny && <span className="inline-flex items-center gap-2 ml-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</span>}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <div className="flex justify-end pb-3">
+                  <Button onClick={exportWeeklyCountsCSV} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Week (Mon)</TableHead>
+                      <TableHead className="text-right">Expenses (entries)</TableHead>
+                      <TableHead className="text-right">Audit Failed Points</TableHead>
+                      <TableHead className="text-right">Waste (entries)</TableHead>
+                      <TableHead className="text-right">Waste Cost (£)</TableHead>
+                      <TableHead className="text-right">Absences (entries)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const keys = new Set([
+                        ...weeklyExpensesCount.map((x) => x.week_start),
+                        ...weeklyAuditFails.map((x) => x.week_start),
+                        ...weeklyWasteEntries.map((x) => x.week_start),
+                        ...weeklyWasteCost.map((x) => x.week_start),
+                        ...weeklyAbsenceEntries.map((x) => x.week_start),
+                      ]);
+                      const weeks = Array.from(keys).sort((a, b) => (a < b ? -1 : 1));
+                      const idx = (arr) => Object.fromEntries(arr.map((r) => [r.week_start, r.count]));
+                      const e = idx(weeklyExpensesCount);
+                      const a = idx(weeklyAuditFails);
+                      const w = idx(weeklyWasteEntries);
+                      const wc = idx(weeklyWasteCost);
+                      const ab = idx(weeklyAbsenceEntries);
+                      return weeks.map((wk) => (
+                        <TableRow key={wk}>
+                          <TableCell>{wk}</TableCell>
+                          <TableCell className="text-right">{e[wk] || 0}</TableCell>
+                          <TableCell className="text-right">{a[wk] || 0}</TableCell>
+                          <TableCell className="text-right">{w[wk] || 0}</TableCell>
+                          <TableCell className="text-right">{Number(wc[wk] || 0).toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{ab[wk] || 0}</TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Audit Fails */}
+          <TabsContent value="audits" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Audit Reports — Failed Points</CardTitle>
+                <CardDescription>
+                  All failed points in range (value_bool = false or points_awarded = 0).
+                  {loadingAny && <span className="inline-flex items-center gap-2 ml-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</span>}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <div className="flex justify-end pb-3">
+                  <Button onClick={exportAuditFailsCSV} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Store</TableHead>
+                      <TableHead>Point</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {failedAuditRows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{String(r.date).slice(0, 10)}</TableCell>
+                        <TableCell>{storeName(r.store_id)}</TableCell>
+                        <TableCell className="max-w-[520px] whitespace-nowrap overflow-hidden text-ellipsis">{r.point}</TableCell>
+                        <TableCell><Badge className="bg-red-600 hover:bg-red-600">Fail</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {!failedAuditRows.length && !auditsLoading && !answersLoading && (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No failed points found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Waste (Cost preferred, Qty fallback) */}
+          <TabsContent value="waste" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>{hasWasteCost ? "Total Waste Cost by Store" : "Total Waste Quantity by Store"}</CardTitle>
+                <CardDescription>
+                  {hasWasteCost ? <>Sum of <code>cost</code> from <code>{TABLES.wasteCostView}</code>.</> : <>No cost view found—showing total <code>quantity</code> from <code>{TABLES.wasteQty}</code>.</>}
+                  {loadingAny && <span className="inline-flex items-center gap-2 ml-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</span>}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <div className="flex justify-end pb-3">
+                  <Button onClick={exportWasteTotalsCSV} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Store</TableHead>
+                      <TableHead className="text-right">{hasWasteCost ? "Total Waste Cost (£)" : "Total Waste Qty"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleStoreList.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>{s.name}</TableCell>
+                        <TableCell className="text-right">
+                          {hasWasteCost
+                            ? (Number(wasteTotalsByStore[String(s.id)]) || 0).toFixed(2)
+                            : (Number(wasteTotalsByStore[String(s.id)]) || 0).toFixed(3)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!visibleStoreList.length && (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center text-muted-foreground">
+                          No stores visible.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+                {!hasWasteCost && (
+                  <>
+                    <Separator className="my-4" />
+                    <p className="text-xs text-muted-foreground">
+                      To switch to £ cost, create a view <code>{TABLES.wasteCostView}</code> with <code>(store_id, report_date, cost)</code> joining <code>{TABLES.wasteQty}</code> to a price list.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Absence flags 3+ */}
+          <TabsContent value="absence" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Absence — Flag 3 or More</CardTitle>
+                <CardDescription>
+                  Staff with 3+ absence records in the selected range.
+                  {loadingAny && <span className="inline-flex items-center gap-2 ml-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</span>}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <div className="flex justify-end pb-3">
+                  <Button onClick={exportAbsenceFlagsCSV} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Store</TableHead>
+                      <TableHead>Staff</TableHead>
+                      <TableHead className="text-right">Absence Count</TableHead>
+                      <TableHead>Flag</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {flaggedAbsences.map((x, i) => (
+                      <TableRow key={`${x.store_id}-${x.staff_name}-${i}`}>
+                        <TableCell>{storeName(x.store_id)}</TableCell>
+                        <TableCell className="max-w-[480px] whitespace-nowrap overflow-hidden text-ellipsis">{x.staff_name}</TableCell>
+                        <TableCell className="text-right">{x.count}</TableCell>
+                        <TableCell><Badge className="bg-amber-600 hover:bg-amber-600">3+</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {!flaggedAbsences.length && !absencesLoading && (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No staff meet the threshold.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
