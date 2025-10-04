@@ -54,6 +54,9 @@ export default function AuditEditor() {
   const [previewHref, setPreviewHref] = useState(null);
   const [previewName, setPreviewName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false); // <- for loader
+  // near the other useState hooks
+ const [savingAnswers, setSavingAnswers] = useState(false);
+
 
   const filesTableRef = useRef(null); // to scroll back after closing preview
 
@@ -282,7 +285,10 @@ export default function AuditEditor() {
     return Math.min(Math.max(n, min), max);
   };
 
-  const saveAll = async () => {
+const saveAll = async () => {
+  if (savingAnswers) return;            // prevent rapid double-save
+  setSavingAnswers(true);
+  try {
     const rows = [];
     for (const q of questions) {
       const d = draft[q.id];
@@ -305,7 +311,16 @@ export default function AuditEditor() {
       rows.push(row);
     }
     if (!rows.length) return;
-    const { error } = await supabase.from("audit_answers").upsert(rows).select("id");
+
+    const { error } = await supabase
+      .from("audit_answers")
+      .upsert(rows, {
+        onConflict: "audit_id,question_id",  // <-- the key fix
+        ignoreDuplicates: false,
+        defaultToNull: false,
+      })
+      .select("id");
+
     if (error) {
       console.error(error);
       alert(error.message || "Could not save answers.");
@@ -313,7 +328,11 @@ export default function AuditEditor() {
     }
     queryClient.invalidateQueries({ queryKey: ["audit_answers", auditId] });
     alert("Saved.");
-  };
+  } finally {
+    setSavingAnswers(false);
+  }
+};
+
 
   /* ----------------------- PDF link helpers / upload ----------------------- */
   const dataUrlToBase64 = (s = "") => {
@@ -1087,19 +1106,26 @@ export default function AuditEditor() {
             ))
           )}
 
-          <div className="flex gap-2">
-            <Button onClick={saveAll} disabled={isSubmitting}>Save</Button>
-            <Button variant="outline" onClick={submitAudit} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scheduling...
-                </>
-              ) : (
-                "Submit & generate PDF"
-              )}
-            </Button>
-          </div>
+<div className="flex gap-2">
+  <Button onClick={saveAll} disabled={savingAnswers || isSubmitting}>
+    {savingAnswers ? "Saving..." : "Save"}
+  </Button>
+  <Button
+    variant="outline"
+    onClick={submitAudit}
+    disabled={savingAnswers || isSubmitting}
+  >
+    {isSubmitting ? (
+      <>
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Scheduling...
+      </>
+    ) : (
+      "Submit & generate PDF"
+    )}
+  </Button>
+</div>
+
 
           {/* Generated files table */}
           <div className="rounded-xl border border-gray-800 bg-[#151924] p-4" ref={filesTableRef}>

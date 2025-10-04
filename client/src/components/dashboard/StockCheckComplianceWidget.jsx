@@ -280,27 +280,157 @@ function WeeklyStockCheckWidget() {
 
 /* --- Panel with 3 tabs --- */
 export default function StockCheckCompliancePanel() {
+  const { profile } = useAuth();
+  const isRegional =
+    profile?.permissions === "regional" || profile?.permissions === "admin";
+  if (!isRegional) return null;
+
+  // helpers kept local
+  const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  const startOfDayISO = (d) => startOfDay(d).toISOString();
+  const isoDateOnly = (date) => new Date(date).toISOString().slice(0, 10);
+  const hhmm = (ts) => {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  };
+  const lastNDays = (n = 7) => {
+    const days = [];
+    const today = startOfDay(new Date());
+    for (let i = 0; i < n; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateISO = isoDateOnly(d);
+      days.push({
+        dateISO,
+        // compact dd/mm
+        label: d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" }),
+        title: formatDeliveryDateVerbose(dateISO),
+        dayStartISO: startOfDayISO(d),
+      });
+    }
+    return days.reverse(); // oldest -> newest
+  };
+
+  const days = React.useMemo(() => lastNDays(7), []);
+  const earliestStartISO = days[0].dayStartISO;
+
+  // stores
+  const { data: stores = [], isLoading: storesLoading } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // updates in last 7 days
+  const { data: updates = [], isLoading: updatesLoading } = useQuery({
+    queryKey: ["store_stock_levels_last7", earliestStartISO],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("store_stock_levels")
+        .select("store_id, last_updated")
+        .gte("last_updated", earliestStartISO);
+      if (error) throw error;
+      return data || [];
+    },
+    refetchOnWindowFocus: true,
+    refetchInterval: 300000,
+  });
+
+  // `${store}|YYYY-MM-DD` -> latest timestamp
+  const latestByStoreDay = useMemo(() => {
+    const map = new Map();
+    for (const row of updates) {
+      const key = `${row.store_id}|${isoDateOnly(row.last_updated)}`;
+      const prev = map.get(key);
+      if (!prev || new Date(row.last_updated) > new Date(prev)) {
+        map.set(key, row.last_updated);
+      }
+    }
+    return map;
+  }, [updates]);
+
+  const loading = storesLoading || updatesLoading;
+
   return (
     <div className="w-full">
-      <Tabs defaultValue="daily" className="mb-2">
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
-          <TabsTrigger value="weekly">Weekly (Sundays)</TabsTrigger>
-          <TabsTrigger value="daily">Today</TabsTrigger>
-          <TabsTrigger value="yesterday">Yesterday</TabsTrigger>
-        </TabsList>
+      <div className="relative bg-white border border-gray-200 rounded-lg shadow-sm p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-800">
+            📊 Stock Check Compliance — Last 7 Days
+          </h3>
+          <span className="text-[10px] text-gray-500">Auto-refresh every 5 min</span>
+        </div>
 
-        <TabsContent value="weekly">
-          <WeeklyStockCheckWidget />
-        </TabsContent>
-
-        <TabsContent value="daily">
-          <DailyStockCheckWidget />
-        </TabsContent>
-
-        <TabsContent value="yesterday">
-          <YesterdayStockCheckWidget />
-        </TabsContent>
-      </Tabs>
+        {loading ? (
+          <p className="text-xs text-gray-500">Loading…</p>
+        ) : (
+          <table className="w-full table-fixed text-[12px] leading-tight border-collapse">
+            {/* fixed widths so it fits without scroll */}
+            <colgroup>
+              <col style={{ width: "38%" }} /> {/* store column */}
+              {days.map((_, i) => (
+                <col key={i} style={{ width: `${62 / 7}%` }} /> // ~8.8% each
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-white border border-gray-200 px-2 py-1 text-left text-[11px] font-semibold">
+                  Store
+                </th>
+                {days.map((d) => (
+                  <th
+                    key={d.dateISO}
+                    className="border border-gray-200 px-2 py-1 text-center text-[11px] font-semibold"
+                    title={d.title}
+                  >
+                    {d.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {stores.map((store) => (
+                <tr key={store.id} className="align-top">
+                  <td className="sticky left-0 z-10 bg-white border border-gray-200 px-2 py-1 font-medium truncate">
+                    {store.name}
+                  </td>
+                  {days.map((d) => {
+                    const key = `${store.id}|${d.dateISO}`;
+                    const ts = latestByStoreDay.get(key);
+                    const hadEntry = Boolean(ts);
+                    return (
+                      <td
+                        key={d.dateISO}
+                        className={[
+                          "border px-2 py-1 text-center whitespace-nowrap",
+                          hadEntry
+                            ? "bg-green-50 border-green-200 text-green-800"
+                            : "bg-rose-50 border-rose-200 text-rose-700",
+                        ].join(" ")}
+                        title={
+                          hadEntry
+                            ? `Last update: ${new Date(ts).toLocaleString("en-GB")}`
+                            : "No stock check submitted"
+                        }
+                      >
+                        {hadEntry ? hhmm(ts) : "*"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
+
+
