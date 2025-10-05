@@ -486,10 +486,11 @@ export default function DailyStockCheck({
     if (!storeIdForQuery || !hasPageChanges) return;
     setSaving(true);
     try {
-      const { data: authData, error: userError } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) {
-        console.error("❌ No user found:", userError);
+      // ✅ get the signed-in user and name it authUser (avoid shadowing)
+      const { data: authData, error: getUserErr } = await supabase.auth.getUser();
+      const authUser = authData?.user;
+      if (!authUser) {
+        console.error("❌ No user found:", getUserErr);
         alert("Could not find current user.");
         setSaving(false);
         return;
@@ -498,35 +499,33 @@ export default function DailyStockCheck({
       const nowIso = new Date().toISOString();
       const todayISO = londonTodayDateISO(); // London calendar date (YYYY-MM-DD)
 
-      // 1) Update snapshot/current rows (store_stock_levels) using finalQty
+      // ✅ 1) Upsert current levels using composite key; omit id
       const snapshotRows = pageChanges.map(({ item, finalQty }) => ({
-        id: item.store_stock_level_id ?? undefined,
-        stock_item_id: item.id,
         store_id: storeIdForQuery,
-        quantity: finalQty,
+        stock_item_id: Number(item.id),
+        quantity: Number(finalQty),
         last_updated: nowIso,
-        updated_by: user.id,
+        updated_by: authUser.id,
       }));
 
       const { error: snapshotErr } = await supabase
         .from("store_stock_levels")
-        .upsert(snapshotRows);
+        .upsert(snapshotRows, { onConflict: "store_id,stock_item_id" });
 
       if (snapshotErr) {
         console.error("❌ Supabase error (store_stock_levels):", snapshotErr);
-        alert("Failed to save this page.");
+        alert(snapshotErr.message || "Failed to save this page.");
         setSaving(false);
         return;
       }
 
-      // 2) Append change rows (audit) to stock_history_changes (today only)
-      //    We record the absolute after-value in new_quantity, and the prior in old_quantity.
+      // ✅ 2) Append change rows (audit) to stock_history_changes (today only)
       const changeRows = pageChanges.map(({ item, finalQty }) => ({
         store_id: storeIdForQuery,
         stock_item_id: Number(item.id),
         old_quantity: Number(item.current_qty) || 0,
         new_quantity: Number(finalQty),
-        updated_by: user.id,
+        updated_by: authUser.id,
         changed_at: nowIso,
       }));
 
@@ -541,7 +540,7 @@ export default function DailyStockCheck({
         return;
       }
 
-      // 3) Upsert daily snapshot for reporting & the grid (one row per day)
+      // ✅ 3) Upsert daily snapshot for reporting & the grid (unique by store_id,stock_item_id,date)
       const dailyRows = pageChanges.map(({ item, finalQty }) => ({
         store_id: storeIdForQuery,
         stock_item_id: Number(item.id),
