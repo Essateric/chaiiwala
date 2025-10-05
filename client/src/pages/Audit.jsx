@@ -302,10 +302,13 @@ const saveAll = async () => {
         notes: d.notes ?? null,
       };
       if (q.answer_type === "binary") row.value_bool = d.value_bool ?? null;
-      else if (q.answer_type === "score") {
-        row.value_bool = d.value_bool ?? null; // yes/no alongside score
-        row.value_num = d.value_num ?? null;
-      } else if (q.answer_type === "text" || q.answer_type === "photo") {
+     else if (q.answer_type === "score") {
+  // We store the label in value_text and the numeric score in value_num.
+  // N/A → value_text = "na", value_num = null (excluded from totals)
+  row.value_text = d.value_text ?? null;
+  row.value_num = d.value_text === "na" ? null : (d.value_num ?? null);
+}
+ else if (q.answer_type === "text" || q.answer_type === "photo") {
         row.value_text = d.value_text ?? null;
       }
       rows.push(row);
@@ -339,6 +342,16 @@ const saveAll = async () => {
     const m = s.match(/^data:application\/pdf;base64,(.+)$/i);
     return m ? m[1] : null;
   };
+
+  // Map pass/fair/fail numeric scores from max_points
+const scoreMapForMax = (max = 0) => {
+  if (max >= 5) return { pass: 5, fair: 3, fail: 0 }; // includes max=5
+  if (max === 3) return { pass: 3, fair: 2, fail: 0 };
+  if (max === 2) return { pass: 2, fair: 1, fail: 0 };
+  // sensible fallback for any other max
+  return { pass: max, fair: Math.max(0, Math.floor(max / 2)), fail: 0 };
+};
+
 
   const arrayBufferToBase64 = (ab) => {
     const bytes = new Uint8Array(ab);
@@ -943,59 +956,80 @@ const saveAll = async () => {
                         )}
 
                         {/* Score questions */}
-                        {q.answer_type === "score" && (
-                          <div className="flex items-center gap-4">
-                            <div className="flex gap-5">
-                              <label className="flex items-center gap-2 text-white">
-                                <input
-                                  type="radio"
-                                  name={`score-bin-${q.id}`}
-                                  checked={isYes}
-                                  onChange={() =>
-                                    handleChange(q.id, {
-                                      value_bool: true,
-                                      value_num: d.value_num ?? null,
-                                    })
-                                  }
-                                />
-                                Yes
-                              </label>
-                              <label className="flex items-center gap-2 text-white">
-                                <input
-                                  type="radio"
-                                  name={`score-bin-${q.id}`}
-                                  checked={isNo}
-                                  onChange={() =>
-                                    handleChange(q.id, {
-                                      value_bool: false,
-                                      value_num: null, // clear score when No
-                                    })
-                                  }
-                                />
-                                No
-                              </label>
-                            </div>
+{q.answer_type === "score" && (() => {
+  const map = scoreMapForMax(q.max_points ?? 0);
+  const sel = d.value_text || (
+    d.value_num == null
+      ? null
+      : d.value_num === map.pass
+        ? "pass"
+        : d.value_num === map.fair
+          ? "fair"
+          : "fail"
+  );
 
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-300 text-xs">Score</span>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                min={0}
-                                max={q.max_points ?? 999}
-                                placeholder={`0–${q.max_points ?? 0}`}
-                                value={d.value_num ?? ""}
-                                disabled={!isYes}
-                                className="w-20"
-                                onChange={(e) => {
-                                  const raw = e.target.value === "" ? null : Number(e.target.value);
-                                  const clamped = raw == null ? null : clamp(raw, 0, q.max_points ?? 0);
-                                  handleChange(q.id, { value_num: clamped });
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
+  const choose = (choice) => {
+    if (choice === "na") {
+      // N/A: no score required, exclude from totals → store null score
+      handleChange(q.id, { value_text: "na", value_num: null });
+    } else if (choice === "pass") {
+      handleChange(q.id, { value_text: "pass", value_num: map.pass });
+    } else if (choice === "fair") {
+      handleChange(q.id, { value_text: "fair", value_num: map.fair });
+    } else if (choice === "fail") {
+      handleChange(q.id, { value_text: "fail", value_num: map.fail });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-6">
+        <label className="flex items-center gap-2 text-white">
+          <input
+            type="radio"
+            name={`score-choice-${q.id}`}
+            checked={sel === "pass"}
+            onChange={() => choose("pass")}
+          />
+          Pass <span className="text-xs text-gray-400">({map.pass})</span>
+        </label>
+        <label className="flex items-center gap-2 text-white">
+          <input
+            type="radio"
+            name={`score-choice-${q.id}`}
+            checked={sel === "fair"}
+            onChange={() => choose("fair")}
+          />
+          Fair <span className="text-xs text-gray-400">({map.fair})</span>
+        </label>
+        <label className="flex items-center gap-2 text-white">
+          <input
+            type="radio"
+            name={`score-choice-${q.id}`}
+            checked={sel === "fail"}
+            onChange={() => choose("fail")}
+          />
+          Fail <span className="text-xs text-gray-400">({map.fail})</span>
+        </label>
+        <label className="flex items-center gap-2 text-white">
+          <input
+            type="radio"
+            name={`score-choice-${q.id}`}
+            checked={sel === "na"}
+            onChange={() => choose("na")}
+          />
+          N/A <span className="text-xs text-gray-400">(excluded)</span>
+        </label>
+      </div>
+
+      {/* Tiny helper text */}
+      <div className="text-[11px] text-gray-400">
+        Max {q.max_points ?? 0}: Pass = {map.pass}, Fair = {map.fair}, Fail = {map.fail}. N/A does not require a score and is excluded from totals.
+      </div>
+    </div>
+  );
+})()}
+
 
                         {/* Text answers */}
                         {q.answer_type === "text" && (
