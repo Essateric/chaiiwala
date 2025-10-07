@@ -67,12 +67,25 @@ export default function SettingsPage() {
     daily_check: false
   });
 
+  // Inline threshold editing: drafts/dirty/saving per row
+  const [thresholdDraft, setThresholdDraft] = useState({});   // { [itemId]: "typed text" }
+  const [thresholdDirty, setThresholdDirty] = useState({});   // { [itemId]: true/false }
+  const [thresholdSaving, setThresholdSaving] = useState({}); // { [itemId]: true/false }
+
+  const getDraftText = (id, fallback) =>
+    thresholdDraft[id] ?? String(fallback ?? '');
+
+  const setDraftText = (id, text) => {
+    setThresholdDraft(prev => ({ ...prev, [id]: text }));
+    setThresholdDirty(prev => ({ ...prev, [id]: true }));
+  };
+
   const [activeTab, setActiveTab] = useState("general");
   const [newCategory, setNewCategory] = useState({ name: "", prefix: "", description: "" });
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const { data: dbcategories = [] } = useStockCategoriesFromDB();
 
+  const { data: dbcategories = [] } = useStockCategoriesFromDB();
   const { categories = [], createCategory, updateCategory, deleteCategory } = useStockCategories() || {};
 
   const { toast } = useToast();
@@ -88,7 +101,7 @@ export default function SettingsPage() {
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('auth_id', authUser.id)
         .maybeSingle();
 
       return {
@@ -102,7 +115,7 @@ export default function SettingsPage() {
   });
 
   // Server-truth role (matches your DB policies / RPCs)
-  const { data: roleFromRPC } = useQuery({
+  const { data: roleFromRPC, isLoading: roleLoading } = useQuery({
     queryKey: ['current_user_role'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('current_user_role');
@@ -148,16 +161,16 @@ export default function SettingsPage() {
   const canEditThreshold = new Set(['admin', 'administrator', 'regional']).has(effectiveRole);
 
   // RPC caller: server enforces who can change thresholds
-  async function saveThresholdRPC({ itemId, threshold, storeId = null, dailyCheck = null }) {
-    const { data, error } = await supabase.rpc('set_stock_threshold', {
-      p_item_id: Number(itemId),
-      p_threshold: Number(threshold),
-      p_store_id: storeId === null ? null : Number(storeId),
-      p_daily_check: typeof dailyCheck === 'boolean' ? dailyCheck : null,
-    });
-    if (error) throw error;
-    return data;
-  }
+async function saveThresholdRPC({ itemId, threshold, dailyCheck = null }) {
+  const { data, error } = await supabase.rpc('set_stock_threshold', {
+    p_item_id: Number(itemId),
+    p_threshold: Number(threshold),      // decimals OK
+    p_store_id: null,                    // <— always global
+    p_daily_check: !!dailyCheck,         // keep if your function expects it
+  });
+  if (error) throw error;
+  return data; // e.g. { scope: 'master' } from your SQL
+}
 
   /* --------------------------- data fetching ---------------------------- */
   const fetchStockItems = useCallback(async () => {
@@ -222,30 +235,15 @@ export default function SettingsPage() {
     return `${prefix}${suffix}`;
   };
 
-  // Resolve the threshold to show: prefer store override, else master
-  const storeIdForView = user?.store_id ?? null;
+// All thresholds are global now
+const storeIdForView = null;
 
-  const getEffectiveThreshold = useCallback(
-    (item) => {
-      const level = storeIdForView
-        ? stockLevels.find(
-            (l) => toNum(l.stock_item_id) === toNum(item.id) && toNum(l.store_id) === toNum(storeIdForView)
-          )
-        : null;
+const getEffectiveThreshold = useCallback(
+  (item) => Number(item?.low_stock_threshold ?? 0),
+  []
+);
 
-      const override = level
-        ? (Number.isFinite(toNum(level?.threshold, NaN))
-            ? toNum(level?.threshold, NaN)
-            : toNum(level?.low_stock_limit, NaN))
-        : NaN;
-
-      if (Number.isFinite(override)) return override;
-      return toNum(item.low_stock_threshold, 0);
-    },
-    [stockLevels, storeIdForView, toNum]
-  );
-
-  // CSV Upload/Download (unchanged placeholders)
+  // CSV Upload/Download (placeholders keep your existing behavior)
   const handleCsvUpload = (event) => { /* unchanged from your original */ };
   const processCSV = (csvData) => { /* unchanged from your original */ };
   const downloadCsvTemplate = () => { /* unchanged from your original */ };
@@ -265,8 +263,8 @@ export default function SettingsPage() {
       name: newItem.name,
       category: newItem.category,
       low_stock_threshold: Number.isFinite(newItem.lowStockThreshold)
-        ? Math.max(1, parseInt(newItem.lowStockThreshold, 10))
-        : 1,
+        ? Math.max(0.1, parseFloat(newItem.lowStockThreshold))
+        : 0.1,
       price: newItem.price,
       sku: newItem.sku,
       daily_check: !!newItem.daily_check,
@@ -288,10 +286,9 @@ export default function SettingsPage() {
     });
   }, [newItem, toast, fetchStockItems, fetchStockLevels]);
 
-  // Edit logic
+  // Edit dialog prefill
   const handleEditItem = (item) => {
     const storeId = user?.store_id ?? null;
-
     const level = storeId
       ? stockLevels.find(
           (l) => toNum(l.stock_item_id) === toNum(item.id) && toNum(l.store_id) === toNum(storeId)
@@ -319,55 +316,31 @@ export default function SettingsPage() {
     setDialogOpen(true);
   };
 
+  // Dialog save (kept)
   const handleSaveChanges = useCallback(async () => {
     if (!editItem) return;
 
-    const safeThreshold = Number.isFinite(editItem.lowStockThreshold)
-      ? Math.max(1, parseInt(editItem.lowStockThreshold, 10))
-      : 1;
+    const n = parseFloat((editItem?.lowStockThresholdText ?? editItem?.lowStockThreshold)?.toString());
+    const safeThreshold = Number.isFinite(n) ? Math.max(0.1, n) : 0.1;
 
-    const storeId = user?.store_id ?? null;
 
     try {
       // === 1) Save threshold via RPC (admins/regional only) ===
-      if (canEditThreshold) {
-        const res = await saveThresholdRPC({
-          itemId: editItem.id,
-          threshold: safeThreshold,
-          storeId,                 // null => master threshold; number => store override
-          dailyCheck: editItem.daily_check,
-        });
+if (canEditThreshold) {
+  await saveThresholdRPC({
+    itemId: editItem.id,
+    threshold: safeThreshold,
+    dailyCheck: editItem.daily_check,
+  });
 
-        // Optimistic local update based on scope
-        if (res?.scope === 'master') {
-          setStockConfig(prev =>
-            prev.map(r =>
-              toNum(r.id) === toNum(editItem.id)
-                ? { ...r, low_stock_threshold: safeThreshold, updated_at: new Date().toISOString() }
-                : r
-            )
-          );
-        } else if (res?.scope === 'store' && storeId) {
-          setStockLevels(prev => {
-            const idx = prev.findIndex(
-              l => toNum(l.stock_item_id) === toNum(editItem.id) && toNum(l.store_id) === toNum(storeId)
-            );
-            const next = [...prev];
-            const overrideRow = {
-              store_id: Number(storeId),
-              stock_item_id: Number(editItem.id),
-              threshold: safeThreshold,
-              daily_check: !!editItem.daily_check,
-              last_updated: new Date().toISOString(),
-            };
-            if (idx >= 0) next[idx] = { ...next[idx], ...overrideRow };
-            else next.push(overrideRow);
-            return next;
-          });
-        }
-      }
-      // For non-admin/regional: we don't attempt threshold writes (avoids RLS/403).
-
+  setStockConfig(prev =>
+    prev.map(r =>
+      Number(r.id) === Number(editItem.id)
+        ? { ...r, low_stock_threshold: safeThreshold, updated_at: new Date().toISOString() }
+        : r
+    )
+  );
+}
       // === 2) Save other fields on master row ===
       const updatePayload = {
         name: editItem.name,
@@ -383,14 +356,14 @@ export default function SettingsPage() {
         .from('stock_items')
         .update(updatePayload)
         .eq('id', Number(editItem.id))
-        .select(); // force return for confirmation
+        .select();
 
       if (!itemError && updated?.length) {
         setStockConfig(prev =>
           prev.map(r => (toNum(r.id) === toNum(editItem.id) ? { ...r, ...updated[0] } : r))
         );
       } else if (itemError) {
-        console.debug('[Settings] Master update blocked/failed (RLS?):', itemError);
+        console.debug('[Settings] item update blocked/failed:', itemError);
       }
 
       toast({ title: 'Item Updated', description: `${editItem.name} updated.` });
@@ -411,7 +384,6 @@ export default function SettingsPage() {
     }
   }, [editItem, user?.store_id, canEditThreshold, toNum, fetchStockItems, fetchStockLevels, toast]);
 
-  // light click handler to yield before the heavy async work
   const onClickSave = useCallback(() => {
     setTimeout(() => {
       handleSaveChanges();
@@ -421,6 +393,32 @@ export default function SettingsPage() {
   // Delete logic (placeholder - unchanged)
   const handleDeleteItem = async (id) => { /* unchanged from your original */ };
 
+  /* ---------------------- inline threshold save helper ------------------- */
+async function saveInlineThreshold(item, rawText) {
+  const n = parseFloat(rawText);
+  const next = Number.isFinite(n) ? Math.max(0.1, n) : 0.1;
+
+  if (!canEditThreshold) return next;
+
+  await saveThresholdRPC({
+    itemId: item.id,
+    threshold: next,
+    dailyCheck: item.daily_check,
+  });
+
+  // Optimistic update on the global (item) row
+  setStockConfig(prev =>
+    prev.map(r =>
+      Number(r.id) === Number(item.id)
+        ? { ...r, low_stock_threshold: next, updated_at: new Date().toISOString() }
+        : r
+    )
+  );
+
+  return next;
+}
+
+  /* --------------------------------- UI --------------------------------- */
   return (
     <DashboardLayout title="Settings">
       <div className="container max-w-7xl mx-auto py-6">
@@ -580,11 +578,80 @@ export default function SettingsPage() {
                                 No Stock
                               </span>
                             </TableCell>
+
+                            {/* Threshold inline editor */}
                             <TableCell className="text-center">
-                              <span className="text-sm">
-                                {getEffectiveThreshold(item)} units
-                              </span>
+                              <div className="flex items-center justify-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={0.1}
+                                  step="any"
+                                  inputMode="decimal"
+                                  className="w-20 text-center"
+                                  disabled={roleLoading ? false : !canEditThreshold}
+                                  value={getDraftText(item.id, getEffectiveThreshold(item))}
+                                  onChange={e => setDraftText(item.id, e.target.value)}
+                                  onBlur={async (e) => {
+                                    if (!canEditThreshold) return;
+                                    if (!thresholdDirty[item.id]) return;
+                                    setThresholdSaving(prev => ({ ...prev, [item.id]: true }));
+                                    const oldVal = getEffectiveThreshold(item);
+                                    const finalVal = await saveInlineThreshold(item, e.target.value)
+                                      .catch(err => {
+                                        console.error('[inline save] failed:', err);
+                                        toast({
+                                          title: 'Save failed',
+                                          description: err?.message || 'Could not save threshold.',
+                                          variant: 'destructive',
+                                        });
+                                        return oldVal;
+                                      });
+                                    setThresholdSaving(prev => ({ ...prev, [item.id]: false }));
+                                    setDraftText(item.id, String(Number(finalVal).toFixed(1)));
+                                    setThresholdDirty(prev => ({ ...prev, [item.id]: false }));
+                                  }}
+                                />
+                                {canEditThreshold && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7"
+                                    disabled={!thresholdDirty[item.id] || thresholdSaving[item.id]}
+                                    onClick={async () => {
+                                      setThresholdSaving(prev => ({ ...prev, [item.id]: true }));
+                                      const text = thresholdDraft[item.id] ?? String(getEffectiveThreshold(item));
+                                      const oldVal = getEffectiveThreshold(item);
+                                      const finalVal = await saveInlineThreshold(item, text)
+                                        .catch(err => {
+                                          console.error('[inline save] failed:', err);
+                                          toast({
+                                            title: 'Save failed',
+                                            description: err?.message || 'Could not save threshold.',
+                                            variant: 'destructive',
+                                          });
+                                          return oldVal;
+                                        });
+                                      setThresholdSaving(prev => ({ ...prev, [item.id]: false }));
+                                      setDraftText(item.id, String(Number(finalVal).toFixed(1)));
+                                      setThresholdDirty(prev => ({ ...prev, [item.id]: false }));
+                                      toast({ title: 'Saved', description: `Threshold set to ${finalVal}` });
+                                    }}
+                                  >
+                                    {thresholdSaving[item.id] ? 'Saving…' : 'Save'}
+                                  </Button>
+                                )}
+                                {/* Scope badge: Store override vs Regional default */}
+                                {(() => {
+                                  const level = storeIdForView
+                                    ? stockLevels.find(
+                                        l => toNum(l.stock_item_id) === toNum(item.id) && toNum(l.store_id) === toNum(storeIdForView)
+                                      )
+                                    : null;
+                                  const isOverride = !!level && Number.isFinite(toNum(level?.threshold, NaN));
+                                })()}
+                              </div>
                             </TableCell>
+
                             <TableCell className="text-center">
                               <span className="text-sm">
                                 {Number(item.price ?? 0).toFixed(2)}
@@ -595,14 +662,6 @@ export default function SettingsPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => handleEditItem(item)}
-                                  title="Edit"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
                                 {['admin','administrator','regional','area'].includes(effectiveRole) && (
                                   <Button
                                     variant="outline"
@@ -792,7 +851,7 @@ export default function SettingsPage() {
         </Tabs>
       </div>
 
-      {/* Edit Item Dialog */}
+      {/* Edit Item Dialog (kept; thresholds allow decimals) */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -818,26 +877,30 @@ export default function SettingsPage() {
             <Input
               id="threshold"
               type="number"
-              min={1}
+              min={0.1}
+              step="any"
               disabled={!canEditThreshold}
               value={
-                editItem?.lowStockThreshold !== undefined &&
-                editItem?.lowStockThreshold !== null
-                  ? editItem.lowStockThreshold
-                  : 1
+                editItem?.lowStockThresholdText ??
+                (editItem?.lowStockThreshold ?? '')
               }
-              onChange={e =>
-                setEditItem({
-                  ...editItem,
-                  lowStockThreshold: Math.max(1, parseInt(e.target.value, 10) || 1)
-                })
-              }
+              onChange={(e) => {
+                const v = e.target.value; // allow '0.', '', '0.2' while typing
+                setEditItem(prev => ({ ...prev, lowStockThresholdText: v }));
+              }}
+              onBlur={(e) => {
+                const n = parseFloat(e.target.value);
+                const fixed = Number.isFinite(n) ? Math.max(0.1, n) : 0.1;
+                setEditItem(prev => ({
+                  ...prev,
+                  lowStockThreshold: fixed,
+                  lowStockThresholdText: String(fixed),
+                }));
+              }}
             />
-            {!canEditThreshold && (
-              <span className="text-xs text-muted-foreground">
-                Only admin/regional can change the threshold
-              </span>
-            )}
+            <span className="text-xs text-muted-foreground">
+              Min 0.1. Anything below 0.1 is treated as Out of Stock.
+            </span>
 
             <div className="flex items-center gap-2 mt-2">
               <Label htmlFor="edit-daily-check" className="mb-0">Daily Check</Label>
@@ -924,7 +987,7 @@ export default function SettingsPage() {
               min={0}
               step="0.01"
               value={newItem.price}
-              onChange={e => setNewItem({ ...newItem, price: parseFloat(e.target.value, 10) || 0 })}
+              onChange={e => setNewItem({ ...newItem, price: parseFloat(e.target.value) || 0 })}
               placeholder="0.00"
             />
 
@@ -932,10 +995,16 @@ export default function SettingsPage() {
             <Input
               id="new-threshold"
               type="number"
-              min={1}
+              min={0.1}
+              step="any"
               value={newItem.lowStockThreshold}
-              onChange={e => setNewItem({ ...newItem, lowStockThreshold: parseInt(e.target.value, 10) || 1 })}
-              placeholder="5"
+              onChange={e => setNewItem({ ...newItem, lowStockThreshold: e.target.value })}
+              onBlur={(e) => {
+                const n = parseFloat(e.target.value);
+                const fixed = Number.isFinite(n) ? Math.max(0.1, n) : 0.1;
+                setNewItem(prev => ({ ...prev, lowStockThreshold: fixed }));
+              }}
+              placeholder="0.1"
             />
           </div>
           <DialogFooter>
