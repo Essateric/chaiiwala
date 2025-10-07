@@ -36,91 +36,91 @@ function ComplianceBlock({ title, subtitle, stores, completedStoresIds }) {
   const completedCount = doneStores.length;
   const percent = totalStores ? Math.round((completedCount / totalStores) * 100) : 0;
 
-return (
-  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-4">
-    {/* Header */}
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <h3 className="text-sm font-semibold text-gray-900 leading-tight">
-          {title}
-        </h3>
-        <p className="mt-0.5 text-xs text-gray-600 truncate">{subtitle}</p>
-      </div>
-
-      <div className="text-right shrink-0">
-        <div className="text-[22px] font-bold leading-none text-emerald-600">
-          {completedCount}
-          <span className="text-gray-900 text-base font-semibold"> / {totalStores}</span>
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900 leading-tight">
+            {title}
+          </h3>
+          <p className="mt-0.5 text-xs text-gray-600 truncate">{subtitle}</p>
         </div>
-        <div className="mt-1 text-[11px] text-gray-500">stores completed</div>
+
+        <div className="text-right shrink-0">
+          <div className="text-[22px] font-bold leading-none text-emerald-600">
+            {completedCount}
+            <span className="text-gray-900 text-base font-semibold"> / {totalStores}</span>
+          </div>
+          <div className="mt-1 text-[11px] text-gray-500">stores completed</div>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="w-full h-1.5 rounded bg-gray-200 overflow-hidden">
+        <div
+          className="h-full bg-emerald-500 transition-all"
+          style={{ width: `${percent}%` }}
+          role="progressbar"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Progress ${percent}%`}
+        />
+      </div>
+
+      {/* Lists */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Completed */}
+        <section className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+          <header className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Stores that completed</span>
+            </div>
+            <span className="text-xs font-medium text-emerald-700">{doneStores.length}</span>
+          </header>
+
+          {doneStores.length === 0 ? (
+            <p className="mt-2 text-xs text-emerald-700">— None —</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-emerald-100 rounded">
+              {doneStores.map((store) => (
+                <li key={store.id} className="py-1.5 text-sm text-emerald-900 flex items-center">
+                  <Dot className="h-5 w-5 -ml-1" />
+                  <span className="truncate">{store.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Missed */}
+        <section className="rounded-md border border-rose-200 bg-rose-50 p-3">
+          <header className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-rose-800">
+              <XCircle className="h-4 w-4" />
+              <span>Stores that missed</span>
+            </div>
+            <span className="text-xs font-medium text-rose-700">{missedStores.length}</span>
+          </header>
+
+          {missedStores.length === 0 ? (
+            <p className="mt-2 text-xs text-rose-700">— None —</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-rose-100 rounded">
+              {missedStores.map((store) => (
+                <li key={store.id} className="py-1.5 text-sm text-rose-900 flex items-center">
+                  <Dot className="h-5 w-5 -ml-1" />
+                  <span className="truncate">{store.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
-
-    {/* Progress */}
-    <div className="w-full h-1.5 rounded bg-gray-200 overflow-hidden">
-      <div
-        className="h-full bg-emerald-500 transition-all"
-        style={{ width: `${percent}%` }}
-        role="progressbar"
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Progress ${percent}%`}
-      />
-    </div>
-
-    {/* Lists */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {/* Completed */}
-      <section className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Stores that completed</span>
-          </div>
-          <span className="text-xs font-medium text-emerald-700">{doneStores.length}</span>
-        </header>
-
-        {doneStores.length === 0 ? (
-          <p className="mt-2 text-xs text-emerald-700">— None —</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-emerald-100 rounded">
-            {doneStores.map((store) => (
-              <li key={store.id} className="py-1.5 text-sm text-emerald-900 flex items-center">
-                <Dot className="h-5 w-5 -ml-1" />
-                <span className="truncate">{store.name}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Missed */}
-      <section className="rounded-md border border-rose-200 bg-rose-50 p-3">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold text-rose-800">
-            <XCircle className="h-4 w-4" />
-            <span>Stores that missed</span>
-          </div>
-          <span className="text-xs font-medium text-rose-700">{missedStores.length}</span>
-        </header>
-
-        {missedStores.length === 0 ? (
-          <p className="mt-2 text-xs text-rose-700">— None —</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-rose-100 rounded">
-            {missedStores.map((store) => (
-              <li key={store.id} className="py-1.5 text-sm text-rose-900 flex items-center">
-                <Dot className="h-5 w-5 -ml-1" />
-                <span className="truncate">{store.name}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  </div>
-);
+  );
 }
 
 /* --- Today --- */
@@ -287,12 +287,12 @@ export default function StockCheckCompliancePanel() {
 
   // helpers kept local
   const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
-  const startOfDayISO = (d) => startOfDay(d).toISOString();
+  const startOfDayISOlocal = (d) => startOfDay(d).toISOString();
   const isoDateOnly = (date) => new Date(date).toISOString().slice(0, 10);
   const hhmm = (ts) => {
     const d = new Date(ts);
     return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  };
+    };
   const lastNDays = (n = 7) => {
     const days = [];
     const today = startOfDay(new Date());
@@ -305,7 +305,7 @@ export default function StockCheckCompliancePanel() {
         // compact dd/mm
         label: d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" }),
         title: formatDeliveryDateVerbose(dateISO),
-        dayStartISO: startOfDayISO(d),
+        dayStartISO: startOfDayISOlocal(d),
       });
     }
     return days.reverse(); // oldest -> newest
@@ -371,16 +371,21 @@ export default function StockCheckCompliancePanel() {
           <p className="text-xs text-gray-500">Loading…</p>
         ) : (
           <table className="w-full table-fixed text-[12px] leading-tight border-collapse">
-            {/* fixed widths so it fits without scroll */}
+            {/* ✅ fixed widths (no illegal whitespace in <colgroup>) */}
             <colgroup>
-              <col style={{ width: "38%" }} /> {/* store column */}
-              {days.map((_, i) => (
-                <col key={i} style={{ width: `${62 / 7}%` }} /> // ~8.8% each
+              {[
+                { width: "38%" }, // Store column
+                ...Array.from({ length: days.length }, () => ({
+                  width: `${62 / days.length}%`, // Even split of the remaining 62%
+                })),
+              ].map((c, i) => (
+                <col key={i} style={{ width: c.width }} />
               ))}
             </colgroup>
+
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-white border border-gray-200 px-2 py-1 text-left text-[11px] font-semibold">
+                <th className="sticky left-0 z-10 bg-white border border-gray-200 p1-2 text-left text-[11px] font-semibold">
                   Store
                 </th>
                 {days.map((d) => (
@@ -394,6 +399,7 @@ export default function StockCheckCompliancePanel() {
                 ))}
               </tr>
             </thead>
+
             <tbody>
               {stores.map((store) => (
                 <tr key={store.id} className="align-top">
@@ -432,5 +438,3 @@ export default function StockCheckCompliancePanel() {
     </div>
   );
 }
-
-

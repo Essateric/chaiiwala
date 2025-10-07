@@ -152,12 +152,24 @@ export default function DailyStockCheck({
   const [editing, setEditing] = useState({});
   // Per-row delivery quantities (adds to current on-hand if New Qty not provided)
   const [editingDelivery, setEditingDelivery] = useState({});
+
+  // NEW: track rows the user touched (even if value ends up unchanged)
+  const [touchedRows, setTouchedRows] = useState(new Set());
+  const markTouched = (id) =>
+    setTouchedRows((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
   const handleDeliveryChange = (id, value) => {
     const v = value === "" ? "" : Math.max(0, Number(value));
     setEditingDelivery((prev) => ({
       ...prev,
       [id]: value === "" ? "" : String(v),
     }));
+    // NEW
+    markTouched(id);
   };
 
   const [search, setSearch] = useState("");
@@ -228,7 +240,7 @@ export default function DailyStockCheck({
       const { data: levelData, error: levelsError } = await supabase
         .from("store_stock_levels")
         .select(
-          "id, store_id, stock_item_id, quantity, threshold, last_updated, updated_by"
+          "id, store_id, stock_item_id, quantity, threshold, last_updated, updated_by, checked_at, checked_by"
         )
         .in("stock_item_id", itemIds)
         .eq("store_id", storeIdForQuery);
@@ -263,6 +275,8 @@ export default function DailyStockCheck({
       ...prev,
       [id]: value === "" ? "" : String(v),
     }));
+    // NEW
+    markTouched(id);
   };
 
   // category options
@@ -482,8 +496,12 @@ export default function DailyStockCheck({
 
   const hasPageChanges = pageChanges.length > 0;
 
+  // NEW: can save if any row was touched OR there are actual changes
+  const canSavePage = (touchedRows.size > 0 || hasPageChanges) && !saving && !loading;
+
   const handleSavePage = async () => {
-    if (!storeIdForQuery || !hasPageChanges) return;
+    // NEW: allow save when user touched rows (even if no changes)
+    if (!storeIdForQuery || touchedRows.size === 0) return;
     setSaving(true);
     try {
       // ✅ get the signed-in user and name it authUser (avoid shadowing)
@@ -499,18 +517,45 @@ export default function DailyStockCheck({
       const nowIso = new Date().toISOString();
       const todayISO = londonTodayDateISO(); // London calendar date (YYYY-MM-DD)
 
-      // ✅ 1) Upsert current levels using composite key; omit id
-      const snapshotRows = pageChanges.map(({ item, finalQty }) => ({
-        store_id: storeIdForQuery,
-        stock_item_id: Number(item.id),
-        quantity: Number(finalQty),
-        last_updated: nowIso,
-        updated_by: authUser.id,
-      }));
+      // NEW: build snapshots from *touched* rows (proof-of-check even if unchanged)
+      const touchedIds = Array.from(touchedRows);
+      const touchedSnapshots = touchedIds
+        .map((id) => {
+          const item = pageItems.find((x) => x.id === id);
+          if (!item) return null;
 
+          const current = Number(item.current_qty) || 0;
+          const rawNew = editing[item.id];
+          const rawDel = editingDelivery[item.id];
+
+          const hasNew = typeof rawNew !== "undefined" && rawNew !== "";
+          const hasDel = typeof rawDel !== "undefined" && rawDel !== "";
+
+          const newQty = hasNew ? Number(rawNew) : null;
+          const delQty = hasDel ? Number(rawDel) : null;
+
+          const finalQty = hasNew
+            ? newQty
+            : hasDel
+            ? current + Number(delQty)
+            : current; // unchanged allowed
+
+          return {
+            store_id: storeIdForQuery,
+            stock_item_id: Number(item.id),
+            quantity: Number(finalQty),
+            last_updated: nowIso,
+            updated_by: authUser.id,
+            checked_at: nowIso, // proof-of-check
+            checked_by: authUser.id,
+          };
+        })
+        .filter(Boolean);
+
+      // ✅ 1) Upsert touched snapshots (includes unchanged qty; stamps checked_at/by)
       const { error: snapshotErr } = await supabase
         .from("store_stock_levels")
-        .upsert(snapshotRows, { onConflict: "store_id,stock_item_id" });
+        .upsert(touchedSnapshots, { onConflict: "store_id,stock_item_id" });
 
       if (snapshotErr) {
         console.error("❌ Supabase error (store_stock_levels):", snapshotErr);
@@ -519,45 +564,49 @@ export default function DailyStockCheck({
         return;
       }
 
-      // ✅ 2) Append change rows (audit) to stock_history_changes (today only)
-      const changeRows = pageChanges.map(({ item, finalQty }) => ({
-        store_id: storeIdForQuery,
-        stock_item_id: Number(item.id),
-        old_quantity: Number(item.current_qty) || 0,
-        new_quantity: Number(finalQty),
-        updated_by: authUser.id,
-        changed_at: nowIso,
-      }));
+      // ✅ 2) Append change rows (audit) to stock_history_changes (today only) — CHANGED ONLY
+      if (hasPageChanges) {
+        const changeRows = pageChanges.map(({ item, finalQty }) => ({
+          store_id: storeIdForQuery,
+          stock_item_id: Number(item.id),
+          old_quantity: Number(item.current_qty) || 0,
+          new_quantity: Number(finalQty),
+          updated_by: authUser.id,
+          changed_at: nowIso,
+        }));
 
-      const { error: changeErr } = await supabase
-        .from("stock_history_changes")
-        .insert(changeRows);
+        const { error: changeErr } = await supabase
+          .from("stock_history_changes")
+          .insert(changeRows);
 
-      if (changeErr) {
-        console.error("❌ stock_history_changes insert failed", changeErr);
-        alert(changeErr.message || "Failed to write history rows");
-        setSaving(false);
-        return;
+        if (changeErr) {
+          console.error("❌ stock_history_changes insert failed", changeErr);
+          alert(changeErr.message || "Failed to write history rows");
+          setSaving(false);
+          return;
+        }
       }
 
-      // ✅ 3) Upsert daily snapshot for reporting & the grid (unique by store_id,stock_item_id,date)
-      const dailyRows = pageChanges.map(({ item, finalQty }) => ({
-        store_id: storeIdForQuery,
-        stock_item_id: Number(item.id),
-        date: todayISO, // London day
-        quantity: Number(finalQty),
-        recorded_at: nowIso,
-      }));
+      // ✅ 3) Upsert daily snapshot for reporting & the grid — CHANGED ONLY
+      if (hasPageChanges) {
+        const dailyRows = pageChanges.map(({ item, finalQty }) => ({
+          store_id: storeIdForQuery,
+          stock_item_id: Number(item.id),
+          date: todayISO, // London day
+          quantity: Number(finalQty),
+          recorded_at: nowIso,
+        }));
 
-      const { error: dailyErr } = await supabase
-        .from("stock_history")
-        .upsert(dailyRows, { onConflict: "store_id,stock_item_id,date" });
+        const { error: dailyErr } = await supabase
+          .from("stock_history")
+          .upsert(dailyRows, { onConflict: "store_id,stock_item_id,date" });
 
-      if (dailyErr) {
-        console.error("❌ stock_history upsert failed", dailyErr);
-        alert(dailyErr.message || "Failed to write daily snapshots");
-        setSaving(false);
-        return;
+        if (dailyErr) {
+          console.error("❌ stock_history upsert failed", dailyErr);
+          alert(dailyErr.message || "Failed to write daily snapshots");
+          setSaving(false);
+          return;
+        }
       }
 
       await fetchStock();
@@ -584,6 +633,9 @@ export default function DailyStockCheck({
         });
         return next;
       });
+
+      // NEW: clear touched set after save
+      setTouchedRows(new Set());
 
       alert("Saved this page!");
     } finally {
@@ -661,7 +713,7 @@ export default function DailyStockCheck({
               variant="default"
               size="sm"
               onClick={handleSavePage}
-              disabled={!hasPageChanges || saving || loading}
+              disabled={!canSavePage}
             >
               {saving ? "Saving..." : "Save This Page"}
             </Button>
@@ -858,7 +910,7 @@ export default function DailyStockCheck({
                     variant="default"
                     size="sm"
                     onClick={handleSavePage}
-                    disabled={!hasPageChanges || saving || loading}
+                    disabled={!canSavePage}
                   >
                     {saving ? "Saving..." : "Save This Page"}
                   </Button>
@@ -877,7 +929,7 @@ export default function DailyStockCheck({
                 variant="default"
                 size="sm"
                 onClick={handleSavePage}
-                disabled={!hasPageChanges || saving || loading}
+                disabled={!canSavePage}
               >
                 {saving ? "Saving..." : "Save changes"}
               </Button>
@@ -885,7 +937,7 @@ export default function DailyStockCheck({
           </div>
 
           {/* Optional floating Save on small screens */}
-          {hasPageChanges && (
+          {(touchedRows.size > 0 || hasPageChanges) && (
             <Button
               className="fixed right-4 bottom-20 z-50 sm:hidden"
               onClick={handleSavePage}
