@@ -1,0 +1,87 @@
+﻿|-- .env
+|-- .github
+|   |-- workflows
+|   |   |-- netlify-deploy.yml
+|-- .gitignore
+|-- .netlify
+|   |-- blobs-serve
+|   |-- functions-internal
+|   |-- functions-serve
+|   |   |-- sendAuditPdf
+|   |   |-- sendChaiiwalaOrderEmail
+|   |   |-- sendFeedbackEmail
+|   |   |-- sendFreshwaysOrderEmail
+|   |-- plugins
+|   |   |-- node_modules
+|   |   |-- package.json
+|   |   |-- package-lock.json
+|   |-- v1
+|   |   |-- functions
+|-- .nvmrc
+|-- .replit
+|-- attached_assets
+|   |-- chaiiwala.png
+|   |-- cleaned_stock_data (1).csv
+|   |-- Cleaned_Stock_Data.csv
+|   |-- managers.csv
+|   |-- Order Sheet V 7.7 1.xlsx
+|   |-- store_locations.csv
+|-- build-netlify.js
+|-- client
+|   |-- .env
+|   |-- index.html
+|   |-- public
+|   |   |-- assets
+|   |-- src
+|   |   |-- App.jsx
+|   |   |-- components
+|   |   |-- hooks
+|   |   |-- index.css
+|   |   |-- lib
+|   |   |-- main.jsx
+|   |   |-- pages
+|   |   |-- schemas
+|-- components.json
+|-- deno.lock
+|-- generated-icon.png
+|-- netlify
+|-- netlify.toml
+|   |-- auth.js
+|   |-- edge-functions
+|   |-- functions
+|   |   |-- sendAuditPdf
+|   |   |-- sendChaiiwalaOrderEmail.mjs
+|   |   |-- sendFeedbackEmail.js
+|   |   |-- sendFreshwaysOrderEmail.js
+|   |-- routes.js
+|   |-- storage.js
+|-- netlify-deploy.js
+|-- NETLIFY-DEPLOYMENT.md
+|-- package.json
+|-- package-lock.json
+|-- postcss.config.cjs
+|-- project-structure.txt
+|-- public
+|   |-- _headers
+|   |-- _redirects
+|-- README.md
+|-- schema.sql
+|-- SECURITY.md
+|-- structure.txt
+|-- supabase
+|   |-- .temp
+|   |   |-- cli-latest
+|   |-- config.toml
+|   |-- functions
+|   |   |-- create-user
+|   |   |-- invite-user
+|   |   |-- log-freshways-missed-orders
+|   |   |-- rotate-daily-checklist
+|   |   |-- set-role
+|   |   |-- sync-auth-for-profiles
+|   |   |-- tsconfig.json
+|-- tailwind.config.js
+|-- theme.json
+|-- tree.txt
+|-- tsconfig.json
+|-- vite.config.js
