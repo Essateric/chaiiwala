@@ -85,7 +85,7 @@ input, select, textarea {
 button { border-radius: var(--radius); }
 /* client/src/styles/theme.css */
 /* Brighter gold + lighter surfaces */
-:/* tokens only + plain selectors */
+/* tokens only + plain selectors */
 :root {
   /* … all the CSS variables you added … */
   --brand-50:#fff8e6; --brand-100:#ffefbf; --brand-200:#ffe38e; --brand-300:#ffd65c;
