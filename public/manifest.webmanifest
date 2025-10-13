@@ -22,18 +22,9 @@
       "type": "image/png",
       "purpose": "any"
     }
-    /* Optional (recommended if you add it later)
-    ,{
-      "src": "/assets/android/maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-    */
+
   ],
 
-  /* Optional but removes Chrome's “Richer Install UI” warnings.
-     If you don’t have screenshots yet, you can delete this whole block. */
   "screenshots": [
     {
       "src": "/assets/screenshots/dashboard-wide.png",
