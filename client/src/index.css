@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* You CAN use @layer base here because @tailwind base is in this file */
+@layer base {
+  :root {
+    color-scheme: light;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  .dark {
+    color-scheme: dark;
+  }
+}
+
 :root {
   /* Chaiiwala brand colors */
   --chai-gold: #D4AF37;
@@ -9,13 +21,14 @@
 }
 
 @layer base {
-    * {
+  * {
     @apply border-border;
   }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
   .bg-chai-gold {
     background-color: var(--chai-gold);
   }
@@ -27,34 +40,45 @@
   .rbc-time-content {
     background-color: rgba(0, 255, 0, 0.05); /* light green to test */
   }
-  
+
   .bg-chai-black {
     background-color: var(--chai-black);
   }
-  
+
   .text-chai-gold {
     color: var(--chai-gold);
   }
-  
+
   .hover\:bg-yellow-600:hover {
     background-color: #B8860B;
   }
-  
+
   .hover\:text-yellow-600:hover {
     color: #B8860B;
   }
+
+  /* (kept) duplicate base tokens */
+  :root {
+    color-scheme: light;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  .dark {
+    color-scheme: dark;
+  }
 }
 
-.product-table td:last-child, .product-table th:last-child {
+.product-table td:last-child,
+.product-table th:last-child {
   min-width: 70px;
   text-align: center;
 }
+
 .product-name-cell {
   white-space: normal;
   word-break: break-word;
   max-width: 180px;
 }
-
 
 /* Add some global font settings */
 body {
@@ -68,34 +92,54 @@ body {
 }
 
 .KanbanColumn-content {
-  flex: 1;               /* grow to fill available space */
-  overflow-y: auto;      /* allow scrolling if content is tall */
+  flex: 1;                /* grow to fill available space */
+  overflow-y: auto;       /* allow scrolling if content is tall */
   padding-bottom: 0.5rem; /* so buttons aren’t cut off */
   display: flex;
   flex-direction: column;
 }
 
-
-
 @layer components {
   .text-stat-responsive {
-    font-size: 2.25rem;    /* text-4xl (36px) */
+    font-size: 2.25rem; /* text-4xl (36px) */
     font-weight: 800;
   }
 
   @media (min-width: 640px) { /* sm */
     .text-stat-responsive {
-      font-size: 3rem;      /* text-5xl (48px) */
+      font-size: 3rem; /* text-5xl (48px) */
     }
   }
+
   @media (min-width: 768px) { /* md */
     .text-stat-responsive {
-      font-size: 3.75rem;   /* text-6xl (60px) */
+      font-size: 3.75rem; /* text-6xl (60px) */
     }
   }
+
   @media (min-width: 1024px) { /* lg */
     .text-stat-responsive {
-      font-size: 4.5rem;    /* text-7xl (72px) */
+      font-size: 4.5rem; /* text-7xl (72px) */
     }
   }
 }
+
+/* --- Chaiiwala gold button utility --- */
+.btn-chai {
+  background-color: var(--chai-gold);
+  color: #fff;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+/* hover/disabled states */
+.btn-chai:hover { background-color: #B8860B; }
+.btn-chai:disabled { opacity: .65; cursor: not-allowed; }
+
+/* If your Login/Sign Up are shadcn Tabs triggers, force both to use gold */
+.btn-chai[role="tab"],
+.btn-chai[role="tab"][data-state="active"] {
+  background-color: var(--chai-gold) !important;
+  color: #fff !important;
+}
+

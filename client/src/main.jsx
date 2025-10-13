@@ -1,6 +1,11 @@
+// client/src/main.jsx
 import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+
+// ✅ Load theme tokens (fixes invisible inputs/borders/colors)
+import "./styles/theme.css";
+// Tailwind base/components/utilities
 import "./index.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -10,8 +15,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { supabase } from "./lib/supabaseClient";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
 
+// Optional: register PWA service worker (vite-plugin-pwa)
+try {
+  // This import is provided by vite-plugin-pwa at build/dev time
+  const { registerSW } = await import("virtual:pwa-register");
+  registerSW({ immediate: true });
+} catch {
+  // no-op if plugin not present
+}
+
 function InitWrapper() {
-  // Keep your initial user log (optional)
+  // Keep your initial user log (unchanged)
   useEffect(() => {
     const init = async () => {
       const {

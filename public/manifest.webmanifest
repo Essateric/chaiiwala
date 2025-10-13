@@ -1,0 +1,13 @@
+{
+  "name": "Chaiiwala Dashboard",
+  "short_name": "Chaiiwala",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    { "src": "/icons/chaiiwalalogoblack.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/chaiiwalalogobrown.png", "sizes": "512x512", "type": "image/png" }
+
+  ]
+}

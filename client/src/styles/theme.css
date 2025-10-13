@@ -1,0 +1,150 @@
+/* client/src/styles/theme.css */
+:root {
+  /* Brand palette (gold) */
+  --brand-50:  #f8f3e6;
+  --brand-100: #f1e4bf;
+  --brand-200: #e7cf8e;
+  --brand-300: #dcb95c;
+  --brand-400: #d3a93a;
+  --brand-500: #c2991f; /* main gold */
+  --brand-600: #a78016;
+  --brand-700: #89660f;
+  --brand-800: #6b4e0a;
+  --brand-900: #4f3907;
+
+  /* shadcn tokens (HSL values expected by components) */
+  --background: 48 100% 97%;   /* very light warm */
+  --foreground: 24 16% 15%;
+
+  --card: 48 100% 97%;
+  --card-foreground: 24 16% 15%;
+
+  --popover: 48 100% 97%;
+  --popover-foreground: 24 16% 15%;
+
+  --primary: 45 71% 44%;       /* ~ var(--brand-500) */
+  --primary-foreground: 48 100% 97%;
+
+  --secondary: 48 62% 90%;
+  --secondary-foreground: 24 16% 15%;
+
+  --muted: 48 62% 92%;
+  --muted-foreground: 24 8% 35%;
+
+  --accent: 45 71% 44%;
+  --accent-foreground: 48 100% 97%;
+
+  --destructive: 0 72% 50%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 40 20% 80%;
+  --input: 40 20% 80%;
+  --ring: 45 71% 44%;
+
+  --radius: 14px;
+}
+
+/* Optional dark mode */
+.dark {
+  --background: 24 10% 8%;
+  --foreground: 48 100% 96%;
+
+  --card: 24 10% 8%;
+  --card-foreground: 48 100% 96%;
+
+  --popover: 24 10% 8%;
+  --popover-foreground: 48 100% 96%;
+
+  --primary: 45 71% 44%;
+  --primary-foreground: 24 10% 8%;
+
+  --secondary: 24 10% 14%;
+  --secondary-foreground: 48 100% 96%;
+
+  --muted: 24 10% 18%;
+  --muted-foreground: 48 10% 72%;
+
+  --accent: 45 71% 44%;
+  --accent-foreground: 24 10% 8%;
+
+  --destructive: 0 72% 54%;
+  --destructive-foreground: 24 10% 8%;
+
+  --border: 24 10% 20%;
+  --input: 24 10% 20%;
+  --ring: 45 71% 44%;
+}
+
+/* Inputs look right even if components miss a class */
+input, select, textarea {
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+::placeholder { color: hsl(var(--muted-foreground)); }
+button { border-radius: var(--radius); }
+/* client/src/styles/theme.css */
+/* Brighter gold + lighter surfaces */
+:/* tokens only + plain selectors */
+:root {
+  /* … all the CSS variables you added … */
+  --brand-50:#fff8e6; --brand-100:#ffefbf; --brand-200:#ffe38e; --brand-300:#ffd65c;
+  --brand-400:#f3c530; --brand-500:#d8a800; --brand-600:#b98f00; --brand-700:#967200;
+  --brand-800:#725600; --brand-900:#4d3a00;
+
+  --background:48 100% 98%;
+  --foreground:24 20% 15%;
+  --card:48 100% 99%;
+  --card-foreground:24 20% 15%;
+  --popover:48 100% 99%;
+  --popover-foreground:24 20% 15%;
+  --primary:46 100% 45%;
+  --primary-foreground:0 0% 100%;
+  --secondary:48 45% 93%;
+  --secondary-foreground:24 20% 20%;
+  --muted:48 45% 94%;
+  --muted-foreground:24 10% 35%;
+  --accent:46 100% 45%;
+  --accent-foreground:0 0% 100%;
+  --destructive:0 72% 50%;
+  --destructive-foreground:0 0% 98%;
+  --border:35 18% 75%;
+  --input:35 18% 75%;
+  --ring:46 100% 45%;
+  --radius:14px;
+}
+
+.dark {
+  --background:24 10% 8%;
+  --foreground:48 100% 96%;
+  --card:24 10% 10%;
+  --card-foreground:48 100% 96%;
+  --popover:24 10% 10%;
+  --popover-foreground:48 100% 96%;
+  --primary:46 100% 50%;
+  --primary-foreground:24 10% 8%;
+  --secondary:24 10% 16%;
+  --secondary-foreground:48 100% 96%;
+  --muted:24 10% 20%;
+  --muted-foreground:48 12% 75%;
+  --accent:46 100% 48%;
+  --accent-foreground:24 10% 8%;
+  --border:24 10% 24%;
+  --input:24 10% 24%;
+  --ring:46 100% 48%;
+}
+
+/* plain selectors are fine here (no @layer) */
+input, select, textarea {
+  background-color: #fff;
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+::placeholder { color: hsl(var(--muted-foreground)); }
+button { border-radius: var(--radius); }
+
+/* optional gradient helper */
+.gold-gradient {
+  background-image: linear-gradient(180deg, #ffd65c, #d8a800);
+  color: #fff;
+}
