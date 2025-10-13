@@ -1,0 +1,44 @@
+{
+  "name": "Chaiiwala Dashboard",
+  "short_name": "Chaiiwala",
+  "description": "A comprehensive dashboard for Chaiiwala operations.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
+
+  "icons": [
+    {
+      "src": "/assets/android/android-launchericon-192-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/android/android-launchericon-512-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+
+  ],
+
+  "screenshots": [
+    {
+      "src": "/assets/screenshots/dashboard-wide.png",
+      "sizes": "1600x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard – Desktop"
+    },
+    {
+      "src": "/assets/screenshots/dashboard-mobile.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard – Mobile"
+    }
+  ]
+}
