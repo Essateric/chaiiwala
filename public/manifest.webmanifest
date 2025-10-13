@@ -2,12 +2,12 @@
   "name": "Chaiiwala Dashboard",
   "short_name": "Chaiiwala",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
   "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
   "icons": [
-    { "src": "/icons/chaiiwalalogoblack.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/chaiiwalalogobrown.png", "sizes": "512x512", "type": "image/png" }
-
+    { "src": "/assets/android/android-launchericon-192-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/android/android-launchericon-512-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
