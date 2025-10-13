@@ -24,12 +24,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [
-        "icons/chaiiwalalogobrown.png"
-      ],
+      includeAssets: ["icons/chaiiwalalogobrown.png"],
       // If you already have /public/manifest.webmanifest, you can omit `manifest`.
       manifest: undefined,
       workbox: {
+        // ✅ Increase the default 2 MiB precache limit to avoid build failure
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
         globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
         runtimeCaching: [
           // HTML navigation
