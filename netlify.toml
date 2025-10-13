@@ -6,6 +6,7 @@
 
   [build.environment]
 NPM_FLAGS = "--include=dev"
+  NODE_VERSION = "22.14.0"
 
 
 [functions]
