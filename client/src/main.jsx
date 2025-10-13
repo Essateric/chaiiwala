@@ -10,7 +10,7 @@ import "./index.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient.js";
-import { Toaster } from "./components/ui/toast.jsx";
+import { Toaster } from "./components/ui/toaster.jsx";
 
 import { supabase } from "./lib/supabaseClient.js";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
