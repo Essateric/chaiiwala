@@ -25,9 +25,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/maskable-512.png",
+        "icons/chaiiwalalogobrown.png"
       ],
       // If you already have /public/manifest.webmanifest, you can omit `manifest`.
       manifest: undefined,
@@ -83,7 +81,7 @@ export default defineConfig({
     outDir: OUT_DIR,
     emptyOutDir: true,
     sourcemap: false,
-    target: "es2019",
+    target: "es2022",
   },
 
   // Some libs expect process.env to exist
