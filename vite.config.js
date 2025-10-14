@@ -22,38 +22,39 @@ export default defineConfig({
 
   plugins: [
     react(),
-    VitePWA({
-      registerType: "autoUpdate",
-        injectRegister: "auto", 
-      // ⬇ correct web path relative to client/public
-      includeAssets: ["/assets/android/android-launchericon-512-512.png"],
-      manifest: undefined,
-      workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === "navigate",
-            handler: "NetworkFirst",
-            options: { cacheName: "html-cache" },
-          },
-          {
-            urlPattern: /.*\.(?:js|css|woff2|png|jpg|jpeg|svg|webp)/,
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "asset-cache" },
-          },
-          {
-            urlPattern: /https:\/\/.*\.(supabase\.co|supabase\.in)\/.*/i,
-            handler: "NetworkFirst",
-            options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },
-          },
-          {
-            urlPattern: /\/\.netlify\/functions\/.*/i,
-            handler: "NetworkOnly",
-          },
-        ],
+VitePWA({
+  registerType: "autoUpdate",
+  injectRegister: "auto",           // ensure SW registers in prod
+  // includeAssets: [
+  //   "assets/android/android-launchericon-192-192.png",
+  //   "assets/android/android-launchericon-512-512.png"
+  // ], // ❌ remove to avoid duplicate precache entries
+  manifest: undefined,
+  workbox: {
+    maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+    // keep png/js/css etc. If you want to be extra-safe, you can also exclude android icons:
+    // globPatterns: ["**/*.{js,css,html,svg,webp,woff2}", "assets/ios/*.png"],
+    globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
+    runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.mode === "navigate",
+        handler: "NetworkFirst",
+        options: { cacheName: "html-cache" },
       },
-    }),
+      {
+        urlPattern: /.*\.(?:js|css|woff2|png|jpg|jpeg|svg|webp)/,
+        handler: "StaleWhileRevalidate",
+        options: { cacheName: "asset-cache" },
+      },
+      {
+        urlPattern: /https:\/\/.*\.(supabase\.co|supabase\.in)\/.*/i,
+        handler: "NetworkFirst",
+        options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },
+      },
+      { urlPattern: /\/\.netlify\/functions\/.*/i, handler: "NetworkOnly" },
+    ],
+  },
+}),
   ],
 
   resolve: {
