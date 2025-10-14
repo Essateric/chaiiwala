@@ -24,6 +24,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+        injectRegister: "auto", 
       // ⬇ correct web path relative to client/public
       includeAssets: ["/assets/android/android-launchericon-512-512.png"],
       manifest: undefined,
