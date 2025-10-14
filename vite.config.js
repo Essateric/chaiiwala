@@ -1,18 +1,14 @@
-// vite.config.js
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Resolve __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Common paths
 const CLIENT_DIR = path.resolve(__dirname, "client");
 const OUT_DIR = path.resolve(__dirname, "dist/public");
-// ⬇ change publicDir to client/public (matches where your file actually is)
 const PUBLIC_DIR = path.resolve(CLIENT_DIR, "public");
 
 export default defineConfig({
@@ -22,39 +18,27 @@ export default defineConfig({
 
   plugins: [
     react(),
-VitePWA({
-  registerType: "autoUpdate",
-  injectRegister: "auto",           // ensure SW registers in prod
-  // includeAssets: [
-  //   "assets/android/android-launchericon-192-192.png",
-  //   "assets/android/android-launchericon-512-512.png"
-  // ], // ❌ remove to avoid duplicate precache entries
-  manifest: undefined,
-  workbox: {
-    maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-    // keep png/js/css etc. If you want to be extra-safe, you can also exclude android icons:
-    // globPatterns: ["**/*.{js,css,html,svg,webp,woff2}", "assets/ios/*.png"],
-    globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
-    runtimeCaching: [
-      {
-        urlPattern: ({ request }) => request.mode === "navigate",
-        handler: "NetworkFirst",
-        options: { cacheName: "html-cache" },
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+
+      // 🔴 IMPORTANT: do not let the plugin generate a manifest
+      manifest: false,
+
+      // (optional) if you keep includeAssets, don't also match those PNGs in globPatterns
+      // includeAssets: [],
+
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ["**/*.{js,css,html,svg,webp,woff2,png}"],
+        runtimeCaching: [
+          { urlPattern: ({ request }) => request.mode === "navigate", handler: "NetworkFirst", options: { cacheName: "html-cache" } },
+          { urlPattern: /.*\.(?:js|css|woff2|png|jpg|jpeg|svg|webp)/, handler: "StaleWhileRevalidate", options: { cacheName: "asset-cache" } },
+          { urlPattern: /https:\/\/.*\.(supabase\.co|supabase\.in)\/.*/i, handler: "NetworkFirst", options: { cacheName: "api-cache", networkTimeoutSeconds: 5 } },
+          { urlPattern: /\/\.netlify\/functions\/.*/i, handler: "NetworkOnly" },
+        ],
       },
-      {
-        urlPattern: /.*\.(?:js|css|woff2|png|jpg|jpeg|svg|webp)/,
-        handler: "StaleWhileRevalidate",
-        options: { cacheName: "asset-cache" },
-      },
-      {
-        urlPattern: /https:\/\/.*\.(supabase\.co|supabase\.in)\/.*/i,
-        handler: "NetworkFirst",
-        options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },
-      },
-      { urlPattern: /\/\.netlify\/functions\/.*/i, handler: "NetworkOnly" },
-    ],
-  },
-}),
+    }),
   ],
 
   resolve: {
@@ -73,10 +57,5 @@ VitePWA({
 
   define: {
     "process.env": process.env ?? {},
-  },
-
-  optimizeDeps: {
-    include: [],
-    exclude: [],
   },
 });
